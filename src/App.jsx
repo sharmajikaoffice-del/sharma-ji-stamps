@@ -444,6 +444,7 @@ function RubberTab({ rubbers, refresh }) {
         <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
         </label>
       <Btn onClick={add} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add Rubber</Btn>
+    </Card>
       <div style={{ position: "relative", marginBottom: 10 }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
         <Field placeholder="Search rubber name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
