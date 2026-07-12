@@ -416,13 +416,22 @@ function RubberTab({ rubbers, refresh }) {
   const [editId, setEditId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editOpening, setEditOpening] = useState(0);
+  const [editPhotoPreview, setEditPhotoPreview] = useState(null);
+  const [editPhotoFile, setEditPhotoFile] = useState(null);
   
   const startEdit = (r) => {
     setEditId(r.id);
     setEditName(r.name);
     setEditOpening(r.opening_stock);
+    setEditPhotoPreview(r.photo_url || null);
+    setEditPhotoFile(null);
   };
-  
+ const handleEditPhotoChange = (e) => {
+ const file = e.target.files[0];
+ if (!file) return;
+  setEditPhotoFile(file);
+  setEditPhotoPreview(URL.createObjectURL(file));
+};
   const saveEdit = async () => {
     if (!editName.trim()) return;
     await dbUpdate("rubbers", editId, { name: editName.trim(), opening_stock: Number(editOpening) || 0 });
@@ -446,6 +455,8 @@ function RubberTab({ rubbers, refresh }) {
     <div>
       <SectionTitle icon={Stamp} title="Rubber Master" />
       <Card>
+
+        
         <Label>Rubber Name</Label>
         <Field value={name} onChange={(e) => setName(e.target.value)} placeholder='e.g. Round Seal 2"' />
         <Label>Opening Stock</Label>
@@ -467,18 +478,27 @@ function RubberTab({ rubbers, refresh }) {
       </div>
     {filtered.map((r) => (
       <Card key={r.id}>
-        {editId === r.id ? (
-          <div>
-            <Label>Rubber Name</Label>
-            <Field value={editName} onChange={(e) => setEditName(e.target.value)} />
-            <Label>Opening Stock</Label>
-            <Field type="number" value={editOpening} onChange={(e) => setEditOpening(e.target.value)} />
-            <div style={{ display: "flex", gap: 8 }}>
-              <Btn onClick={saveEdit} style={{ flex: 1, justifyContent: "center" }}>Save</Btn>
-              <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
-            </div>
-          </div>
-        ) : (
+    {editId === r.id ? (
+      <div>
+        <Label>Rubber Name</Label>
+        <Field value={editName} onChange={(e) => setEditName(e.target.value)} />
+        <Label>Opening Stock</Label>
+        <Field type="number" value={editOpening} onChange={(e) => setEditOpening(e.target.value)} />
+        <Label>Rubber Stamp Photo</Label>
+        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
+          {editPhotoPreview ? (
+            <img src={editPhotoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+          ) : (
+            "📷 Tap to capture / upload rubber stamp photo"
+          )}
+          <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleEditPhotoChange} />
+        </label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn onClick={saveEdit} style={{ flex: 1, justifyContent: "center" }}>Save</Btn>
+          <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+        </div>
+      </div>
+    ) : (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <div style={{ width: 40, height: 40, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}` }} />
