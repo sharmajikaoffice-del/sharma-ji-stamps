@@ -245,7 +245,7 @@ export default function SharmaJiStamps() {
         {tab === "rate" && <RateTab rubbers={rubbers} refresh={refreshAll} canEdit={user.role === "admin"} />}
         {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
         {tab === "purchase" && user.role === "admin" && <PurchaseTab rubbers={rubbers} purchases={purchases} refresh={refreshAll} />}
-        {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} refresh={refreshAll} />}
+        {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} rubbers={rubbers} refresh={refreshAll} />}
         {tab === "users" && user.role === "admin" && <UsersTab users={users} refresh={refreshAll} currentUser={user} />}
       </div>
 
@@ -572,7 +572,7 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
 }
 
 /* ================= CASH LEDGER ================= */
-function LedgerTab({ purchases, entries, cashManual, refresh }) {
+function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [type, setType] = useState("in");
   const [category, setCategory] = useState("Other Receipt");
   const [amount, setAmount] = useState(0);
@@ -587,8 +587,14 @@ function LedgerTab({ purchases, entries, cashManual, refresh }) {
   const balance = totalIn - totalOut;
 
   const txnsChronological = [
-  ...entries.map((e) => ({ id: e.id, date: e.date, label: "Stamp Sale", type: "in", amount: e.amount })),
-  ...purchases.map((p) => ({ id: p.id, date: p.date, label: `Rubber Purchase${p.courier ? " + Courier" : ""}`, type: "out", amount: p.total })),
+  ...entries.map((e) => {
+    const r = rubbers.find((r) => r.id === e.rubber_id);
+    return { id: e.id, date: e.date, label: `${r?.name || "Unknown Item"} - Sale`, type: "in", amount: e.amount };
+  }),
+  ...purchases.map((p) => {
+    const r = rubbers.find((r) => r.id === p.rubber_id);
+    return { id: p.id, date: p.date, label: `${r?.name || "Unknown Item"} - Purchase${p.courier ? " + Courier" : ""}`, type: "out", amount: p.total };
+  }),
   ...cashManual.map((c) => ({ id: c.id, date: c.date, label: c.category, type: c.type, amount: c.amount })),
 ].sort((a, b) => new Date(a.date) - new Date(b.date));
 
