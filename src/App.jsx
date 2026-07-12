@@ -586,11 +586,19 @@ function LedgerTab({ purchases, entries, cashManual, refresh }) {
   const totalOut = cashOutPurchase + cashOutManual;
   const balance = totalIn - totalOut;
 
-  const txns = [
-    ...entries.map((e) => ({ id: e.id, date: e.date, label: "Stamp Sale", type: "in", amount: e.amount })),
-    ...purchases.map((p) => ({ id: p.id, date: p.date, label: `Rubber Purchase${p.courier ? " + Courier" : ""}`, type: "out", amount: p.total })),
-    ...cashManual.map((c) => ({ id: c.id, date: c.date, label: c.category, type: c.type, amount: c.amount })),
-  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const txnsChronological = [
+  ...entries.map((e) => ({ id: e.id, date: e.date, label: "Stamp Sale", type: "in", amount: e.amount })),
+  ...purchases.map((p) => ({ id: p.id, date: p.date, label: `Rubber Purchase${p.courier ? " + Courier" : ""}`, type: "out", amount: p.total })),
+  ...cashManual.map((c) => ({ id: c.id, date: c.date, label: c.category, type: c.type, amount: c.amount })),
+].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+let runningTotal = 0;
+  const txnsWithBalance = txnsChronological.map((t) => {
+  runningTotal += t.type === "in" ? Number(t.amount) : -Number(t.amount);
+  return { ...t, balanceAfter: runningTotal };
+});
+
+  const txns = [...txnsWithBalance].reverse();
 
   const addManual = async () => {
     if (!amount) return;
@@ -624,15 +632,18 @@ function LedgerTab({ purchases, entries, cashManual, refresh }) {
         <Btn onClick={addManual} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add Entry</Btn>
       </Card>
       <Label>Transactions</Label>
-      {txns.slice(0, 15).map((t) => (
-        <Card key={t.id} style={{ display: "flex", justifyContent: "space-between" }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</div>
-            <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{fmtDate(t.date)}</div>
-          </div>
-          <div style={{ fontFamily: font.mono, fontWeight: 700, color: t.type === "in" ? C.sage : C.stamp }}>{t.type === "in" ? "+" : "−"}{inr(t.amount)}</div>
-        </Card>
-      ))}
+{txns.slice(0, 15).map((t) => (
+  <Card key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div>
+      <div style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</div>
+      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{fmtDate(t.date)}</div>
+    </div>
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontFamily: font.mono, fontWeight: 700, color: t.type === "in" ? C.sage : C.stamp }}>{t.type === "in" ? "+" : "−"}{inr(t.amount)}</div>
+      <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(t.balanceAfter)}</div>
+    </div>
+  </Card>
+))}
       {txns.length === 0 && <EmptyNote text="No transactions yet." />}
     </div>
   );
