@@ -411,6 +411,14 @@ function RubberTab({ rubbers, refresh }) {
   const [name, setName] = useState("");
   const [opening, setOpening] = useState(0);
   const [q, setQ] = useState("");
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const handlePhotoChange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setPhotoFile(file);
+  setPhotoPreview(URL.createObjectURL(file));
+  };
   const add = async () => {
     if (!name.trim()) return;
     await dbInsert("rubbers", { id: uid(), name: name.trim(), opening_stock: Number(opening) || 0, rate: 0 });
@@ -426,8 +434,16 @@ function RubberTab({ rubbers, refresh }) {
         <Field value={name} onChange={(e) => setName(e.target.value)} placeholder='e.g. Round Seal 2"' />
         <Label>Opening Stock</Label>
         <Field type="number" value={opening} onChange={(e) => setOpening(e.target.value)} />
-        <Btn onClick={add} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add Rubber</Btn>
-      </Card>
+        <Label>Rubber Stamp Photo</Label>
+        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
+        {photoPreview ? (
+        <img src={photoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+        ) : (
+        "📷 Tap to capture / upload rubber stamp photo"
+        )}
+        <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
+        </label>
+      <Btn onClick={add} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add Rubber</Btn>
       <div style={{ position: "relative", marginBottom: 10 }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
         <Field placeholder="Search rubber name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
