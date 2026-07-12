@@ -365,38 +365,55 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
 }
 
 /* ================= STOCK ================= */
+/* ================= STOCK ================= */
 function StockTab({ rubbers, stockByRubber }) {
   return (
     <div>
       <SectionTitle icon={Package} title="Stock Report" />
-      {rubbers.map((r) => {
-        const s = stockByRubber[r.id]; const low = s.balance <= 15;
-        return (
-          <Card key={r.id}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              {r.photo_url ? (
-                <img src={r.photo_url} alt={r.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", border: `1px solid ${C.line}` }} />
-              ) : (
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Stamp size={16} color={C.brass} />
-                </div>
-              )}
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</div>
-            </div>
-            <Row label="Opening" value={s.opening} />
-            <Row label="In" value={`+${s.purchased}`} color={C.sage} />
-            <Row label="Out" value={`−${s.used}`} color={C.stamp} />
-            <hr style={{ border: "none", borderTop: `1px dotted ${C.line}`, margin: "8px 0" }} />
-            <Row label="Closing" value={low ? `${s.balance} ⚠` : s.balance} bold color={low ? C.stamp : C.ink} />
-          </Card>
-        );
-      })}
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Name</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Opening</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>In</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Out</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Closing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rubbers.map((r) => {
+              const s = stockByRubber[r.id];
+              const low = s.balance <= 15;
+              return (
+                <tr key={r.id}>
+                  <td style={tdStyle}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {r.photo_url ? (
+                        <img src={r.photo_url} alt={r.name} style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                      ) : (
+                        <div style={{ width: 32, height: 32, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Stamp size={14} color={C.brass} />
+                        </div>
+                      )}
+                      <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5 }}>{r.name}</span>
+                    </div>
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>{s.opening}</td>
+                  <td style={{ ...tdStyle, textAlign: "right", color: C.sage }}>+{s.purchased}</td>
+                  <td style={{ ...tdStyle, textAlign: "right", color: C.stamp }}>−{s.used}</td>
+                  <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: low ? C.stamp : C.ink }}>{low ? `${s.balance} ⚠` : s.balance}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-function Row({ label, value, color, bold }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 12.5, color: color || C.ink, fontWeight: bold ? 700 : 400, marginBottom: 3 }}><span>{label}</span><span>{value}</span></div>;
-}
+const thStyle = { padding: "10px 12px", textAlign: "left", fontFamily: font.mono, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, background: C.paperDark, borderBottom: `1px solid ${C.line}` };
+const tdStyle = { padding: "10px 12px", fontFamily: font.mono, fontSize: 12.5, color: C.ink, borderBottom: `1px solid ${C.paperDark}` };
 
 /* ================= RATE ================= */
 function RateTab({ rubbers, refresh, canEdit }) {
