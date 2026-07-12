@@ -277,6 +277,15 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
   const rubber = rubbers.find((r) => r.id === rubberId);
   const rate = rubber?.rate || 0;
   const amount = Math.max(0, rate - Number(discount || 0));
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+
+  const handlePhotoChange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setPhotoFile(file);
+  setPhotoPreview(URL.createObjectURL(file));
+};
 
   const save = async () => {
     if (!rubberId || busy) return;
@@ -312,8 +321,16 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
         <Label>Amount (Auto = Rate − Discount)</Label>
         <Field value={inr(amount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
         <Label>Stamp Impression Image</Label>
-        <div style={{ border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12 }}>📷 Tap to capture / upload impression</div>
-        <Label>Remarks (Optional)</Label>
+        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
+        {photoPreview ? (
+        <img src={photoPreview} alt="Stamp impression" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+          ) : (
+        "📷 Tap to capture / upload impression"
+        )}
+        <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
+        </label>
+
+        
         <Field placeholder="Any notes…" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
         <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Save Entry"}</Btn>
         {savedMsg && <div style={{ marginTop: 10, color: C.sage, fontFamily: font.mono, fontSize: 12, textAlign: "center" }}>{savedMsg}</div>}
