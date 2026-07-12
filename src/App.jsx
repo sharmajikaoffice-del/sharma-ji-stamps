@@ -46,6 +46,17 @@ async function dbDelete(table, id) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: "DELETE", headers: HEADERS });
   if (!res.ok) throw new Error(`DELETE ${table} failed`);
 }
+async function uploadPhoto(file, folder) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${folder}/${uid()}.${ext}`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/rubber-photos/${path}`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type },
+    body: file,
+  });
+  if (!res.ok) throw new Error("Photo upload failed");
+  return `${SUPABASE_URL}/storage/v1/object/public/rubber-photos/${path}`;
+}
 
 /* ---------- design tokens ---------- */
 const C = {
@@ -362,12 +373,21 @@ function StockTab({ rubbers, stockByRubber }) {
         const s = stockByRubber[r.id]; const low = s.balance <= 15;
         return (
           <Card key={r.id}>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{r.name}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              {r.photo_url ? (
+                <img src={r.photo_url} alt={r.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", border: `1px solid ${C.line}` }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Stamp size={16} color={C.brass} />
+                </div>
+              )}
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</div>
+            </div>
             <Row label="Opening" value={s.opening} />
-            <Row label="Purchased" value={`+${s.purchased}`} color={C.sage} />
-            <Row label="Used" value={`−${s.used}`} color={C.stamp} />
+            <Row label="In" value={`+${s.purchased}`} color={C.sage} />
+            <Row label="Out" value={`−${s.used}`} color={C.stamp} />
             <hr style={{ border: "none", borderTop: `1px dotted ${C.line}`, margin: "8px 0" }} />
-            <Row label="Balance" value={low ? `${s.balance} ⚠` : s.balance} bold color={low ? C.stamp : C.ink} />
+            <Row label="Closing" value={low ? `${s.balance} ⚠` : s.balance} bold color={low ? C.stamp : C.ink} />
           </Card>
         );
       })}
@@ -418,103 +438,126 @@ function RubberTab({ rubbers, refresh }) {
   const [editOpening, setEditOpening] = useState(0);
   const [editPhotoPreview, setEditPhotoPreview] = useState(null);
   const [editPhotoFile, setEditPhotoFile] = useState(null);
-  
+  const [editPhotoUrl, setEditPhotoUrl] = useState(null);
+  const [busy, setBusy] = useState(false);
+
   const startEdit = (r) => {
     setEditId(r.id);
     setEditName(r.name);
     setEditOpening(r.opening_stock);
     setEditPhotoPreview(r.photo_url || null);
+    setEditPhotoUrl(r.photo_url || null);
     setEditPhotoFile(null);
   };
- const handleEditPhotoChange = (e) => {
- const file = e.target.files[0];
- if (!file) return;
-  setEditPhotoFile(file);
-  setEditPhotoPreview(URL.createObjectURL(file));
-};
+  const handleEditPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setEditPhotoFile(file);
+    setEditPhotoPreview(URL.createObjectURL(file));
+  };
   const saveEdit = async () => {
-    if (!editName.trim()) return;
-    await dbUpdate("rubbers", editId, { name: editName.trim(), opening_stock: Number(editOpening) || 0 });
-    setEditId(null);
-    await refresh();
+    if (!editName.trim() || busy) return;
+    setBusy(true);
+    try {
+      let photo_url = editPhotoUrl;
+      if (editPhotoFile) photo_url = await uploadPhoto(editPhotoFile, "rubbers");
+      await dbUpdate("rubbers", editId, { name: editName.trim(), opening_stock: Number(editOpening) || 0, photo_url });
+      setEditId(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
   };
   const handlePhotoChange = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  setPhotoFile(file);
-  setPhotoPreview(URL.createObjectURL(file));
+    const file = e.target.files[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
   };
   const add = async () => {
-    if (!name.trim()) return;
-    await dbInsert("rubbers", { id: uid(), name: name.trim(), opening_stock: Number(opening) || 0, rate: 0 });
-    setName(""); setOpening(0); await refresh();
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      let photo_url = null;
+      if (photoFile) photo_url = await uploadPhoto(photoFile, "rubbers");
+      await dbInsert("rubbers", { id: uid(), name: name.trim(), opening_stock: Number(opening) || 0, rate: 0, photo_url });
+      setName(""); setOpening(0); setPhotoPreview(null); setPhotoFile(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
   };
   const remove = async (id) => { await dbDelete("rubbers", id); await refresh(); };
   const filtered = rubbers.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()));
+
   return (
     <div>
       <SectionTitle icon={Stamp} title="Rubber Master" />
       <Card>
-
-        
         <Label>Rubber Name</Label>
         <Field value={name} onChange={(e) => setName(e.target.value)} placeholder='e.g. Round Seal 2"' />
         <Label>Opening Stock</Label>
         <Field type="number" value={opening} onChange={(e) => setOpening(e.target.value)} />
         <Label>Rubber Stamp Photo</Label>
         <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
-        {photoPreview ? (
-        <img src={photoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
-        ) : (
-        "📷 Tap to capture / upload rubber stamp photo"
-        )}
-        <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
+          {photoPreview ? (
+            <img src={photoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+          ) : (
+            "📷 Tap to capture / upload rubber stamp photo"
+          )}
+          <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
         </label>
-      <Btn onClick={add} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add Rubber</Btn>
-    </Card>
+        <Btn onClick={add} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Add Rubber"}</Btn>
+      </Card>
       <div style={{ position: "relative", marginBottom: 10 }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
         <Field placeholder="Search rubber name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
       </div>
-    {filtered.map((r) => (
-      <Card key={r.id}>
-    {editId === r.id ? (
-      <div>
-        <Label>Rubber Name</Label>
-        <Field value={editName} onChange={(e) => setEditName(e.target.value)} />
-        <Label>Opening Stock</Label>
-        <Field type="number" value={editOpening} onChange={(e) => setEditOpening(e.target.value)} />
-        <Label>Rubber Stamp Photo</Label>
-        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
-          {editPhotoPreview ? (
-            <img src={editPhotoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
-          ) : (
-            "📷 Tap to capture / upload rubber stamp photo"
-          )}
-          <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleEditPhotoChange} />
-        </label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Btn onClick={saveEdit} style={{ flex: 1, justifyContent: "center" }}>Save</Btn>
-          <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
-        </div>
-      </div>
-    ) : (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <div style={{ width: 40, height: 40, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}` }} />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.name}</div>
-                <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>Opening: {r.opening_stock}</div>
+      {filtered.map((r) => (
+        <Card key={r.id}>
+          {editId === r.id ? (
+            <div>
+              <Label>Rubber Name</Label>
+              <Field value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <Label>Opening Stock</Label>
+              <Field type="number" value={editOpening} onChange={(e) => setEditOpening(e.target.value)} />
+              <Label>Rubber Stamp Photo</Label>
+              <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
+                {editPhotoPreview ? (
+                  <img src={editPhotoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+                ) : (
+                  "📷 Tap to capture / upload rubber stamp photo"
+                )}
+                <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleEditPhotoChange} />
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={saveEdit} disabled={busy} style={{ flex: 1, justifyContent: "center" }}>{busy ? "Saving…" : "Save"}</Btn>
+                <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => startEdit(r)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={16} /></button>
-              <button onClick={() => remove(r.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={16} /></button>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                {r.photo_url ? (
+                  <img src={r.photo_url} alt={r.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                ) : (
+                  <div style={{ width: 40, height: 40, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Stamp size={18} color={C.brass} />
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.name}</div>
+                  <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>Opening: {r.opening_stock}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => startEdit(r)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={16} /></button>
+                <button onClick={() => remove(r.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={16} /></button>
+              </div>
             </div>
-          </div>
-        )}
-      </Card>
-    ))}
+          )}
+        </Card>
+      ))}
     </div>
   );
 }
@@ -522,36 +565,83 @@ function RubberTab({ rubbers, refresh }) {
 /* ================= PURCHASE ================= */
 function PurchaseTab({ rubbers, purchases, refresh }) {
   const [date, setDate] = useState(todayISO());
-  const [rubberId, setRubberId] = useState(rubbers[0]?.id || "");
-  const [qty, setQty] = useState(0);
-  const [purchaseRate, setPurchaseRate] = useState(0);
   const [courier, setCourier] = useState(0);
-  const amount = Number(qty || 0) * Number(purchaseRate || 0);
-  const total = amount + Number(courier || 0);
+  const [items, setItems] = useState([{ rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
+  const [busy, setBusy] = useState(false);
+
+  const addRow = () => setItems([...items, { rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
+  const removeRow = (idx) => setItems(items.filter((_, i) => i !== idx));
+  const updateRow = (idx, patch) => setItems(items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+
+  const itemsAmount = items.reduce((s, it) => s + Number(it.qty || 0) * Number(it.purchaseRate || 0), 0);
+  const total = itemsAmount + Number(courier || 0);
+
   const save = async () => {
-    if (!rubberId || !qty) return;
-    await dbInsert("purchases", { id: uid(), date, rubber_id: rubberId, qty: Number(qty), purchase_rate: Number(purchaseRate), amount, courier: Number(courier || 0), total });
-    setQty(0); setPurchaseRate(0); setCourier(0); await refresh();
+    const validItems = items.filter((it) => it.rubberId && Number(it.qty) > 0);
+    if (validItems.length === 0 || busy) return;
+    setBusy(true);
+    try {
+      for (let i = 0; i < validItems.length; i++) {
+        const it = validItems[i];
+        const amount = Number(it.qty) * Number(it.purchaseRate || 0);
+        const isLast = i === validItems.length - 1;
+        const rowCourier = isLast ? Number(courier || 0) : 0;
+        await dbInsert("purchases", {
+          id: uid(), date, rubber_id: it.rubberId, qty: Number(it.qty),
+          purchase_rate: Number(it.purchaseRate || 0), amount,
+          courier: rowCourier, total: amount + rowCourier,
+        });
+      }
+      setItems([{ rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
+      setCourier(0);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
   };
+
   return (
     <div>
       <SectionTitle icon={ShoppingCart} title="Purchase Entry" />
       <Card>
         <Label>Date</Label>
         <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <Label>Rubber Name</Label>
-        <Select value={rubberId} onChange={(e) => setRubberId(e.target.value)}>{rubbers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select>
-        <Label>Quantity</Label>
-        <Field type="number" value={qty} onChange={(e) => setQty(e.target.value)} />
-        <Label>Purchase Rate (₹)</Label>
-        <Field type="number" value={purchaseRate} onChange={(e) => setPurchaseRate(e.target.value)} />
-        <Label>Amount (Auto)</Label>
-        <Field value={inr(amount)} disabled style={{ background: C.paperDark, color: C.inkSoft }} />
-        <Label>Courier Charge</Label>
+
+        {items.map((it, idx) => {
+          const rowAmount = Number(it.qty || 0) * Number(it.purchaseRate || 0);
+          return (
+            <div key={idx} style={{ border: `1px dashed ${C.line}`, borderRadius: 8, padding: 10, marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <Label>Item {idx + 1}</Label>
+                {items.length > 1 && (
+                  <button onClick={() => removeRow(idx)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={14} /></button>
+                )}
+              </div>
+              <Select value={it.rubberId} onChange={(e) => updateRow(idx, { rubberId: e.target.value })}>
+                {rubbers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </Select>
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <Label>Quantity</Label>
+                  <Field type="number" value={it.qty} onChange={(e) => updateRow(idx, { qty: e.target.value })} style={{ marginBottom: 0 }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Label>Rate (₹)</Label>
+                  <Field type="number" value={it.purchaseRate} onChange={(e) => updateRow(idx, { purchaseRate: e.target.value })} style={{ marginBottom: 0 }} />
+                </div>
+              </div>
+              <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 6, textAlign: "right" }}>Amount: {inr(rowAmount)}</div>
+            </div>
+          );
+        })}
+
+        <Btn variant="ghost" onClick={addRow} style={{ width: "100%", justifyContent: "center", marginBottom: 12 }}><Plus size={16} /> Add Another Item</Btn>
+
+        <Label>Courier Charge (₹)</Label>
         <Field type="number" value={courier} onChange={(e) => setCourier(e.target.value)} />
         <Label>Total Amount (Auto)</Label>
         <Field value={inr(total)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
-        <Btn onClick={save} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Save Purchase</Btn>
+        <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Save Purchase"}</Btn>
       </Card>
       <Label>Recent Purchases</Label>
       {purchases.slice(0, 8).map((p) => {
@@ -638,18 +728,31 @@ let runningTotal = 0;
         <Btn onClick={addManual} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add Entry</Btn>
       </Card>
       <Label>Transactions</Label>
-{txns.slice(0, 15).map((t) => (
-  <Card key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-    <div>
-      <div style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</div>
-      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{fmtDate(t.date)}</div>
+{(() => {
+  const shown = txns.slice(0, 30);
+  const groups = [];
+  shown.forEach((t) => {
+    const last = groups[groups.length - 1];
+    if (last && last.date === t.date) last.items.push(t);
+    else groups.push({ date: t.date, items: [t] });
+  });
+  return groups.map((g) => (
+    <div key={g.date}>
+      <div style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: C.brass, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 6px" }}>{fmtDate(g.date)}</div>
+      {g.items.map((t) => (
+        <Card key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: font.mono, fontWeight: 700, color: t.type === "in" ? C.sage : C.stamp }}>{t.type === "in" ? "+" : "−"}{inr(t.amount)}</div>
+            <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(t.balanceAfter)}</div>
+          </div>
+        </Card>
+      ))}
     </div>
-    <div style={{ textAlign: "right" }}>
-      <div style={{ fontFamily: font.mono, fontWeight: 700, color: t.type === "in" ? C.sage : C.stamp }}>{t.type === "in" ? "+" : "−"}{inr(t.amount)}</div>
-      <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(t.balanceAfter)}</div>
-    </div>
-  </Card>
-))}
+  ));
+})()}
       {txns.length === 0 && <EmptyNote text="No transactions yet." />}
     </div>
   );
