@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
-  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users
+  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download
 } from "lucide-react";
 
 /* =====================================================================
@@ -168,8 +168,9 @@ function Login({ users, onLogin }) {
 /* ================= APP SHELL ================= */
 const TABS_ADMIN = [
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
+  { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
-  { id: "rate", label: "Rates", icon: Tag },
+  { id: "rate", label: "Rates", icon: TagIcon },
   { id: "rubber", label: "Rubber", icon: Stamp },
   { id: "purchase", label: "Purchase", icon: ShoppingCart },
   { id: "ledger", label: "Cash", icon: Wallet },
@@ -178,8 +179,9 @@ const TABS_ADMIN = [
 ];
 const TABS_STAFF = [
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
+  { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
-  { id: "rate", label: "Rates", icon: Tag },
+  { id: "rate", label: "Rates", icon: TagIcon },
   { id: "ledger", label: "Cash", icon: Wallet },
   
 ];
@@ -252,6 +254,7 @@ export default function SharmaJiStamps() {
 
       <div style={{ flex: 1, padding: "16px 16px 90px", maxWidth: 760, width: "100%", margin: "0 auto" }}>
         {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
+        {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} />}
         {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
         {tab === "rate" && <RateTab rubbers={rubbers} refresh={refreshAll} canEdit={user.role === "admin"} />}
         {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
@@ -302,8 +305,10 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
     if (!rubberId || busy) return;
     setBusy(true);
     try {
-      await dbInsert("stamp_entries", { id: uid(), date, rubber_id: rubberId, mobile, qty: 1, rate, discount: Number(discount || 0), amount, remarks, by_user: user.name });
-      setMobile(""); setDiscount(0); setRemarks("");
+      let image_url = null;
+      if (photoFile) image_url = await uploadPhoto(photoFile, "entries");
+      await dbInsert("stamp_entries", { id: uid(), date, rubber_id: rubberId, mobile, qty: 1, rate, discount: Number(discount || 0), amount, remarks, by_user: user.name, image_url });
+      setMobile(""); setDiscount(0); setRemarks(""); setPhotoFile(null); setPhotoPreview(null);
       setSavedMsg(`Saved — Stock −1, Cash In ${inr(amount)}`);
       await refresh();
       setTimeout(() => setSavedMsg(""), 2500);
@@ -364,13 +369,64 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
   );
 }
 
-/* ================= STOCK ================= */
-/* ================= STOCK ================= */
+/* ================= STAMP SALE REGISTER ================= */
+function StampRegisterTab({ entries, rubbers }) {
+  const chronological = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+  let runningTotal = 0;
+  const withBalance = chronological.map((e) => {
+    runningTotal += Number(e.amount);
+    return { ...e, balanceAfter: runningTotal };
+  });
+  const display = [...withBalance].reverse();
+
+  return (
+    <div>
+      <SectionTitle icon={BookOpen} title="Stamp Sale Register" />
+      {display.map((e) => {
+        const r = rubbers.find((r) => r.id === e.rubber_id);
+        return (
+          <Card key={e.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 56 }}>
+                <div style={{ fontWeight: 600, fontSize: 11.5, textAlign: "center", marginBottom: 4, lineHeight: 1.2 }}>{r?.name || "—"}</div>
+                {r?.photo_url ? (
+                  <img src={r.photo_url} alt={r.name} style={{ width: 40, height: 40, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                ) : (
+                  <div style={{ width: 40, height: 40, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Stamp size={16} color={C.brass} />
+                  </div>
+                )}
+              </div>
+              <div style={{ flex: 1, marginLeft: 12 }}>
+                <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft }}>{fmtDate(e.date)}</div>
+                <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{e.mobile || "no mobile"}</div>
+                {e.image_url ? (
+                  <a href={e.image_url} download target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 6, fontFamily: font.mono, fontSize: 11, color: C.brass, textDecoration: "none" }}>
+                    <Download size={13} /> Impression photo
+                  </a>
+                ) : (
+                  <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft, marginTop: 6 }}>No photo</div>
+                )}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage }}>+{inr(e.amount)}</div>
+                <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(e.balanceAfter)}</div>
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+      {entries.length === 0 && <EmptyNote text="No entries yet." />}
+    </div>
+  );
+}
+
+
 function StockTab({ rubbers, stockByRubber }) {
   return (
     <div>
       <SectionTitle icon={Package} title="Stock Report" />
-      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -414,6 +470,10 @@ function StockTab({ rubbers, stockByRubber }) {
 }
 const thStyle = { padding: "10px 12px", textAlign: "left", fontFamily: font.mono, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, background: C.paperDark, borderBottom: `1px solid ${C.line}` };
 const tdStyle = { padding: "10px 12px", fontFamily: font.mono, fontSize: 12.5, color: C.ink, borderBottom: `1px solid ${C.paperDark}` };
+function Row({ label, value, color, bold }) {
+  return <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 12.5, color: color || C.ink, fontWeight: bold ? 700 : 400, marginBottom: 3 }}><span>{label}</span><span>{value}</span></div>;
+}
+
 
 /* ================= RATE ================= */
 function RateTab({ rubbers, refresh, canEdit }) {
@@ -424,21 +484,48 @@ function RateTab({ rubbers, refresh, canEdit }) {
   };
   return (
     <div>
-      <SectionTitle icon={Tag} title="Rate Master" />
-      {rubbers.map((r) => (
-        <Card key={r.id}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</div><Tag>Active</Tag>
-          </div>
-          <Label>Set Rate (₹)</Label>
-          {canEdit ? (
-            <Field type="number" defaultValue={r.rate} onBlur={(e) => update(r.id, e.target.value)} style={{ marginBottom: 0, opacity: busyId === r.id ? 0.5 : 1 }} />
-          ) : (
-            <div style={{ fontFamily: font.mono, fontWeight: 700, fontSize: 16 }}>{inr(r.rate)}</div>
-          )}
-        </Card>
-      ))}
-      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, textAlign: "center", marginTop: 8 }}>ⓘ rate changes apply to new entries only · tap outside the field to save</div>
+      <SectionTitle icon={TagIcon} title="Rate Master" />
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Name</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Rate (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rubbers.map((r) => (
+              <tr key={r.id}>
+                <td style={tdStyle}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {r.photo_url ? (
+                      <img src={r.photo_url} alt={r.name} style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                    ) : (
+                      <div style={{ width: 32, height: 32, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Stamp size={14} color={C.brass} />
+                      </div>
+                    )}
+                    <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5 }}>{r.name}</span>
+                  </div>
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right" }}>
+                  {canEdit ? (
+                    <input
+                      type="number"
+                      defaultValue={r.rate}
+                      onBlur={(e) => update(r.id, e.target.value)}
+                      style={{ width: 80, textAlign: "right", background: C.paperDark, border: `1px solid ${C.line}`, borderRadius: 6, padding: "6px 8px", fontFamily: font.mono, fontSize: 13, color: C.ink, opacity: busyId === r.id ? 0.5 : 1 }}
+                    />
+                  ) : (
+                    <span style={{ fontFamily: font.mono, fontWeight: 700, fontSize: 13.5 }}>{inr(r.rate)}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {canEdit && <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, textAlign: "center", marginTop: 8 }}>ⓘ rate changes apply to new entries only · tap outside the field to save</div>}
     </div>
   );
 }
@@ -586,6 +673,14 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
   const [items, setItems] = useState([{ rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
   const [busy, setBusy] = useState(false);
 
+  const [editId, setEditId] = useState(null);
+  const [editRubberId, setEditRubberId] = useState("");
+  const [editQty, setEditQty] = useState(0);
+  const [editRate, setEditRate] = useState(0);
+  const [editCourier, setEditCourier] = useState(0);
+  const [editDate, setEditDate] = useState(todayISO());
+  const [editBusy, setEditBusy] = useState(false);
+
   const addRow = () => setItems([...items, { rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
   const removeRow = (idx) => setItems(items.filter((_, i) => i !== idx));
   const updateRow = (idx, patch) => setItems(items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -616,6 +711,40 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
       setBusy(false);
     }
   };
+
+  const startEdit = (p) => {
+    setEditId(p.id);
+    setEditRubberId(p.rubber_id);
+    setEditQty(p.qty);
+    setEditRate(p.purchase_rate);
+    setEditCourier(p.courier || 0);
+    setEditDate(p.date);
+  };
+  const saveEdit = async () => {
+    if (!editRubberId || !editQty || editBusy) return;
+    setEditBusy(true);
+    try {
+      const amount = Number(editQty) * Number(editRate || 0);
+      await dbUpdate("purchases", editId, {
+        date: editDate, rubber_id: editRubberId, qty: Number(editQty),
+        purchase_rate: Number(editRate || 0), amount,
+        courier: Number(editCourier || 0), total: amount + Number(editCourier || 0),
+      });
+      setEditId(null);
+      await refresh();
+    } finally {
+      setEditBusy(false);
+    }
+  };
+  const removePurchase = async (id) => { await dbDelete("purchases", id); await refresh(); };
+
+  const purchasesChronological = [...purchases].sort((a, b) => new Date(a.date) - new Date(b.date));
+  let runningSpend = 0;
+  const purchasesWithBalance = purchasesChronological.map((p) => {
+    runningSpend += Number(p.total);
+    return { ...p, runningTotal: runningSpend };
+  });
+  const purchasesDisplay = [...purchasesWithBalance].reverse();
 
   return (
     <div>
@@ -661,15 +790,53 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
         <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Save Purchase"}</Btn>
       </Card>
       <Label>Recent Purchases</Label>
-      {purchases.slice(0, 8).map((p) => {
+      {purchasesDisplay.slice(0, 15).map((p) => {
         const r = rubbers.find((r) => r.id === p.rubber_id);
         return (
-          <Card key={p.id} style={{ display: "flex", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r?.name} · Qty {p.qty}</div>
-              <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{fmtDate(p.date)}</div>
-            </div>
-            <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.stamp }}>−{inr(p.total)}</div>
+          <Card key={p.id}>
+            {editId === p.id ? (
+              <div>
+                <Label>Date</Label>
+                <Field type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+                <Label>Rubber</Label>
+                <Select value={editRubberId} onChange={(e) => setEditRubberId(e.target.value)}>
+                  {rubbers.map((rb) => <option key={rb.id} value={rb.id}>{rb.name}</option>)}
+                </Select>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <Label>Quantity</Label>
+                    <Field type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ marginBottom: 0 }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <Label>Rate (₹)</Label>
+                    <Field type="number" value={editRate} onChange={(e) => setEditRate(e.target.value)} style={{ marginBottom: 0 }} />
+                  </div>
+                </div>
+                <Label style={{ marginTop: 12 }}>Courier (₹)</Label>
+                <Field type="number" value={editCourier} onChange={(e) => setEditCourier(e.target.value)} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 1, justifyContent: "center" }}>{editBusy ? "Saving…" : "Save"}</Btn>
+                  <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r?.name} · Qty {p.qty}</div>
+                  <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{fmtDate(p.date)}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.stamp }}>−{inr(p.total)}</div>
+                    <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Total: {inr(p.runningTotal)}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => startEdit(p)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={15} /></button>
+                    <button onClick={() => removePurchase(p.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button>
+                  </div>
+                </div>
+              </div>
+            )}
           </Card>
         );
       })}
