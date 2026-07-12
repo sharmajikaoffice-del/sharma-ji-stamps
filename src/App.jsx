@@ -413,6 +413,22 @@ function RubberTab({ rubbers, refresh }) {
   const [q, setQ] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editOpening, setEditOpening] = useState(0);
+  
+  const startEdit = (r) => {
+    setEditId(r.id);
+    setEditName(r.name);
+    setEditOpening(r.opening_stock);
+  };
+  
+  const saveEdit = async () => {
+    if (!editName.trim()) return;
+    await dbUpdate("rubbers", editId, { name: editName.trim(), opening_stock: Number(editOpening) || 0 });
+    setEditId(null);
+    await refresh();
+  };
   const handlePhotoChange = (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -449,18 +465,36 @@ function RubberTab({ rubbers, refresh }) {
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
         <Field placeholder="Search rubber name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
       </div>
-      {filtered.map((r) => (
-        <Card key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <div style={{ width: 40, height: 40, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}` }} />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.name}</div>
-              <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>Opening: {r.opening_stock}</div>
+    {filtered.map((r) => (
+      <Card key={r.id}>
+        {editId === r.id ? (
+          <div>
+            <Label>Rubber Name</Label>
+            <Field value={editName} onChange={(e) => setEditName(e.target.value)} />
+            <Label>Opening Stock</Label>
+            <Field type="number" value={editOpening} onChange={(e) => setEditOpening(e.target.value)} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn onClick={saveEdit} style={{ flex: 1, justifyContent: "center" }}>Save</Btn>
+              <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
             </div>
           </div>
-          <button onClick={() => remove(r.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={16} /></button>
-        </Card>
-      ))}
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ width: 40, height: 40, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}` }} />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.name}</div>
+                <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>Opening: {r.opening_stock}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => startEdit(r)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={16} /></button>
+              <button onClick={() => remove(r.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={16} /></button>
+            </div>
+          </div>
+        )}
+      </Card>
+    ))}
     </div>
   );
 }
