@@ -163,11 +163,14 @@ const TABS_ADMIN = [
   { id: "purchase", label: "Purchase", icon: ShoppingCart },
   { id: "ledger", label: "Cash", icon: Wallet },
   { id: "users", label: "Users", icon: Users },
+  
 ];
 const TABS_STAFF = [
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "stock", label: "Stock", icon: Package },
   { id: "rate", label: "Rates", icon: Tag },
+  { id: "ledger", label: "Cash", icon: Wallet },
+  
 ];
 
 export default function SharmaJiStamps() {
@@ -242,7 +245,7 @@ export default function SharmaJiStamps() {
         {tab === "rate" && <RateTab rubbers={rubbers} refresh={refreshAll} canEdit={user.role === "admin"} />}
         {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
         {tab === "purchase" && user.role === "admin" && <PurchaseTab rubbers={rubbers} purchases={purchases} refresh={refreshAll} />}
-        {tab === "ledger" && user.role === "admin" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} refresh={refreshAll} />}
+        {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} refresh={refreshAll} />}
         {tab === "users" && user.role === "admin" && <UsersTab users={users} refresh={refreshAll} currentUser={user} />}
       </div>
 
