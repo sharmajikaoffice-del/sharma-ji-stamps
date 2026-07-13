@@ -254,7 +254,7 @@ export default function SharmaJiStamps() {
 
       <div style={{ flex: 1, padding: "16px 16px 90px", maxWidth: 760, width: "100%", margin: "0 auto" }}>
         {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
-        {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} />}
+        {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
         {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
         {tab === "rate" && <RateTab rubbers={rubbers} refresh={refreshAll} canEdit={user.role === "admin"} />}
         {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
@@ -370,7 +370,15 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
 }
 
 /* ================= STAMP SALE REGISTER ================= */
-function StampRegisterTab({ entries, rubbers }) {
+function StampRegisterTab({ entries, rubbers, refresh }) {
+  const [editId, setEditId] = useState(null);
+  const [editDate, setEditDate] = useState(todayISO());
+  const [editRubberId, setEditRubberId] = useState("");
+  const [editMobile, setEditMobile] = useState("");
+  const [editDiscount, setEditDiscount] = useState(0);
+  const [editRemarks, setEditRemarks] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+
   const chronological = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
   let runningTotal = 0;
   const withBalance = chronological.map((e) => {
@@ -379,6 +387,34 @@ function StampRegisterTab({ entries, rubbers }) {
   });
   const display = [...withBalance].reverse();
 
+  const startEdit = (e) => {
+    setEditId(e.id);
+    setEditDate(e.date);
+    setEditRubberId(e.rubber_id);
+    setEditMobile(e.mobile || "");
+    setEditDiscount(e.discount || 0);
+    setEditRemarks(e.remarks || "");
+  };
+  const editRubber = rubbers.find((r) => r.id === editRubberId);
+  const editRate = editRubber?.rate || 0;
+  const editAmount = Math.max(0, editRate - Number(editDiscount || 0));
+
+  const saveEdit = async () => {
+    if (!editRubberId || editBusy) return;
+    setEditBusy(true);
+    try {
+      await dbUpdate("stamp_entries", editId, {
+        date: editDate, rubber_id: editRubberId, mobile: editMobile,
+        rate: editRate, discount: Number(editDiscount || 0), amount: editAmount, remarks: editRemarks,
+      });
+      setEditId(null);
+      await refresh();
+    } finally {
+      setEditBusy(false);
+    }
+  };
+  const removeEntry = async (id) => { await dbDelete("stamp_entries", id); await refresh(); };
+
   return (
     <div>
       <SectionTitle icon={BookOpen} title="Stamp Sale Register" />
@@ -386,33 +422,60 @@ function StampRegisterTab({ entries, rubbers }) {
         const r = rubbers.find((r) => r.id === e.rubber_id);
         return (
           <Card key={e.id}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 56 }}>
-                <div style={{ fontWeight: 600, fontSize: 11.5, textAlign: "center", marginBottom: 4, lineHeight: 1.2 }}>{r?.name || "—"}</div>
-                {r?.photo_url ? (
-                  <img src={r.photo_url} alt={r.name} style={{ width: 40, height: 40, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
-                ) : (
-                  <div style={{ width: 40, height: 40, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Stamp size={16} color={C.brass} />
+            {editId === e.id ? (
+              <div>
+                <Label>Date</Label>
+                <Field type="date" value={editDate} onChange={(ev) => setEditDate(ev.target.value)} />
+                <Label>Rubber</Label>
+                <Select value={editRubberId} onChange={(ev) => setEditRubberId(ev.target.value)}>
+                  {rubbers.map((rb) => <option key={rb.id} value={rb.id}>{rb.name}</option>)}
+                </Select>
+                <Label>Customer Mobile No.</Label>
+                <Field type="tel" value={editMobile} onChange={(ev) => setEditMobile(ev.target.value)} />
+                <Label>Discount (₹)</Label>
+                <Field type="number" value={editDiscount} onChange={(ev) => setEditDiscount(ev.target.value)} />
+                <Label>Amount (Auto)</Label>
+                <Field value={inr(editAmount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
+                <Label>Remarks</Label>
+                <Field value={editRemarks} onChange={(ev) => setEditRemarks(ev.target.value)} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 1, justifyContent: "center" }}>{editBusy ? "Saving…" : "Save"}</Btn>
+                  <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 56 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11.5, textAlign: "center", marginBottom: 4, lineHeight: 1.2 }}>{r?.name || "—"}</div>
+                  {r?.photo_url ? (
+                    <img src={r.photo_url} alt={r.name} style={{ width: 40, height: 40, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                  ) : (
+                    <div style={{ width: 40, height: 40, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Stamp size={16} color={C.brass} />
+                    </div>
+                  )}
+                </div>
+                <div style={{ flex: 1, marginLeft: 12 }}>
+                  <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft }}>{fmtDate(e.date)}</div>
+                  <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{e.mobile || "no mobile"}</div>
+                  {e.image_url ? (
+                    <a href={e.image_url} download target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 6, fontFamily: font.mono, fontSize: 11, color: C.brass, textDecoration: "none" }}>
+                      <Download size={13} /> Impression photo
+                    </a>
+                  ) : (
+                    <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft, marginTop: 6 }}>No photo</div>
+                  )}
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage }}>+{inr(e.amount)}</div>
+                  <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(e.balanceAfter)}</div>
+                  <div style={{ display: "flex", gap: 4, marginTop: 6, justifyContent: "flex-end" }}>
+                    <button onClick={() => startEdit(e)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={14} /></button>
+                    <button onClick={() => removeEntry(e.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={14} /></button>
                   </div>
-                )}
+                </div>
               </div>
-              <div style={{ flex: 1, marginLeft: 12 }}>
-                <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft }}>{fmtDate(e.date)}</div>
-                <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{e.mobile || "no mobile"}</div>
-                {e.image_url ? (
-                  <a href={e.image_url} download target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 6, fontFamily: font.mono, fontSize: 11, color: C.brass, textDecoration: "none" }}>
-                    <Download size={13} /> Impression photo
-                  </a>
-                ) : (
-                  <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft, marginTop: 6 }}>No photo</div>
-                )}
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage }}>+{inr(e.amount)}</div>
-                <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(e.balanceAfter)}</div>
-              </div>
-            </div>
+            )}
           </Card>
         );
       })}
