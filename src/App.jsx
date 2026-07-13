@@ -68,6 +68,25 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+function exportToCSV(filename, rows) {
+  if (!rows || rows.length === 0) return;
+  const headers = Object.keys(rows[0]);
+  const escape = (val) => {
+    const s = String(val ?? "");
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+  const csv = [headers.join(","), ...rows.map((row) => headers.map((h) => escape(row[h])).join(","))].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 function useFonts() {
   useEffect(() => {
@@ -415,9 +434,29 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
   };
   const removeEntry = async (id) => { await dbDelete("stamp_entries", id); await refresh(); };
 
+  const exportCSV = () => {
+    const rows = display.map((e) => {
+      const r = rubbers.find((r) => r.id === e.rubber_id);
+      return {
+        Date: fmtDate(e.date),
+        "Rubber Name": r?.name || "",
+        Mobile: e.mobile || "",
+        "Stamp Name": e.remarks || "",
+        Rate: e.rate,
+        Discount: e.discount,
+        Amount: e.amount,
+        Balance: e.balanceAfter,
+      };
+    });
+    exportToCSV(`stamp-sale-register-${todayISO()}.csv`, rows);
+  };
+
   return (
     <div>
-      <SectionTitle icon={BookOpen} title="Stamp Sale Register" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <SectionTitle icon={BookOpen} title="Stamp Sale Register" />
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5 }}><Download size={13} /> Export</Btn>
+      </div>
       <div style={{ position: "relative", marginBottom: 10 }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
         <Field placeholder="Search by rubber name, mobile, or stamp name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
@@ -825,9 +864,28 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
   });
   const purchasesDisplay = [...purchasesWithBalance].reverse();
 
+  const exportCSV = () => {
+    const rows = purchasesDisplay.map((p) => {
+      const r = rubbers.find((r) => r.id === p.rubber_id);
+      return {
+        Date: fmtDate(p.date),
+        "Rubber Name": r?.name || "",
+        Qty: p.qty,
+        "Purchase Rate": p.purchase_rate,
+        Courier: p.courier,
+        Total: p.total,
+        "Running Total": p.runningTotal,
+      };
+    });
+    exportToCSV(`purchases-${todayISO()}.csv`, rows);
+  };
+
   return (
     <div>
-      <SectionTitle icon={ShoppingCart} title="Purchase Entry" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <SectionTitle icon={ShoppingCart} title="Purchase Entry" />
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5 }}><Download size={13} /> Export</Btn>
+      </div>
       <Card>
         <Label>Date</Label>
         <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -965,9 +1023,23 @@ let runningTotal = 0;
     setAmount(0); setNote(""); await refresh();
   };
 
+  const exportCSV = () => {
+    const rows = txns.map((t) => ({
+      Date: fmtDate(t.date),
+      Description: t.label,
+      Type: t.type === "in" ? "Cash In" : "Cash Out",
+      Amount: t.amount,
+      Balance: t.balanceAfter,
+    }));
+    exportToCSV(`cash-ledger-${todayISO()}.csv`, rows);
+  };
+
   return (
     <div>
-      <SectionTitle icon={Wallet} title="Cash Ledger" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <SectionTitle icon={Wallet} title="Cash Ledger" />
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5 }}><Download size={13} /> Export</Btn>
+      </div>
       <Card style={{ background: C.ink, color: C.white }}>
         <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.5, color: "#C9BC9C" }}>CURRENT CASH BALANCE</div>
         <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, margin: "4px 0 8px" }}>{inr(balance)}</div>
