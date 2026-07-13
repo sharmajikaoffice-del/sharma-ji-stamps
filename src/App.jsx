@@ -384,7 +384,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     if (!q.trim()) return true;
     const r = rubbers.find((r) => r.id === e.rubber_id);
     const needle = q.trim().toLowerCase();
-    return (r?.name || "").toLowerCase().includes(needle) || (e.mobile || "").toLowerCase().includes(needle);
+    return (r?.name || "").toLowerCase().includes(needle) || (e.mobile || "").toLowerCase().includes(needle) || (e.remarks || "").toLowerCase().includes(needle);
   });
 
   const startEdit = (e) => {
@@ -420,7 +420,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
       <SectionTitle icon={BookOpen} title="Stamp Sale Register" />
       <div style={{ position: "relative", marginBottom: 10 }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
-        <Field placeholder="Search by rubber name or mobile…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
+        <Field placeholder="Search by rubber name, mobile, or stamp name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
       </div>
       {display.map((e) => {
         const r = rubbers.find((r) => r.id === e.rubber_id);
