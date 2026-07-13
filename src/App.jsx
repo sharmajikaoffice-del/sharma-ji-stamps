@@ -340,8 +340,8 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
         <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
         </label>
 
-        
-        <Field placeholder="Any notes…" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+        <Label>Stamp Name (text engraved on stamp)</Label>
+        <Field placeholder="e.g. Dr. Sharma Clinic" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
         <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Save Entry"}</Btn>
         {savedMsg && <div style={{ marginTop: 10, color: C.sage, fontFamily: font.mono, fontSize: 12, textAlign: "center" }}>{savedMsg}</div>}
       </Card>
@@ -365,6 +365,7 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
 
 /* ================= STAMP SALE REGISTER ================= */
 function StampRegisterTab({ entries, rubbers, refresh }) {
+  const [q, setQ] = useState("");
   const [editId, setEditId] = useState(null);
   const [editDate, setEditDate] = useState(todayISO());
   const [editRubberId, setEditRubberId] = useState("");
@@ -379,7 +380,12 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     runningTotal += Number(e.amount);
     return { ...e, balanceAfter: runningTotal };
   });
-  const display = [...withBalance].reverse();
+  const display = [...withBalance].reverse().filter((e) => {
+    if (!q.trim()) return true;
+    const r = rubbers.find((r) => r.id === e.rubber_id);
+    const needle = q.trim().toLowerCase();
+    return (r?.name || "").toLowerCase().includes(needle) || (e.mobile || "").toLowerCase().includes(needle);
+  });
 
   const startEdit = (e) => {
     setEditId(e.id);
@@ -412,6 +418,10 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
   return (
     <div>
       <SectionTitle icon={BookOpen} title="Stamp Sale Register" />
+      <div style={{ position: "relative", marginBottom: 10 }}>
+        <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
+        <Field placeholder="Search by rubber name or mobile…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
+      </div>
       {display.map((e) => {
         const r = rubbers.find((r) => r.id === e.rubber_id);
         return (
@@ -430,7 +440,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
                 <Field type="number" value={editDiscount} onChange={(ev) => setEditDiscount(ev.target.value)} />
                 <Label>Amount (Auto)</Label>
                 <Field value={inr(editAmount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
-                <Label>Remarks</Label>
+                <Label>Stamp Name (text engraved on stamp)</Label>
                 <Field value={editRemarks} onChange={(ev) => setEditRemarks(ev.target.value)} />
                 <div style={{ display: "flex", gap: 8 }}>
                   <Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 1, justifyContent: "center" }}>{editBusy ? "Saving…" : "Save"}</Btn>
@@ -452,6 +462,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
                 <div style={{ flex: 1, marginLeft: 12 }}>
                   <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft }}>{fmtDate(e.date)}</div>
                   <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{e.mobile || "no mobile"}</div>
+                  {e.remarks && <div style={{ fontFamily: font.body, fontSize: 12, color: C.ink, marginTop: 4, fontStyle: "italic" }}>"{e.remarks}"</div>}
                   {e.image_url ? (
                     <a href={e.image_url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 6 }}>
                       <img src={e.image_url} alt="Stamp impression" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.line}` }} />
@@ -473,7 +484,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
           </Card>
         );
       })}
-      {entries.length === 0 && <EmptyNote text="No entries yet." />}
+      {display.length === 0 && <EmptyNote text={q ? "No matching entries." : "No entries yet."} />}
     </div>
   );
 }
