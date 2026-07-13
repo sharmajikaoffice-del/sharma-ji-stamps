@@ -97,6 +97,20 @@ function useFonts() {
     link.href = "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Work+Sans:wght@400;500;600;700&display=swap";
     document.head.appendChild(link);
   }, []);
+  // Global reset — without box-sizing:border-box, elements with width:100% plus
+  // padding (Field, Select, Card, etc.) render wider than their parent, which was
+  // pushing content past the right edge of the screen and getting clipped.
+  useEffect(() => {
+    if (document.getElementById("sjs-reset")) return;
+    const style = document.createElement("style");
+    style.id = "sjs-reset";
+    style.textContent = `
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }
+      #root { max-width: 100%; overflow-x: hidden; }
+    `;
+    document.head.appendChild(style);
+  }, []);
 }
 const font = { display: "'Fraunces', serif", mono: "'IBM Plex Mono', monospace", body: "'Work Sans', sans-serif" };
 
@@ -368,12 +382,12 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
       {entries.slice(0, 8).map((e) => {
         const r = rubbers.find((r) => r.id === e.rubber_id);
         return (
-          <Card key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r?.name || "—"}</div>
-              <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 2 }}>{fmtDate(e.date)} · {e.mobile || "no mobile"}</div>
+          <Card key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <div style={{ minWidth: 0, overflow: "hidden" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r?.name || "—"}</div>
+              <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtDate(e.date)} · {e.mobile || "no mobile"}</div>
             </div>
-            <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage }}>+{inr(e.amount)}</div>
+            <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage, flexShrink: 0 }}>+{inr(e.amount)}</div>
           </Card>
         );
       })}
@@ -453,9 +467,9 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <SectionTitle icon={BookOpen} title="Stamp Sale Register" />
-        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5 }}><Download size={13} /> Export</Btn>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
+        <SectionTitle icon={BookOpen} title="Stamp Sale Register" bare />
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
       <div style={{ position: "relative", marginBottom: 10 }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
@@ -882,9 +896,9 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <SectionTitle icon={ShoppingCart} title="Purchase Entry" />
-        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5 }}><Download size={13} /> Export</Btn>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
+        <SectionTitle icon={ShoppingCart} title="Purchase Entry" bare />
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
       <Card>
         <Label>Date</Label>
@@ -1036,14 +1050,14 @@ let runningTotal = 0;
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <SectionTitle icon={Wallet} title="Cash Ledger" />
-        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5 }}><Download size={13} /> Export</Btn>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
+        <SectionTitle icon={Wallet} title="Cash Ledger" bare />
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
       <Card style={{ background: C.ink, color: C.white }}>
         <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.5, color: "#C9BC9C" }}>CURRENT CASH BALANCE</div>
         <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, margin: "4px 0 8px" }}>{inr(balance)}</div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 11.5 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 11.5, gap: 8, flexWrap: "wrap" }}>
           <span>In: <span style={{ color: "#9FC08A" }}>{inr(totalIn)}</span></span>
           <span>Out: <span style={{ color: "#E29B90" }}>{inr(totalOut)}</span></span>
         </div>
@@ -1075,11 +1089,11 @@ let runningTotal = 0;
     <div key={g.date}>
       <div style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: C.brass, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 6px" }}>{fmtDate(g.date)}</div>
       {g.items.map((t) => (
-        <Card key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{t.label}</div>
+        <Card key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div style={{ minWidth: 0, overflow: "hidden" }}>
+            <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</div>
           </div>
-          <div style={{ textAlign: "right" }}>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontFamily: font.mono, fontWeight: 700, color: t.type === "in" ? C.sage : C.stamp }}>{t.type === "in" ? "+" : "−"}{inr(t.amount)}</div>
             <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(t.balanceAfter)}</div>
           </div>
@@ -1155,7 +1169,12 @@ function UsersTab({ users, refresh, currentUser }) {
 }
 
 /* ---------- helpers ---------- */
-function SectionTitle({ icon: Icon, title }) {
-  return <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}><Icon size={18} color={C.stamp} /><div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 19 }}>{title}</div></div>;
+function SectionTitle({ icon: Icon, title, bare = false }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, ...(bare ? {} : { marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}` }) }}>
+      <Icon size={18} color={C.headerGreen} />
+      <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 19, color: C.headerGreen, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+    </div>
+  );
 }
 function EmptyNote({ text }) { return <div style={{ textAlign: "center", fontFamily: font.mono, fontSize: 12, color: C.inkSoft, padding: "20px 0" }}>{text}</div>; }
