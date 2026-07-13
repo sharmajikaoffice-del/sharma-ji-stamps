@@ -62,7 +62,7 @@ async function uploadPhoto(file, folder) {
 const C = {
   paper: "#EDE6D3", paperDark: "#E2D9C0", ink: "#1E2A35", inkSoft: "#4A5A66",
   stamp: "#A5332A", stampDark: "#7F241C", brass: "#B08A3E", sage: "#5C6E4E",
-  white: "#FCFAF3", line: "#C9BC9C",
+  white: "#FCFAF3", line: "#C9BC9C", headerGreen: "#034F45",
 };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -83,19 +83,13 @@ const font = { display: "'Fraunces', serif", mono: "'IBM Plex Mono', monospace",
 
 function StampMark({ size = 64 }) {
   return (
-    <svg viewBox="0 0 200 200" width={size} height={size} style={{ color: C.stamp, opacity: 0.9, transform: "rotate(-6deg)" }}>
-      <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" strokeWidth="4" />
-      <circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      <path id="ctop" d="M 100,100 m -70,0 a 70,70 0 1,1 140,0" fill="none" />
-      <path id="cbot" d="M 100,100 m -70,0 a 70,70 0 1,0 140,0" fill="none" />
-      <text fontFamily="IBM Plex Mono, monospace" fontSize="13" letterSpacing="3" fill="currentColor">
-        <textPath href="#ctop" startOffset="50%" textAnchor="middle">SHARMA JI STAMPS</textPath>
-      </text>
-      <text fontFamily="IBM Plex Mono, monospace" fontSize="11" letterSpacing="4" fill="currentColor">
-        <textPath href="#cbot" startOffset="50%" textAnchor="middle">RECORD BOOK</textPath>
-      </text>
-      <text x="100" y="94" fontFamily="Fraunces, serif" fontWeight="700" fontSize="34" fill="currentColor" textAnchor="middle">SJ</text>
-    </svg>
+    <img
+      src="/logo.png"
+      alt="Sharma Ji Stamps"
+      width={size}
+      height={size}
+      style={{ width: size, height: size, objectFit: "contain", display: "block" }}
+    />
   );
 }
 
@@ -241,7 +235,7 @@ export default function SharmaJiStamps() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column", overflowX: "hidden" }}>
-      <div style={{ background: C.ink, color: C.white, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: C.headerGreen, color: C.white, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <StampMark size={30} />
           <div>
@@ -510,7 +504,7 @@ function StockTab({ rubbers, stockByRubber }) {
           <tbody>
             {rubbers.map((r) => {
               const s = stockByRubber[r.id];
-              const low = s.balance <= 5;
+              const low = s.balance <= 15;
               return (
                 <tr key={r.id}>
                   <td style={tdStyle}>
