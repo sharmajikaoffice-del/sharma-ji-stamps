@@ -240,7 +240,7 @@ export default function SharmaJiStamps() {
   const tabs = user.role === "admin" ? TABS_ADMIN : TABS_STAFF;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column", overflowX: "hidden" }}>
       <div style={{ background: C.ink, color: C.white, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <StampMark size={30} />
@@ -489,33 +489,40 @@ function StockTab({ rubbers, stockByRubber }) {
   return (
     <div>
       <SectionTitle icon={Package} title="Stock Report" />
-      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", minWidth: 340, borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "40%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+          </colgroup>
           <thead>
             <tr>
               <th style={thStyle}>Name</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Opening</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Open</th>
               <th style={{ ...thStyle, textAlign: "right" }}>In</th>
               <th style={{ ...thStyle, textAlign: "right" }}>Out</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Closing</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Close</th>
             </tr>
           </thead>
           <tbody>
             {rubbers.map((r) => {
               const s = stockByRubber[r.id];
-              const low = s.balance <= 15;
+              const low = s.balance <= 5;
               return (
                 <tr key={r.id}>
                   <td style={tdStyle}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       {r.photo_url ? (
-                        <img src={r.photo_url} alt={r.name} style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                        <img src={r.photo_url} alt={r.name} style={{ width: 26, height: 26, borderRadius: 6, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
                       ) : (
-                        <div style={{ width: 32, height: 32, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <Stamp size={14} color={C.brass} />
+                        <div style={{ width: 26, height: 26, borderRadius: 6, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Stamp size={12} color={C.brass} />
                         </div>
                       )}
-                      <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5 }}>{r.name}</span>
+                      <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
                     </div>
                   </td>
                   <td style={{ ...tdStyle, textAlign: "right" }}>{s.opening}</td>
@@ -531,8 +538,8 @@ function StockTab({ rubbers, stockByRubber }) {
     </div>
   );
 }
-const thStyle = { padding: "10px 12px", textAlign: "left", fontFamily: font.mono, fontSize: 10.5, letterSpacing: 1, textTransform: "uppercase", color: C.inkSoft, background: C.paperDark, borderBottom: `1px solid ${C.line}` };
-const tdStyle = { padding: "10px 12px", fontFamily: font.mono, fontSize: 12.5, color: C.ink, borderBottom: `1px solid ${C.paperDark}` };
+const thStyle = { padding: "8px 6px", textAlign: "left", fontFamily: font.mono, fontSize: 9.5, letterSpacing: 0.5, textTransform: "uppercase", color: C.inkSoft, background: C.paperDark, borderBottom: `1px solid ${C.line}` };
+const tdStyle = { padding: "8px 6px", fontFamily: font.mono, fontSize: 11.5, color: C.ink, borderBottom: `1px solid ${C.paperDark}`, overflow: "hidden" };
 function Row({ label, value, color, bold }) {
   return <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 12.5, color: color || C.ink, fontWeight: bold ? 700 : 400, marginBottom: 3 }}><span>{label}</span><span>{value}</span></div>;
 }
@@ -548,8 +555,12 @@ function RateTab({ rubbers, refresh, canEdit }) {
   return (
     <div>
       <SectionTitle icon={TagIcon} title="Rate Master" />
-      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", minWidth: 260, borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "60%" }} />
+            <col style={{ width: "40%" }} />
+          </colgroup>
           <thead>
             <tr>
               <th style={thStyle}>Name</th>
@@ -560,15 +571,15 @@ function RateTab({ rubbers, refresh, canEdit }) {
             {rubbers.map((r) => (
               <tr key={r.id}>
                 <td style={tdStyle}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     {r.photo_url ? (
-                      <img src={r.photo_url} alt={r.name} style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                      <img src={r.photo_url} alt={r.name} style={{ width: 26, height: 26, borderRadius: 6, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
                     ) : (
-                      <div style={{ width: 32, height: 32, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Stamp size={14} color={C.brass} />
+                      <div style={{ width: 26, height: 26, borderRadius: 6, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Stamp size={12} color={C.brass} />
                       </div>
                     )}
-                    <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 13.5 }}>{r.name}</span>
+                    <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
                   </div>
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right" }}>
@@ -577,10 +588,10 @@ function RateTab({ rubbers, refresh, canEdit }) {
                       type="number"
                       defaultValue={r.rate}
                       onBlur={(e) => update(r.id, e.target.value)}
-                      style={{ width: 80, textAlign: "right", background: C.paperDark, border: `1px solid ${C.line}`, borderRadius: 6, padding: "6px 8px", fontFamily: font.mono, fontSize: 13, color: C.ink, opacity: busyId === r.id ? 0.5 : 1 }}
+                      style={{ width: "100%", maxWidth: 76, textAlign: "right", background: C.paperDark, border: `1px solid ${C.line}`, borderRadius: 6, padding: "6px 8px", fontFamily: font.mono, fontSize: 12.5, color: C.ink, opacity: busyId === r.id ? 0.5 : 1 }}
                     />
                   ) : (
-                    <span style={{ fontFamily: font.mono, fontWeight: 700, fontSize: 13.5 }}>{inr(r.rate)}</span>
+                    <span style={{ fontFamily: font.mono, fontWeight: 700, fontSize: 12.5 }}>{inr(r.rate)}</span>
                   )}
                 </td>
               </tr>
