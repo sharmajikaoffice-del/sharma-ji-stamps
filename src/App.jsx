@@ -61,9 +61,10 @@ async function uploadPhoto(file, folder) {
 
 /* ---------- design tokens ---------- */
 const C = {
-  paper: "#EDE6D3", paperDark: "#E2D9C0", ink: "#1E2A35", inkSoft: "#4A5A66",
-  stamp: "#A5332A", stampDark: "#7F241C", brass: "#B08A3E", sage: "#5C6E4E",
-  white: "#FCFAF3", line: "#C9BC9C", headerGreen: "#034F45",
+  // Desktop theme tuned to the blue editor shown in the reference UI.
+  paper: "#F3F6FA", paperDark: "#E8EDF4", ink: "#263241", inkSoft: "#687587",
+  stamp: "#3F7FE8", stampDark: "#245FC4", brass: "#3F7FE8", sage: "#3F7FE8",
+  white: "#FFFFFF", line: "#D7DEE8", headerGreen: "#3F7FE8",
 };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -144,7 +145,7 @@ function addInkTexture(ctx, w, h, color, seed) {
   ctx.restore();
 }
 
-const STAMP_INK_BLUE = "#2158A6";
+const STAMP_INK_BLUE = "#3F7FE8";
 const STAMP_CANVAS_SIZE = 320;
 const STAMP_SHAPES = [
   { id: "circle", label: "Round" },
@@ -169,6 +170,14 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, size, size);
 
+  // A brand-new stamp must open completely blank. Draw nothing until the user
+  // adds content/layers or enters actual text/logo content.
+  const hasContent = Boolean(
+    layers.length || topText || bottomText || centerLine1 || centerLine2 ||
+    rectLine1 || rectLine2 || rectLine3 || logo
+  );
+  if (!hasContent) return;
+
   const cx = size / 2;
   const cy = size / 2;
   ctx.strokeStyle = inkColor;
@@ -184,11 +193,13 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     const textR = outerR - 25;
     const scale = outerR / 138;
     const hasFrameLayers = layers.some((l) => l.type === "frame");
+    const hasAnyLayers = layers.length > 0;
 
-    // When the two circles are represented by separate Frame layers, let those
-    // layers own the rings. This prevents the old built-in double border from
-    // being drawn a second time and makes each ring independently editable.
-    if (!hasFrameLayers) {
+    // Toolbar layers are independent objects. In particular, “Text around the circle”
+    // must draw ONLY the curved text — it must never create the two default rings.
+    // Rings appear only when the user adds a Circle/Frame layer. Legacy templates
+    // with no layers still use their original built-in border.
+    if (!hasAnyLayers) {
       ctx.lineWidth = strokeWidth;
       ctx.beginPath();
       ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
@@ -229,9 +240,6 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       ctx.fillText(centerLine2.toUpperCase(), cx, cy + (logo ? 24 : 16));
     }
 
-    ctx.font = "12px Georgia, serif";
-    ctx.fillText("★", cx - 54 * scale, cy - (logo ? -4 : 4));
-    ctx.fillText("★", cx + 54 * scale, cy - (logo ? -4 : 4));
   } else {
     const w = 260;
     const h = shape === "square" ? 200 : 170;
@@ -444,7 +452,7 @@ const Btn = ({ children, variant = "solid", ...props }) => {
   const styles = variant === "ghost" ? { background: "transparent", color: C.ink, border: `1.5px solid ${C.ink}` } : { background: C.headerGreen, color: C.white, border: "none" };
   return <button {...props} style={{ ...styles, padding: "10px 16px", borderRadius: 8, fontWeight: 600, fontSize: 13.5, fontFamily: font.body, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, ...props.style }}>{children}</button>;
 };
-const Tag = ({ children, tone = "in" }) => <span style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, padding: "3px 8px", borderRadius: 20, textTransform: "uppercase", background: tone === "in" ? "#E4EBDD" : "#F3E0DC", color: tone === "in" ? C.sage : C.stampDark }}>{children}</span>;
+const Tag = ({ children, tone = "in" }) => <span style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, padding: "3px 8px", borderRadius: 20, textTransform: "uppercase", background: tone === "in" ? "#EAF2FF" : "#F3E0DC", color: tone === "in" ? C.sage : C.stampDark }}>{children}</span>;
 
 /* ================= LOGIN ================= */
 function Login({ users, onLogin }) {
@@ -523,7 +531,7 @@ function useIsDesktop(breakpoint = 900) {
   }, [breakpoint]);
   return isDesktop;
 }
-const SIDEBAR_W = 236;
+const SIDEBAR_W = 210;
 
 /* ================= APP SHELL ================= */
 const TABS_ADMIN = [
@@ -635,19 +643,19 @@ export default function SharmaJiStamps() {
     return (
       <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, overflowX: "hidden" }}>
         {/* ---- desktop sidebar ---- */}
-        <div style={{ position: "fixed", top: 0, bottom: 0, left: 0, width: SIDEBAR_W, background: C.headerGreen, color: C.white, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div style={{ position: "fixed", top: 0, bottom: 0, left: 0, width: SIDEBAR_W, background: C.headerGreen, color: C.white, display: "flex", flexDirection: "column", overflowY: "auto", boxShadow: "2px 0 12px rgba(36,95,196,.12)" }}>
           <div style={{ padding: "22px 18px 18px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.14)" }}>
             <StampMark size={32} />
             <div>
               <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 15, lineHeight: 1.15 }}>Sharma Ji Stamps</div>
-              <div style={{ fontFamily: font.mono, fontSize: 9, letterSpacing: 1, color: "#C9BC9C", marginTop: 3 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
+              <div style={{ fontFamily: font.mono, fontSize: 9, letterSpacing: 1, color: "#DCE9FF", marginTop: 3 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
             </div>
           </div>
           <div style={{ flex: 1, padding: "10px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
             {tabs.map((t) => {
               const Icon = t.icon; const active = tab === t.id;
               return (
-                <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 10, background: active ? "rgba(255,255,255,0.14)" : "none", border: "none", borderRadius: 8, padding: "10px 12px", cursor: "pointer", color: active ? C.white : "#C9D6CE", fontFamily: font.body, fontSize: 13.5, textAlign: "left" }}>
+                <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 10, background: active ? "rgba(255,255,255,0.14)" : "none", border: "none", borderRadius: 8, padding: "10px 12px", cursor: "pointer", color: active ? C.white : "#EAF2FF", fontFamily: font.body, fontSize: 13.5, textAlign: "left" }}>
                   <Icon size={17} />
                   {t.label}
                 </button>
@@ -659,7 +667,7 @@ export default function SharmaJiStamps() {
 
         {/* ---- desktop content ---- */}
         <div style={{ marginLeft: SIDEBAR_W, minHeight: "100vh" }}>
-          <div style={{ padding: "32px 44px 48px", maxWidth: 1140, width: "100%", margin: "0 auto" }}>
+          <div style={{ padding: "18px 18px 34px", width: "100%", maxWidth: 1320, margin: "0 auto" }}>
             {tabContent}
           </div>
         </div>
@@ -674,7 +682,7 @@ export default function SharmaJiStamps() {
           <StampMark size={30} />
           <div>
             <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 16, lineHeight: 1 }}>Sharma Ji Stamps</div>
-            <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: "#C9BC9C", marginTop: 2 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
+            <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: "#DCE9FF", marginTop: 2 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
           </div>
         </div>
         <button onClick={logout} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
@@ -705,6 +713,7 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
   const [rubberId, setRubberId] = useState(rubbers[0]?.id || "");
   const [mobile, setMobile] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [paymentMode, setPaymentMode] = useState("Cash");
   const [remarks, setRemarks] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -728,9 +737,9 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
     try {
       let image_url = null;
       if (photoFile) image_url = await uploadPhoto(photoFile, "entries");
-      await dbInsert("stamp_entries", { id: uid(), date, rubber_id: rubberId, mobile, qty: 1, rate, discount: Number(discount || 0), amount, remarks, by_user: user.name, image_url });
-      setMobile(""); setDiscount(0); setRemarks(""); setPhotoFile(null); setPhotoPreview(null);
-      setSavedMsg(`Saved — Stock −1, Cash In ${inr(amount)}`);
+      await dbInsert("stamp_entries", { id: uid(), date, rubber_id: rubberId, mobile, qty: 1, rate, discount: Number(discount || 0), amount, payment_mode: paymentMode, remarks, by_user: user.name, image_url });
+      setMobile(""); setDiscount(0); setPaymentMode("Cash"); setRemarks(""); setPhotoFile(null); setPhotoPreview(null);
+      setSavedMsg(`Saved — Stock −1, ${paymentMode} In ${inr(amount)}`);
       await refresh();
       setTimeout(() => setSavedMsg(""), 2500);
     } catch { setSavedMsg("Save failed — check connection"); }
@@ -745,7 +754,7 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
       <Card key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <div style={{ minWidth: 0, overflow: "hidden" }}>
           <div style={{ fontWeight: 600, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r?.name || "—"}</div>
-          <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtDate(e.date)} · {e.mobile || "no mobile"}</div>
+          <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtDate(e.date)} · {e.mobile || "no mobile"} · {e.payment_mode || "Cash"}</div>
         </div>
         <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage, flexShrink: 0 }}>+{inr(e.amount)}</div>
       </Card>
@@ -774,6 +783,12 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
             <Field type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
             <Label>Amount (Auto = Rate − Discount)</Label>
             <Field value={inr(amount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
+            <Label>Payment Mode</Label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              {["Cash", "Bank"].map((mode) => (
+                <Btn key={mode} variant={paymentMode === mode ? "solid" : "ghost"} onClick={() => setPaymentMode(mode)} style={{ flex: 1, justifyContent: "center" }}>{mode === "Cash" ? "💵 Cash" : "🏦 Bank"}</Btn>
+              ))}
+            </div>
             <Label>Stamp Impression Image</Label>
             <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
             {photoPreview ? (
@@ -826,6 +841,7 @@ function CreateStampTab() {
   const [logo, setLogo] = useState(null);
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [fileName, setFileName] = useState("");
+  const [plateSize, setPlateSize] = useState(38);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
 
   // Extra layers added from the toolbar (Text around the circle / Text in the
@@ -833,20 +849,35 @@ function CreateStampTab() {
   const [layers, setLayers] = useState([]);
   const [activeLayerId, setActiveLayerId] = useState(null);
   const [layerCounter, setLayerCounter] = useState(0);
+  const [layerFilter, setLayerFilter] = useState("All");
   const layerImageInputRef = useRef(null);
 
-  const LAYER_TYPE_NAMES = { circleText: "Circle txt", centerText: "Text", frame: "Frame", image: "Image" };
+  const LAYER_TYPE_NAMES = { circleText: "Text around the circle", centerText: "Text in the centre", frame: "Frame", image: "Image" };
   const layerLabel = (l) => `${LAYER_TYPE_NAMES[l.type]} #${l.num}`;
+  const layerTypeMatchesFilter = (layer, filter) => {
+    if (filter === "All") return true;
+    if (filter === "Text") return layer.type === "circleText" || layer.type === "centerText";
+    return layer.type === "frame" || layer.type === "image";
+  };
+  const filteredLayers = layers.filter((l) => layerTypeMatchesFilter(l, layerFilter));
 
   const addLayer = (type) => {
     const num = layerCounter + 1;
     setLayerCounter(num);
     const id = uid();
     let layer = { id, type, num };
-    if (type === "circleText") layer = { ...layer, text: "NEW TEXT", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: false, flipX: false };
-    else if (type === "centerText") layer = { ...layer, text: "New text", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0 };
-    else if (type === "frame") layer = { ...layer, radius: 100, strokeWidth: 4, lineBreak: 0, x: 50, y: 50, rotation: 0 };
-    else if (type === "image") layer = { ...layer, size: 15, x: 50, y: 68, rotation: 0, imageDataUrl: null, imageObj: null };
+    if (type === "circleText") {
+      layer = { ...layer, text: "NEW TEXT", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: false, flipX: false };
+    } else if (type === "centerText") {
+      layer = { ...layer, text: "New text", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0 };
+    } else if (type === "frame") {
+      // Each newly added circle sits slightly inside the previous circle.
+      const existingCircleCount = layers.filter((l) => l.type === "frame").length;
+      const radius = Math.max(30, 100 - existingCircleCount * 16);
+      layer = { ...layer, radius, strokeWidth: 4, lineBreak: 0 };
+    } else if (type === "image") {
+      layer = { ...layer, size: 15, x: 50, y: 68, rotation: 0, imageDataUrl: null, imageObj: null };
+    }
     setLayers((ls) => [...ls, layer]);
     setActiveLayerId(id);
   };
@@ -941,17 +972,12 @@ function CreateStampTab() {
   };
 
   const startNew = () => {
+    // New Stamp must always start completely blank: no frames, no stars,
+    // no hidden/default drawing and no preselected layer.
     resetDesign(pickShape);
-    if (pickShape === "circle") {
-      const firstId = uid();
-      const secondId = uid();
-      setLayers([
-        { id: firstId, type: "frame", num: 1, radius: 138, strokeWidth: 3, lineBreak: 0, x: 50, y: 50, rotation: 0 },
-        { id: secondId, type: "frame", num: 2, radius: 122, strokeWidth: 1.5, lineBreak: 0, x: 50, y: 50, rotation: 0 },
-      ]);
-      setActiveLayerId(firstId);
-      setLayerCounter(2);
-    }
+    setLayers([]);
+    setActiveLayerId(null);
+    setLayerCounter(0);
     setView("editor");
   };
 
@@ -1146,7 +1172,7 @@ function CreateStampTab() {
                   style={{
                     flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
                     padding: "14px 6px", borderRadius: 10, cursor: "pointer", fontFamily: font.body,
-                    background: active ? "#E9F0FB" : C.white,
+                    background: active ? "#EAF2FF" : C.white,
                     border: `2px solid ${active ? STAMP_INK_BLUE : C.line}`,
                     color: active ? STAMP_INK_BLUE : C.ink,
                   }}
@@ -1197,24 +1223,40 @@ function CreateStampTab() {
 
   /* ---------------- STEP 2: edit the design ---------------- */
 
-  // Left panel: shape picker + the text that goes on the stamp.
+  // Left panel: contextual text entry only.
+  // The shape picker is kept out of the layer editor so the editing area
+  // stays focused on the selected object, like the reference UI.
   const textFields = (
     <>
-      <Label>Shape</Label>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {STAMP_SHAPES.map((s) => (
-          <Btn
-            key={s.id}
-            variant={shape === s.id ? "solid" : "ghost"}
-            onClick={() => setShape(s.id)}
-            style={{ flex: 1, justifyContent: "center", ...(shape === s.id ? { background: STAMP_INK_BLUE } : {}) }}
-          >
-            {s.label}
-          </Btn>
-        ))}
-      </div>
-
-      {shape === "circle" ? (
+      {activeLayer?.type === "centerText" ? (
+        <>
+          <Label>Text in the centre</Label>
+          <Field
+            placeholder="New text"
+            value={activeLayer.text ?? ""}
+            onChange={(e) => updateLayer(activeLayer.id, { text: e.target.value })}
+            maxLength={40}
+          />
+        </>
+      ) : activeLayer?.type === "circleText" ? (
+        <>
+          <Label>Text around the circle</Label>
+          <Field
+            placeholder="YOUR COMPANY NAME"
+            value={activeLayer.text ?? ""}
+            onChange={(e) => updateLayer(activeLayer.id, { text: e.target.value })}
+            maxLength={40}
+          />
+        </>
+      ) : activeLayer?.type === "frame" ? (
+        <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5, lineHeight: 1.5, textAlign: "center" }}>
+          Circle selected — edit its circle properties on the right.
+        </div>
+      ) : !activeLayer ? (
+        <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5, lineHeight: 1.5, textAlign: "center" }}>
+          Select a layer above to edit it.
+        </div>
+      ) : shape === "circle" ? (
         <>
           <Label>Top curved text</Label>
           <Field placeholder="YOUR COMPANY NAME" value={topText} onChange={(e) => setTopText(e.target.value)} maxLength={40} />
@@ -1275,8 +1317,8 @@ function CreateStampTab() {
         <select value={layer.fontSize ?? layer.size ?? 16} onChange={(e) => updateLayer(layer.id, { fontSize: Number(e.target.value), size: Number(e.target.value) })} style={{ border: "none", padding: "8px 8px", fontSize: 13, background: C.white, outline: "none" }}>
           {[10,12,14,16,18,20,22,24,28,32,36,40,48,56,64].map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
-        <button type="button" onClick={() => updateLayer(layer.id, { bold: !layer.bold })} style={{ border: "none", borderTop: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, background: layer.bold ? "#E9F0FB" : C.white, fontWeight: 700, padding: "7px 10px", cursor: "pointer" }}>B</button>
-        <button type="button" onClick={() => updateLayer(layer.id, { flipX: !layer.flipX })} style={{ border: "none", borderTop: `1px solid ${C.line}`, background: layer.flipX ? "#E9F0FB" : C.white, padding: "7px 10px", cursor: "pointer", fontSize: 12 }}>⇋ Flip text</button>
+        <button type="button" onClick={() => updateLayer(layer.id, { bold: !layer.bold })} style={{ border: "none", borderTop: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, background: layer.bold ? "#EAF2FF" : C.white, fontWeight: 700, padding: "7px 10px", cursor: "pointer" }}>B</button>
+        <button type="button" onClick={() => updateLayer(layer.id, { flipX: !layer.flipX })} style={{ border: "none", borderTop: `1px solid ${C.line}`, background: layer.flipX ? "#EAF2FF" : C.white, padding: "7px 10px", cursor: "pointer", fontSize: 12 }}>⇋ Flip text</button>
       </div>
     </>
   );
@@ -1302,7 +1344,7 @@ function CreateStampTab() {
         <>
           <SliderControl label="Radius text" value={activeLayer.radius ?? 130} min={40} max={155} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
           <SliderControl label="Spacing" value={activeLayer.spacing ?? 4} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { spacing: v })} />
-          <SliderControl label="Start point" value={activeLayer.start ?? 90} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { start: v })} />
+          <SliderControl label="Star point" value={activeLayer.start ?? 90} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { start: v })} />
         </>
       ) : activeLayer.type === "centerText" ? (
         <>
@@ -1315,9 +1357,6 @@ function CreateStampTab() {
           <SliderControl label="Radius" value={activeLayer.radius ?? 100} min={30} max={150} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
           <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
           <SliderControl label="Line break" value={activeLayer.lineBreak ?? 0} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
-          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
-          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
-          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
         </>
       ) : (
         <>
@@ -1334,15 +1373,13 @@ function CreateStampTab() {
   // All three desktop panels share this exact height, so Left / Center / Right
   // line up evenly — each one scrolls internally on its own if its content
   // is taller than the available space, instead of growing the column.
-  const PANEL_HEIGHT = "calc(100vh - 230px)";
+  const PANEL_HEIGHT = isDesktop ? "calc(100vh - 265px)" : "auto";
 
   const sidePanelStyle = {
     width: "100%",
     minWidth: 0,
     height: PANEL_HEIGHT,
     overflowY: "auto",
-    position: "sticky",
-    top: 0,
     borderRadius: 2,
   };
 
@@ -1353,46 +1390,64 @@ function CreateStampTab() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "12px 10px",
+        padding: 10,
         marginBottom: isDesktop ? 0 : 10,
-        ...(isDesktop ? { width: "100%", minWidth: 0, height: PANEL_HEIGHT, overflowY: "auto", position: "sticky", top: 14 } : {}),
+        background: C.white,
+        ...(isDesktop ? { width: "100%", minWidth: 0, height: PANEL_HEIGHT, overflow: "hidden" } : {}),
       }}
     >
-      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          minHeight: isDesktop ? 0 : 340,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#FFFFFF",
+          backgroundImage: `linear-gradient(#DDE3EA 1px, transparent 1px), linear-gradient(90deg, #DDE3EA 1px, transparent 1px), linear-gradient(#EEF1F5 1px, transparent 1px), linear-gradient(90deg, #EEF1F5 1px, transparent 1px)`,
+          backgroundSize: "40px 40px, 40px 40px, 10px 10px, 10px 10px",
+          backgroundPosition: "-1px -1px, -1px -1px, -1px -1px, -1px -1px",
+          border: `1px solid ${C.line}`,
+          overflow: "hidden",
+        }}
+      >
         <canvas
           ref={canvasRef}
           onClick={handleCanvasClick}
           title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
-          style={{ width: STAMP_CANVAS_SIZE, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1", cursor: layers.length ? "pointer" : "default" }}
+          style={{ width: Math.min(STAMP_CANVAS_SIZE, 330), maxWidth: "88%", height: "auto", aspectRatio: "1 / 1", cursor: layers.length ? "pointer" : "default" }}
         />
         {layers.length > 0 && (
-          <div style={{ marginTop: 6, fontFamily: font.mono, fontSize: 10, color: C.inkSoft, textAlign: "center" }}>Click any item on the stamp to edit</div>
+          <div style={{ marginTop: 5, fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft, textAlign: "center", background: "rgba(255,255,255,.8)", padding: "2px 7px", borderRadius: 10 }}>Click any item on the stamp to edit</div>
         )}
       </div>
-      <Btn onClick={handleDownload} style={{ marginTop: 14, background: STAMP_INK_BLUE }}><Download size={16} /> Download PNG</Btn>
     </Card>
   );
 
-  const toolbarPill = { padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13.5, fontFamily: font.body, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, border: "none" };
+  const toolbarPill = { padding: "8px 14px", borderRadius: 7, fontWeight: 700, fontSize: 13, fontFamily: font.body, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, border: "none" };
   const toolbarIconBtn = {
-    display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none",
-    color: C.white, cursor: "pointer", fontFamily: font.body, fontSize: 11, fontWeight: 600, textAlign: "center", lineHeight: 1.15, padding: "4px 6px",
+    display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none",
+    color: C.white, cursor: "pointer", fontFamily: font.body, fontSize: 10.5, fontWeight: 600, textAlign: "center", lineHeight: 1.1, padding: "2px 7px",
   };
-  const toolbarIconBox = { width: 34, height: 34, borderRadius: 9, border: `2px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" };
+  const toolbarIconBox = { width: 40, height: 40, borderRadius: 7, border: `2px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" };
 
   return (
     <div>
       <div
         style={{
-          background: `linear-gradient(90deg, ${STAMP_INK_BLUE}, ${C.sage})`,
+          background: STAMP_INK_BLUE,
           borderRadius: 4,
-          padding: "8px 16px",
+          padding: isDesktop ? "8px 14px" : "10px",
+          minHeight: 54,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 12,
+          gap: 10,
           flexWrap: isDesktop ? "nowrap" : "wrap",
-          marginBottom: 14,
+          marginBottom: 0,
+          boxShadow: "0 1px 2px rgba(36,95,196,.12)",
         }}
       >
         <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white }}>
@@ -1470,19 +1525,61 @@ function CreateStampTab() {
       )}
 
       {isDesktop ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, alignItems: "stretch", width: "100%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(205px, .9fr) minmax(260px, 1.05fr) minmax(205px, .9fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
           <Card style={{ ...sidePanelStyle, padding: 0 }}>
             <div style={{ display: "flex", height: 38, borderBottom: `1px solid ${C.line}`, background: C.paper }}>
               {['All', 'Text', 'Figure'].map((t, i) => (
-                <button key={t} type="button" style={{ flex: 1, border: "none", borderRight: i < 2 ? `1px solid ${C.line}` : "none", background: i === 0 ? C.white : "transparent", color: C.ink, fontFamily: font.body, fontSize: 12.5, cursor: "pointer" }}>{t}</button>
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setLayerFilter(t)}
+                  style={{ flex: 1, border: "none", borderRight: i < 2 ? `1px solid ${C.line}` : "none", background: layerFilter === t ? C.white : "transparent", color: C.ink, fontFamily: font.body, fontSize: 12.5, cursor: "pointer" }}
+                >{t}</button>
               ))}
             </div>
-            <div style={{ padding: 10 }}>{textFields}</div>
+            <div style={{ padding: 10 }}>
+              {layers.length === 0 ? (
+                <div style={{ padding: "14px 6px", color: C.inkSoft, fontFamily: font.mono, fontSize: 11, textAlign: "center" }}>
+                  Add an item from the toolbar above.
+                </div>
+              ) : filteredLayers.length === 0 ? (
+                <div style={{ padding: "14px 6px", color: C.inkSoft, fontFamily: font.mono, fontSize: 11, textAlign: "center" }}>
+                  No items in this category.
+                </div>
+              ) : (
+                filteredLayers.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setActiveLayerId(l.id)}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                      background: activeLayerId === l.id ? "#EAF2FF" : "transparent",
+                      border: "none", borderBottom: `1px solid ${C.line}`,
+                      padding: "10px 2px", cursor: "pointer", textAlign: "left"
+                    }}
+                  >
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font.body, fontSize: 12.5, color: activeLayerId === l.id ? STAMP_INK_BLUE : C.ink }}>
+                      <span style={{ fontFamily: font.mono, color: C.inkSoft, marginRight: 6 }}>{l.num}#</span>{LAYER_TYPE_NAMES[l.type]}
+                    </span>
+                    <span style={{ color: C.inkSoft, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>⋮</span>
+                  </button>
+                ))
+              )}
+            </div>
           </Card>
           {canvasBlock}
           <Card style={{ ...sidePanelStyle, padding: 12 }}>
-            {activeLayer ? layerPanel : <div style={{ padding: 8, color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>Select an item above or click an item on the stamp to edit.</div>}
-            {controlFields}
+            {activeLayer ? (
+              layerPanel
+            ) : (
+              <>
+                <div style={{ padding: 8, color: C.inkSoft, fontFamily: font.mono, fontSize: 11, marginBottom: 12 }}>
+                  Select an item above or click an item on the stamp to edit.
+                </div>
+                {controlFields}
+              </>
+            )}
           </Card>
         </div>
       ) : (
@@ -1491,9 +1588,30 @@ function CreateStampTab() {
           <Card>
             {layerPanel}
             {textFields}
-            {controlFields}
+            {!activeLayer && controlFields}
           </Card>
         </>
+      )}
+
+      {isDesktop && (
+        <div style={{
+          height: 60, display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 16, padding: "8px 10px", background: C.white, border: `1px solid ${C.line}`,
+          borderTop: "none", marginBottom: 10,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: font.body, fontSize: 13.5, color: C.ink }}>
+            <span style={{ fontWeight: 600 }}>Plate size:</span>
+            <input
+              type="number" min="10" max="100" value={plateSize}
+              onChange={(e) => setPlateSize(Number(e.target.value) || 0)}
+              style={{ width: 52, border: "none", borderBottom: `2px solid ${STAMP_INK_BLUE}`, outline: "none", color: STAMP_INK_BLUE, fontWeight: 700, fontSize: 16, textAlign: "center", background: "transparent" }}
+            />
+            <span style={{ color: C.inkSoft }}>/mm</span>
+          </div>
+          <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: 184, justifyContent: "center", borderRadius: 8 }}>
+            <Download size={16} /> Download stamp
+          </Btn>
+        </div>
       )}
 
       <Card>
@@ -1524,6 +1642,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
   const [editRubberId, setEditRubberId] = useState("");
   const [editMobile, setEditMobile] = useState("");
   const [editDiscount, setEditDiscount] = useState(0);
+  const [editPaymentMode, setEditPaymentMode] = useState("Cash");
   const [editRemarks, setEditRemarks] = useState("");
   const [editBusy, setEditBusy] = useState(false);
 
@@ -1546,6 +1665,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     setEditRubberId(e.rubber_id);
     setEditMobile(e.mobile || "");
     setEditDiscount(e.discount || 0);
+    setEditPaymentMode(e.payment_mode || "Cash");
     setEditRemarks(e.remarks || "");
   };
   const editRubber = rubbers.find((r) => r.id === editRubberId);
@@ -1558,7 +1678,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     try {
       await dbUpdate("stamp_entries", editId, {
         date: editDate, rubber_id: editRubberId, mobile: editMobile,
-        rate: editRate, discount: Number(editDiscount || 0), amount: editAmount, remarks: editRemarks,
+        rate: editRate, discount: Number(editDiscount || 0), amount: editAmount, payment_mode: editPaymentMode, remarks: editRemarks,
       });
       setEditId(null);
       await refresh();
@@ -1579,6 +1699,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
         Rate: e.rate,
         Discount: e.discount,
         Amount: e.amount,
+        "Payment Mode": e.payment_mode || "Cash",
         Balance: e.balanceAfter,
       };
     });
@@ -1616,6 +1737,12 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
                 <Field type="number" value={editDiscount} onChange={(ev) => setEditDiscount(ev.target.value)} />
                 <Label>Amount (Auto)</Label>
                 <Field value={inr(editAmount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
+                <Label>Payment Mode</Label>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  {["Cash", "Bank"].map((mode) => (
+                    <Btn key={mode} variant={editPaymentMode === mode ? "solid" : "ghost"} onClick={() => setEditPaymentMode(mode)} style={{ flex: 1, justifyContent: "center" }}>{mode === "Cash" ? "💵 Cash" : "🏦 Bank"}</Btn>
+                  ))}
+                </div>
                 <Label>Stamp Name (text engraved on stamp)</Label>
                 <Field value={editRemarks} onChange={(ev) => setEditRemarks(ev.target.value)} />
                 <div style={{ display: "flex", gap: 8 }}>
@@ -1638,6 +1765,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
                 <div style={{ flex: 1, marginLeft: 12 }}>
                   <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft }}>{fmtDate(e.date)}</div>
                   <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{e.mobile || "no mobile"}</div>
+                  <div style={{ display: "inline-flex", marginTop: 5, padding: "2px 7px", borderRadius: 999, background: (e.payment_mode || "Cash") === "Bank" ? "#EAF2FF" : "#EEF8F1", color: (e.payment_mode || "Cash") === "Bank" ? C.stampDark : "#2D7A4A", fontFamily: font.mono, fontSize: 10, fontWeight: 700 }}>{(e.payment_mode || "Cash") === "Bank" ? "🏦 BANK" : "💵 CASH"}</div>
                   {e.remarks && <div style={{ fontFamily: font.body, fontSize: 12, color: C.ink, marginTop: 4, fontStyle: "italic" }}>"{e.remarks}"</div>}
                   {e.image_url ? (
                     <a href={e.image_url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 6 }}>
@@ -1925,43 +2053,38 @@ function RubberTab({ rubbers, refresh }) {
 /* ================= PURCHASE ================= */
 function PurchaseTab({ rubbers, purchases, refresh }) {
   const [date, setDate] = useState(todayISO());
-  const [courier, setCourier] = useState(0);
-  const [items, setItems] = useState([{ rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [items, setItems] = useState([{ rubberId: rubbers[0]?.id || "", qty: "", purchaseRate: "" }]);
   const [busy, setBusy] = useState(false);
 
   const [editId, setEditId] = useState(null);
   const [editRubberId, setEditRubberId] = useState("");
   const [editQty, setEditQty] = useState(0);
   const [editRate, setEditRate] = useState(0);
-  const [editCourier, setEditCourier] = useState(0);
   const [editDate, setEditDate] = useState(todayISO());
+  const [editPaymentMode, setEditPaymentMode] = useState("Cash");
   const [editBusy, setEditBusy] = useState(false);
 
-  const addRow = () => setItems([...items, { rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
+  const addRow = () => setItems([...items, { rubberId: rubbers[0]?.id || "", qty: "", purchaseRate: "" }]);
   const removeRow = (idx) => setItems(items.filter((_, i) => i !== idx));
   const updateRow = (idx, patch) => setItems(items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
 
   const itemsAmount = items.reduce((s, it) => s + Number(it.qty || 0) * Number(it.purchaseRate || 0), 0);
-  const total = itemsAmount + Number(courier || 0);
 
   const save = async () => {
     const validItems = items.filter((it) => it.rubberId && Number(it.qty) > 0);
     if (validItems.length === 0 || busy) return;
     setBusy(true);
     try {
-      for (let i = 0; i < validItems.length; i++) {
-        const it = validItems[i];
+      for (const it of validItems) {
         const amount = Number(it.qty) * Number(it.purchaseRate || 0);
-        const isLast = i === validItems.length - 1;
-        const rowCourier = isLast ? Number(courier || 0) : 0;
         await dbInsert("purchases", {
           id: uid(), date, rubber_id: it.rubberId, qty: Number(it.qty),
           purchase_rate: Number(it.purchaseRate || 0), amount,
-          courier: rowCourier, total: amount + rowCourier,
+          courier: 0, total: amount, payment_mode: paymentMode,
         });
       }
-      setItems([{ rubberId: rubbers[0]?.id || "", qty: 0, purchaseRate: 0 }]);
-      setCourier(0);
+      setItems([{ rubberId: rubbers[0]?.id || "", qty: "", purchaseRate: "" }]);
       await refresh();
     } finally {
       setBusy(false);
@@ -1973,7 +2096,7 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
     setEditRubberId(p.rubber_id);
     setEditQty(p.qty);
     setEditRate(p.purchase_rate);
-    setEditCourier(p.courier || 0);
+    setEditPaymentMode(p.payment_mode || "Cash");
     setEditDate(p.date);
   };
   const saveEdit = async () => {
@@ -1983,8 +2106,8 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
       const amount = Number(editQty) * Number(editRate || 0);
       await dbUpdate("purchases", editId, {
         date: editDate, rubber_id: editRubberId, qty: Number(editQty),
-        purchase_rate: Number(editRate || 0), amount,
-        courier: Number(editCourier || 0), total: amount + Number(editCourier || 0),
+        purchase_rate: Number(editRate || 0), amount, courier: 0,
+        total: amount, payment_mode: editPaymentMode,
       });
       setEditId(null);
       await refresh();
@@ -1994,25 +2117,30 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
   };
   const removePurchase = async (id) => { await dbDelete("purchases", id); await refresh(); };
 
-  const purchasesChronological = [...purchases].sort((a, b) => new Date(a.date) - new Date(b.date));
-  let runningSpend = 0;
-  const purchasesWithBalance = purchasesChronological.map((p) => {
-    runningSpend += Number(p.total);
-    return { ...p, runningTotal: runningSpend };
-  });
-  const purchasesDisplay = [...purchasesWithBalance].reverse();
+  // All rows having the same date are shown as ONE purchase in the list.
+  const grouped = useMemo(() => {
+    const map = new Map();
+    purchases.forEach((p) => {
+      const key = p.date;
+      if (!map.has(key)) map.set(key, { date: key, items: [], total: 0, modes: new Set() });
+      const g = map.get(key);
+      g.items.push(p);
+      g.total += Number(p.total || 0);
+      g.modes.add(p.payment_mode || "Cash");
+    });
+    return [...map.values()].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [purchases]);
 
   const exportCSV = () => {
-    const rows = purchasesDisplay.map((p) => {
+    const rows = [...purchases].sort((a, b) => new Date(b.date) - new Date(a.date)).map((p) => {
       const r = rubbers.find((r) => r.id === p.rubber_id);
       return {
         Date: fmtDate(p.date),
-        "Rubber Name": r?.name || "",
+        "Payment Mode": p.payment_mode || "Cash",
+        "Item Name": r?.name || "",
         Qty: p.qty,
-        "Purchase Rate": p.purchase_rate,
-        Courier: p.courier,
+        Rate: p.purchase_rate,
         Total: p.total,
-        "Running Total": p.runningTotal,
       };
     });
     exportToCSV(`purchases-${todayISO()}.csv`, rows);
@@ -2024,94 +2152,91 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
         <SectionTitle icon={ShoppingCart} title="Purchase Entry" bare />
         <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
+
       <Card>
-        <Label>Date</Label>
-        <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+          <div>
+            <Label>Date</Label>
+            <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ marginBottom: 0 }} />
+          </div>
+          <div>
+            <Label>Payment Mode</Label>
+            <div style={{ display: "flex", gap: 7 }}>
+              <Btn variant={paymentMode === "Cash" ? "solid" : "ghost"} onClick={() => setPaymentMode("Cash")} style={{ flex: 1, justifyContent: "center", padding: "9px 10px" }}>💵 Cash</Btn>
+              <Btn variant={paymentMode === "Bank" ? "solid" : "ghost"} onClick={() => setPaymentMode("Bank")} style={{ flex: 1, justifyContent: "center", padding: "9px 10px" }}>🏦 Bank</Btn>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "38px minmax(180px, 1fr) 120px 140px 110px 34px", gap: 8, alignItems: "center", padding: "8px 10px", background: C.paperDark, borderRadius: 7, fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: .5 }}>
+          <span>#</span><span>ITEM NAME</span><span>QTY</span><span>RATE (₹)</span><span style={{ textAlign: "right" }}>AMOUNT</span><span />
+        </div>
 
         {items.map((it, idx) => {
           const rowAmount = Number(it.qty || 0) * Number(it.purchaseRate || 0);
           return (
-            <div key={idx} style={{ border: `1px dashed ${C.line}`, borderRadius: 8, padding: 10, marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <Label>Item {idx + 1}</Label>
-                {items.length > 1 && (
-                  <button onClick={() => removeRow(idx)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={14} /></button>
-                )}
-              </div>
-              <Select value={it.rubberId} onChange={(e) => updateRow(idx, { rubberId: e.target.value })}>
+            <div key={idx} style={{ display: "grid", gridTemplateColumns: "38px minmax(180px, 1fr) 120px 140px 110px 34px", gap: 8, alignItems: "center", padding: "9px 10px", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.inkSoft }}>{idx + 1}</div>
+              <Select value={it.rubberId} onChange={(e) => updateRow(idx, { rubberId: e.target.value })} style={{ marginBottom: 0 }}>
                 {rubbers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </Select>
-              <div style={{ display: "flex", gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <Label>Quantity</Label>
-                  <Field type="number" value={it.qty} onChange={(e) => updateRow(idx, { qty: e.target.value })} style={{ marginBottom: 0 }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <Label>Rate (₹)</Label>
-                  <Field type="number" value={it.purchaseRate} onChange={(e) => updateRow(idx, { purchaseRate: e.target.value })} style={{ marginBottom: 0 }} />
-                </div>
-              </div>
-              <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 6, textAlign: "right" }}>Amount: {inr(rowAmount)}</div>
+              <Field type="number" min="0" value={it.qty} onChange={(e) => updateRow(idx, { qty: e.target.value })} placeholder="Qty" style={{ marginBottom: 0 }} />
+              <Field type="number" min="0" value={it.purchaseRate} onChange={(e) => updateRow(idx, { purchaseRate: e.target.value })} placeholder="Rate" style={{ marginBottom: 0 }} />
+              <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 700 }}>{inr(rowAmount)}</div>
+              {items.length > 1 ? <button onClick={() => removeRow(idx)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button> : <span />}
             </div>
           );
         })}
 
-        <Btn variant="ghost" onClick={addRow} style={{ width: "100%", justifyContent: "center", marginBottom: 12 }}><Plus size={16} /> Add Another Item</Btn>
-
-        <Label>Courier Charge (₹)</Label>
-        <Field type="number" value={courier} onChange={(e) => setCourier(e.target.value)} />
-        <Label>Total Amount (Auto)</Label>
-        <Field value={inr(total)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
-        <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Save Purchase"}</Btn>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
+          <Btn variant="ghost" onClick={addRow}><Plus size={15} /> Add Item</Btn>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 1 }}>TOTAL</div>
+            <div style={{ fontFamily: font.display, fontSize: 24, fontWeight: 800 }}>{inr(itemsAmount)}</div>
+          </div>
+        </div>
+        <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center", marginTop: 12 }}><Plus size={16} /> {busy ? "Saving…" : "Save Purchase"}</Btn>
       </Card>
-      <Label>Recent Purchases</Label>
-      {purchasesDisplay.slice(0, 15).map((p) => {
-        const r = rubbers.find((r) => r.id === p.rubber_id);
+
+      <Label>Purchase List</Label>
+      {grouped.slice(0, 30).map((g) => {
+        const mode = g.modes.size === 1 ? [...g.modes][0] : "Mixed";
         return (
-          <Card key={p.id}>
-            {editId === p.id ? (
+          <Card key={g.date}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <div>
-                <Label>Date</Label>
-                <Field type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
-                <Label>Rubber</Label>
-                <Select value={editRubberId} onChange={(e) => setEditRubberId(e.target.value)}>
-                  {rubbers.map((rb) => <option key={rb.id} value={rb.id}>{rb.name}</option>)}
-                </Select>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <Label>Quantity</Label>
-                    <Field type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ marginBottom: 0 }} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <Label>Rate (₹)</Label>
-                    <Field type="number" value={editRate} onChange={(e) => setEditRate(e.target.value)} style={{ marginBottom: 0 }} />
-                  </div>
-                </div>
-                <Label style={{ marginTop: 12 }}>Courier (₹)</Label>
-                <Field type="number" value={editCourier} onChange={(e) => setEditCourier(e.target.value)} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 1, justifyContent: "center" }}>{editBusy ? "Saving…" : "Save"}</Btn>
-                  <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
-                </div>
+                <div style={{ fontWeight: 800, fontSize: 14 }}>{fmtDate(g.date)}</div>
+                <div style={{ display: "inline-flex", marginTop: 5, padding: "2px 8px", borderRadius: 999, background: mode === "Bank" ? "#EAF2FF" : "#EEF8F1", color: mode === "Bank" ? C.stampDark : "#2D7A4A", fontFamily: font.mono, fontSize: 10, fontWeight: 700 }}>{mode === "Bank" ? "🏦 BANK" : mode === "Cash" ? "💵 CASH" : "CASH + BANK"}</div>
               </div>
-            ) : (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r?.name} · Qty {p.qty}</div>
-                  <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{fmtDate(p.date)}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.stamp }}>−{inr(p.total)}</div>
-                    <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Total: {inr(p.runningTotal)}</div>
+              <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 800, fontSize: 15 }}>{inr(g.total)}</div>
+            </div>
+            <div style={{ borderTop: `1px solid ${C.line}` }}>
+              {g.items.map((p, i) => {
+                const r = rubbers.find((r) => r.id === p.rubber_id);
+                return editId === p.id ? (
+                  <div key={p.id} style={{ padding: "10px 0", borderBottom: i < g.items.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div><Label>Date</Label><Field type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} /></div>
+                      <div><Label>Payment Mode</Label><div style={{ display: "flex", gap: 6 }}><Btn variant={editPaymentMode === "Cash" ? "solid" : "ghost"} onClick={() => setEditPaymentMode("Cash")} style={{ flex: 1, justifyContent: "center" }}>Cash</Btn><Btn variant={editPaymentMode === "Bank" ? "solid" : "ghost"} onClick={() => setEditPaymentMode("Bank")} style={{ flex: 1, justifyContent: "center" }}>Bank</Btn></div></div>
+                    </div>
+                    <Label>Item Name</Label>
+                    <Select value={editRubberId} onChange={(e) => setEditRubberId(e.target.value)}>{rubbers.map((rb) => <option key={rb.id} value={rb.id}>{rb.name}</option>)}</Select>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}><div><Label>Qty</Label><Field type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} /></div><div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={(e) => setEditRate(e.target.value)} /></div></div>
+                    <div style={{ display: "flex", gap: 8 }}><Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 1, justifyContent: "center" }}>{editBusy ? "Saving…" : "Save"}</Btn><Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn></div>
                   </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={() => startEdit(p)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={15} /></button>
-                    <button onClick={() => removePurchase(p.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button>
+                ) : (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "32px minmax(160px, 1fr) 80px 100px 110px 50px", gap: 8, alignItems: "center", padding: "9px 0", borderBottom: i < g.items.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                    <div style={{ fontFamily: font.mono, color: C.inkSoft }}>{i + 1}</div>
+                    <div style={{ fontWeight: 600 }}>{r?.name || "Unknown Item"}</div>
+                    <div style={{ fontFamily: font.mono }}>Qty {p.qty}</div>
+                    <div style={{ fontFamily: font.mono }}>₹{Number(p.purchase_rate || 0).toFixed(2)}</div>
+                    <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 700 }}>{inr(p.total)}</div>
+                    <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}><button onClick={() => startEdit(p)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={15} /></button><button onClick={() => removePurchase(p.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button></div>
                   </div>
-                </div>
-              </div>
-            )}
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 10, fontFamily: font.mono, fontWeight: 800 }}>TOTAL&nbsp;&nbsp; {inr(g.total)}</div>
           </Card>
         );
       })}
@@ -2127,22 +2252,25 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
 
-  const cashInSales = entries.reduce((s, e) => s + Number(e.amount), 0);
+  const cashInSales = entries.filter((e) => (e.payment_mode || "Cash") === "Cash").reduce((s, e) => s + Number(e.amount), 0);
+  const bankInSales = entries.filter((e) => (e.payment_mode || "Cash") === "Bank").reduce((s, e) => s + Number(e.amount), 0);
   const cashInManual = cashManual.filter((c) => c.type === "in").reduce((s, c) => s + Number(c.amount), 0);
-  const cashOutPurchase = purchases.reduce((s, p) => s + Number(p.total), 0);
+  const cashOutPurchase = purchases.filter((p) => (p.payment_mode || "Cash") === "Cash").reduce((s, p) => s + Number(p.total), 0);
+  const bankOutPurchase = purchases.filter((p) => (p.payment_mode || "Cash") === "Bank").reduce((s, p) => s + Number(p.total), 0);
   const cashOutManual = cashManual.filter((c) => c.type === "out").reduce((s, c) => s + Number(c.amount), 0);
   const totalIn = cashInSales + cashInManual;
   const totalOut = cashOutPurchase + cashOutManual;
+  const bankBalance = bankInSales - bankOutPurchase;
   const balance = totalIn - totalOut;
 
   const txnsChronological = [
-  ...entries.map((e) => {
+  ...entries.filter((e) => (e.payment_mode || "Cash") === "Cash").map((e) => {
     const r = rubbers.find((r) => r.id === e.rubber_id);
-    return { id: e.id, date: e.date, label: `${r?.name || "Unknown Item"} - Sale`, type: "in", amount: e.amount };
+    return { id: e.id, date: e.date, label: `${r?.name || "Unknown Item"} - Sale (${e.payment_mode || "Cash"})`, type: "in", amount: e.amount, payment_mode: e.payment_mode || "Cash" };
   }),
   ...purchases.map((p) => {
     const r = rubbers.find((r) => r.id === p.rubber_id);
-    return { id: p.id, date: p.date, label: `${r?.name || "Unknown Item"} - Purchase${p.courier ? " + Courier" : ""}`, type: "out", amount: p.total };
+    return { id: p.id, date: p.date, label: `${r?.name || "Unknown Item"} - Purchase (${p.payment_mode || "Cash"})`, type: "out", amount: p.total, payment_mode: p.payment_mode || "Cash" };
   }),
   ...cashManual.map((c) => ({ id: c.id, date: c.date, label: c.category, type: c.type, amount: c.amount })),
 ].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -2178,14 +2306,21 @@ let runningTotal = 0;
         <SectionTitle icon={Wallet} title="Cash Ledger" bare />
         <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
-      <Card style={{ background: C.ink, color: C.white }}>
-        <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.5, color: "#C9BC9C" }}>CURRENT CASH BALANCE</div>
-        <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, margin: "4px 0 8px" }}>{inr(balance)}</div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 11.5, gap: 8, flexWrap: "wrap" }}>
-          <span>In: <span style={{ color: "#9FC08A" }}>{inr(totalIn)}</span></span>
-          <span>Out: <span style={{ color: "#E29B90" }}>{inr(totalOut)}</span></span>
-        </div>
-      </Card>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
+        <Card style={{ background: C.ink, color: C.white }}>
+          <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.5, color: "#DCE9FF" }}>CURRENT CASH BALANCE</div>
+          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, margin: "4px 0 8px" }}>{inr(balance)}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 11.5, gap: 8, flexWrap: "wrap" }}>
+            <span>In: <span style={{ color: "#9FC08A" }}>{inr(totalIn)}</span></span>
+            <span>Out: <span style={{ color: "#E29B90" }}>{inr(totalOut)}</span></span>
+          </div>
+        </Card>
+        <Card style={{ background: C.stampDark, color: C.white }}>
+          <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.5, color: "#DCE9FF" }}>BANK RECEIPTS</div>
+          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, margin: "4px 0 8px" }}>{inr(bankBalance)}</div>
+          <div style={{ fontFamily: font.mono, fontSize: 11.5, color: "#DCE9FF" }}>Stamp entries received by Bank</div>
+        </Card>
+      </div>
       <Card>
         <Label>Add Cash Entry</Label>
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
