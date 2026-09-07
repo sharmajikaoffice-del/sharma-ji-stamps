@@ -535,6 +535,7 @@ const SIDEBAR_W = 210;
 
 /* ================= APP SHELL ================= */
 const TABS_ADMIN = [
+  { id: "dashboard", label: "Dashboard", icon: CircleDot },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "register", label: "Register", icon: BookOpen },
@@ -542,17 +543,18 @@ const TABS_ADMIN = [
   { id: "rate", label: "Rates", icon: TagIcon },
   { id: "rubber", label: "Rubber", icon: Stamp },
   { id: "purchase", label: "Purchase", icon: ShoppingCart },
-  { id: "ledger", label: "Cash", icon: Wallet },
+  { id: "ledger", label: "Cash Register", icon: Wallet },
   { id: "users", label: "Users", icon: Users },
   
 ];
 const TABS_STAFF = [
+  { id: "dashboard", label: "Dashboard", icon: CircleDot },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
   { id: "rate", label: "Rates", icon: TagIcon },
-  { id: "ledger", label: "Cash", icon: Wallet },
+  { id: "ledger", label: "Cash Register", icon: Wallet },
   
 ];
 
@@ -577,7 +579,7 @@ export default function SharmaJiStamps() {
     setUser(null);
     try { localStorage.removeItem("sjs_user"); } catch {}
   };
-  const [tab, setTab] = useState("entry");
+  const [tab, setTab] = useState("dashboard");
 
   const [users, setUsers] = useState([]);
   const [rubbers, setRubbers] = useState([]);
@@ -627,6 +629,7 @@ export default function SharmaJiStamps() {
 
   const tabContent = (
     <>
+      {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
       {tab === "create" && <CreateStampTab />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
@@ -2125,7 +2128,7 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
       if (!map.has(key)) map.set(key, { date: key, items: [], total: 0, modes: new Set() });
       const g = map.get(key);
       g.items.push(p);
-      g.total += Number(p.total || 0);
+      g.total += Number(p.total ?? p.amount ?? 0);
       g.modes.add(p.payment_mode || "Cash");
     });
     return [...map.values()].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -2140,7 +2143,7 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
         "Item Name": r?.name || "",
         Qty: p.qty,
         Rate: p.purchase_rate,
-        Total: p.total,
+        Total: Number(p.total ?? p.amount ?? 0),
       };
     });
     exportToCSV(`purchases-${todayISO()}.csv`, rows);
@@ -2230,7 +2233,7 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
                     <div style={{ fontWeight: 600 }}>{r?.name || "Unknown Item"}</div>
                     <div style={{ fontFamily: font.mono }}>Qty {p.qty}</div>
                     <div style={{ fontFamily: font.mono }}>₹{Number(p.purchase_rate || 0).toFixed(2)}</div>
-                    <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 700 }}>{inr(p.total)}</div>
+                    <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 700 }}>{inr(p.total ?? p.amount ?? 0)}</div>
                     <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}><button onClick={() => startEdit(p)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={15} /></button><button onClick={() => removePurchase(p.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button></div>
                   </div>
                 );
@@ -2246,124 +2249,141 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
 }
 
 /* ================= CASH LEDGER ================= */
+function DashboardTab({ entries, purchases, cashManual, rubbers }) {
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().slice(0, 10);
+  });
+  const [toDate, setToDate] = useState(todayISO());
+
+  const inRange = (d) => (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
+  const sales = entries.filter(e => inRange(e.date));
+  const buys = purchases.filter(p => inRange(p.date));
+  const manual = cashManual.filter(c => inRange(c.date));
+  const salesTotal = sales.reduce((s,e) => s + Number(e.amount || 0), 0);
+  const purchaseTotal = buys.reduce((s,p) => s + Number(p.total ?? p.amount ?? 0), 0);
+  const cashSales = sales.filter(e => (e.payment_mode || "Cash") === "Cash").reduce((s,e) => s + Number(e.amount || 0), 0);
+  const bankSales = sales.filter(e => (e.payment_mode || "Cash") === "Bank").reduce((s,e) => s + Number(e.amount || 0), 0);
+  const cashPurchases = buys.filter(p => (p.payment_mode || "Cash") === "Cash").reduce((s,p) => s + Number(p.total ?? p.amount ?? 0), 0);
+  const bankPurchases = buys.filter(p => (p.payment_mode || "Cash") === "Bank").reduce((s,p) => s + Number(p.total ?? p.amount ?? 0), 0);
+  const manualIn = manual.filter(c => c.type === "in").reduce((s,c) => s + Number(c.amount || 0), 0);
+  const manualOut = manual.filter(c => c.type === "out").reduce((s,c) => s + Number(c.amount || 0), 0);
+  const cashIn = cashSales + manualIn;
+  const cashOut = cashPurchases + manualOut;
+  const netCash = cashIn - cashOut;
+  const bankNet = bankSales - bankPurchases;
+
+  const daily = useMemo(() => {
+    const map = new Map();
+    [...sales.map(e => ({date:e.date, in:Number(e.amount||0), out:0})),
+      ...buys.map(p => ({date:p.date, in:0, out:Number(p.total ?? p.amount ?? 0)})),
+      ...manual.map(c => ({date:c.date, in:c.type === "in" ? Number(c.amount||0) : 0, out:c.type === "out" ? Number(c.amount||0) : 0}))]
+      .forEach(x => { if (!map.has(x.date)) map.set(x.date,{date:x.date,in:0,out:0}); const r=map.get(x.date); r.in+=x.in; r.out+=x.out; });
+    return [...map.values()].sort((a,b)=>a.date.localeCompare(b.date));
+  }, [sales, buys, manual]);
+
+  return <div>
+    <SectionTitle icon={CircleDot} title="Dashboard" />
+    <Card style={{ marginBottom: 12 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:10, alignItems:"end" }}>
+        <div><Label>From Date</Label><Field type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={{marginBottom:0}} /></div>
+        <div><Label>To Date</Label><Field type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={{marginBottom:0}} /></div>
+        <Btn variant="ghost" onClick={()=>{setFromDate("");setToDate("")}}>All Dates</Btn>
+      </div>
+    </Card>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:12}}>
+      {[
+        ["STAMP SALES", salesTotal, C.stamp], ["PURCHASE", purchaseTotal, C.ink],
+        ["CASH NET", netCash, C.sage], ["BANK NET", bankNet, C.stampDark]
+      ].map(([label,value,bg])=><Card key={label} style={{background:bg,color:C.white}}><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.2,color:"#DCE9FF"}}>{label}</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:5}}>{inr(value)}</div></Card>)}
+    </div>
+    <Card style={{marginBottom:12}}>
+      <div style={{fontWeight:800,fontSize:15,marginBottom:2}}>Cash Flow Trend</div>
+      <div style={{fontSize:11,color:C.inkSoft,marginBottom:10}}>Daily money in vs money out for the selected period.</div>
+      <LineChart data={daily} />
+    </Card>
+    <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
+      <Card>
+        <div style={{fontWeight:800,fontSize:15}}>Payment Mix</div>
+        <div style={{fontSize:11,color:C.inkSoft,marginBottom:8}}>Stamp sales received through Cash and Bank.</div>
+        <DonutChart cash={cashSales} bank={bankSales} />
+      </Card>
+      <Card>
+        <div style={{fontWeight:800,fontSize:15,marginBottom:8}}>Period Summary</div>
+        <div style={{display:"grid",gap:9,fontFamily:font.mono,fontSize:11.5}}>
+          <div style={{display:"flex",justifyContent:"space-between"}}><span>Cash In</span><b>{inr(cashIn)}</b></div>
+          <div style={{display:"flex",justifyContent:"space-between"}}><span>Cash Out</span><b>{inr(cashOut)}</b></div>
+          <div style={{display:"flex",justifyContent:"space-between"}}><span>Bank In</span><b>{inr(bankSales)}</b></div>
+          <div style={{display:"flex",justifyContent:"space-between"}}><span>Bank Out</span><b>{inr(bankPurchases)}</b></div>
+          <div style={{borderTop:`1px solid ${C.line}`,paddingTop:9,display:"flex",justifyContent:"space-between",fontWeight:800}}><span>Net Movement</span><span>{inr(cashIn + bankSales - cashOut - bankPurchases)}</span></div>
+        </div>
+      </Card>
+    </div>
+  </div>;
+}
+
+function LineChart({ data }) {
+  if (!data.length) return <EmptyNote text="No data for the selected dates." />;
+  const W=900,H=280,P=38; const max=Math.max(1,...data.map(d=>Math.max(d.in,d.out))); const step=data.length===1 ? 0 : (W-P*2)/(data.length-1);
+  const points=(key)=>data.map((d,i)=>`${P+i*step},${H-P-(d[key]/max)*(H-P*2)}`).join(" ");
+  return <div style={{overflowX:"auto"}}><svg viewBox={`0 0 ${W} ${H}`} width="100%" height="280" role="img" aria-label="Cash flow line chart">
+    {[0,.25,.5,.75,1].map(v=><line key={v} x1={P} x2={W-P} y1={H-P-v*(H-P*2)} y2={H-P-v*(H-P*2)} stroke="#D7DEE8" strokeWidth="1" />)}
+    <polyline fill="none" stroke="#3F7FE8" strokeWidth="3" points={points("in")} />
+    <polyline fill="none" stroke="#263241" strokeWidth="3" points={points("out")} />
+    {data.map((d,i)=><g key={d.date}><circle cx={P+i*step} cy={H-P-(d.in/max)*(H-P*2)} r="3.5" fill="#3F7FE8"/><circle cx={P+i*step} cy={H-P-(d.out/max)*(H-P*2)} r="3.5" fill="#263241"/><text x={P+i*step} y={H-12} textAnchor="middle" fontSize="9" fill="#687587">{new Date(d.date).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}</text></g>)}
+    <text x={P} y={18} fontSize="10" fill="#3F7FE8">IN</text><text x={P+25} y={18} fontSize="10" fill="#263241">OUT</text>
+  </svg></div>;
+}
+
+function DonutChart({ cash, bank }) {
+  const total=cash+bank; if(!total) return <EmptyNote text="No sales for the selected dates." />;
+  const r=62,circ=2*Math.PI*r, cashLen=(cash/total)*circ;
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28,minHeight:190}}>
+    <div style={{position:"relative",width:150,height:150}}><svg width="150" height="150" viewBox="0 0 150 150"><circle cx="75" cy="75" r={r} fill="none" stroke="#E8EDF4" strokeWidth="22"/><circle cx="75" cy="75" r={r} fill="none" stroke="#3F7FE8" strokeWidth="22" strokeDasharray={`${cashLen} ${circ-cashLen}`} transform="rotate(-90 75 75)" strokeLinecap="butt"/><circle cx="75" cy="75" r="38" fill={C.white}/></svg><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}><b style={{fontFamily:font.display,fontSize:18}}>{inr(total)}</b><span style={{fontSize:9,color:C.inkSoft}}>SALES</span></div></div>
+    <div style={{fontFamily:font.mono,fontSize:11,display:"grid",gap:10}}><div><span style={{display:"inline-block",width:9,height:9,borderRadius:2,background:C.stamp,marginRight:7}}/>Cash <b>{inr(cash)}</b></div><div><span style={{display:"inline-block",width:9,height:9,borderRadius:2,background:C.paperDark,border:`1px solid ${C.line}`,marginRight:7}}/>Bank <b>{inr(bank)}</b></div></div>
+  </div>;
+}
+
+/* ================= CASH REGISTER ================= */
 function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [type, setType] = useState("in");
   const [category, setCategory] = useState("Other Receipt");
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState(todayISO());
 
-  const cashInSales = entries.filter((e) => (e.payment_mode || "Cash") === "Cash").reduce((s, e) => s + Number(e.amount), 0);
-  const bankInSales = entries.filter((e) => (e.payment_mode || "Cash") === "Bank").reduce((s, e) => s + Number(e.amount), 0);
-  const cashInManual = cashManual.filter((c) => c.type === "in").reduce((s, c) => s + Number(c.amount), 0);
-  const cashOutPurchase = purchases.filter((p) => (p.payment_mode || "Cash") === "Cash").reduce((s, p) => s + Number(p.total), 0);
-  const bankOutPurchase = purchases.filter((p) => (p.payment_mode || "Cash") === "Bank").reduce((s, p) => s + Number(p.total), 0);
-  const cashOutManual = cashManual.filter((c) => c.type === "out").reduce((s, c) => s + Number(c.amount), 0);
-  const totalIn = cashInSales + cashInManual;
-  const totalOut = cashOutPurchase + cashOutManual;
-  const bankBalance = bankInSales - bankOutPurchase;
-  const balance = totalIn - totalOut;
+  const cashSales = entries.filter(e => (e.payment_mode || "Cash") === "Cash");
+  const cashPurchases = purchases.filter(p => (p.payment_mode || "Cash") === "Cash");
+  const inRange = (d) => (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
+  const allTxns = [
+    ...cashSales.map(e => { const r=rubbers.find(r=>r.id===e.rubber_id); return {id:`sale-${e.id}`,date:e.date,label:`${r?.name||"Unknown Item"} - Sale`,type:"in",amount:Number(e.amount||0),payment_mode:"Cash"}; }),
+    ...cashPurchases.map(p => { const r=rubbers.find(r=>r.id===p.rubber_id); return {id:`purchase-${p.id}`,date:p.date,label:`${r?.name||"Unknown Item"} - Purchase`,type:"out",amount:Number(p.total ?? p.amount ?? 0),payment_mode:"Cash"}; }),
+    ...cashManual.map(c => ({id:`manual-${c.id}`,date:c.date,label:c.category,type:c.type,amount:Number(c.amount||0),payment_mode:"Cash"}))
+  ].sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
 
-  const txnsChronological = [
-  ...entries.filter((e) => (e.payment_mode || "Cash") === "Cash").map((e) => {
-    const r = rubbers.find((r) => r.id === e.rubber_id);
-    return { id: e.id, date: e.date, label: `${r?.name || "Unknown Item"} - Sale (${e.payment_mode || "Cash"})`, type: "in", amount: e.amount, payment_mode: e.payment_mode || "Cash" };
-  }),
-  ...purchases.map((p) => {
-    const r = rubbers.find((r) => r.id === p.rubber_id);
-    return { id: p.id, date: p.date, label: `${r?.name || "Unknown Item"} - Purchase (${p.payment_mode || "Cash"})`, type: "out", amount: p.total, payment_mode: p.payment_mode || "Cash" };
-  }),
-  ...cashManual.map((c) => ({ id: c.id, date: c.date, label: c.category, type: c.type, amount: c.amount })),
-].sort((a, b) => new Date(a.date) - new Date(b.date));
+  let running=0;
+  const txnsWithBalance=allTxns.map(t=>{running += t.type === "in" ? t.amount : -t.amount; return {...t,balanceAfter:running};});
+  const shown=txnsWithBalance.filter(t=>inRange(t.date)).reverse();
+  const currentBalance=running;
+  const filteredIn=shown.reduce((s,t)=>s+(t.type==="in"?t.amount:0),0);
+  const filteredOut=shown.reduce((s,t)=>s+(t.type==="out"?t.amount:0),0);
 
-let runningTotal = 0;
-  const txnsWithBalance = txnsChronological.map((t) => {
-  runningTotal += t.type === "in" ? Number(t.amount) : -Number(t.amount);
-  return { ...t, balanceAfter: runningTotal };
-});
+  const addManual = async () => { if(!amount) return; await dbInsert("cash_manual",{id:uid(),date:todayISO(),type,category,amount:Number(amount),note}); setAmount(0);setNote("");await refresh(); };
+  const exportCSV=()=>exportToCSV(`cash-register-${todayISO()}.csv`,shown.map(t=>({Date:fmtDate(t.date),Description:t.label,Type:t.type==="in"?"Cash In":"Cash Out",Amount:t.amount,Balance:t.balanceAfter})));
 
-  const txns = [...txnsWithBalance].reverse();
-
-  const addManual = async () => {
-    if (!amount) return;
-    await dbInsert("cash_manual", { id: uid(), date: todayISO(), type, category, amount: Number(amount), note });
-    setAmount(0); setNote(""); await refresh();
-  };
-
-  const exportCSV = () => {
-    const rows = txns.map((t) => ({
-      Date: fmtDate(t.date),
-      Description: t.label,
-      Type: t.type === "in" ? "Cash In" : "Cash Out",
-      Amount: t.amount,
-      Balance: t.balanceAfter,
-    }));
-    exportToCSV(`cash-ledger-${todayISO()}.csv`, rows);
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
-        <SectionTitle icon={Wallet} title="Cash Ledger" bare />
-        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
-        <Card style={{ background: C.ink, color: C.white }}>
-          <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.5, color: "#DCE9FF" }}>CURRENT CASH BALANCE</div>
-          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, margin: "4px 0 8px" }}>{inr(balance)}</div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 11.5, gap: 8, flexWrap: "wrap" }}>
-            <span>In: <span style={{ color: "#9FC08A" }}>{inr(totalIn)}</span></span>
-            <span>Out: <span style={{ color: "#E29B90" }}>{inr(totalOut)}</span></span>
-          </div>
-        </Card>
-        <Card style={{ background: C.stampDark, color: C.white }}>
-          <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.5, color: "#DCE9FF" }}>BANK RECEIPTS</div>
-          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, margin: "4px 0 8px" }}>{inr(bankBalance)}</div>
-          <div style={{ fontFamily: font.mono, fontSize: 11.5, color: "#DCE9FF" }}>Stamp entries received by Bank</div>
-        </Card>
-      </div>
-      <Card>
-        <Label>Add Cash Entry</Label>
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <Btn variant={type === "in" ? "solid" : "ghost"} onClick={() => setType("in")} style={{ flex: 1, justifyContent: "center" }}>Cash In</Btn>
-          <Btn variant={type === "out" ? "solid" : "ghost"} onClick={() => setType("out")} style={{ flex: 1, justifyContent: "center" }}>Cash Out</Btn>
-        </div>
-        <Label>Category</Label>
-        <Select value={category} onChange={(e) => setCategory(e.target.value)}>{type === "in" ? <option>Other Receipt</option> : <option>Other Expense</option>}</Select>
-        <Label>Amount (₹)</Label>
-        <Field type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        <Label>Note (optional)</Label>
-        <Field value={note} onChange={(e) => setNote(e.target.value)} />
-        <Btn onClick={addManual} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add Entry</Btn>
-      </Card>
-      <Label>Transactions</Label>
-{(() => {
-  const shown = txns.slice(0, 30);
-  const groups = [];
-  shown.forEach((t) => {
-    const last = groups[groups.length - 1];
-    if (last && last.date === t.date) last.items.push(t);
-    else groups.push({ date: t.date, items: [t] });
-  });
-  return groups.map((g) => (
-    <div key={g.date}>
-      <div style={{ fontFamily: font.mono, fontSize: 10.5, fontWeight: 700, color: C.brass, textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 6px" }}>{fmtDate(g.date)}</div>
-      {g.items.map((t) => (
-        <Card key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <div style={{ minWidth: 0, overflow: "hidden" }}>
-            <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontFamily: font.mono, fontWeight: 700, color: t.type === "in" ? C.sage : C.stamp }}>{t.type === "in" ? "+" : "−"}{inr(t.amount)}</div>
-            <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(t.balanceAfter)}</div>
-          </div>
-        </Card>
-      ))}
+  return <div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,paddingBottom:10,borderBottom:`2px solid ${C.headerGreen}`,gap:8}}><SectionTitle icon={Wallet} title="Cash Register" bare/><Btn variant="ghost" onClick={exportCSV} style={{padding:"6px 10px",fontSize:11.5}}><Download size={13}/> Export</Btn></div>
+    <Card style={{marginBottom:12}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:10,alignItems:"end"}}><div><Label>From Date</Label><Field type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={{marginBottom:0}}/></div><div><Label>To Date</Label><Field type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={{marginBottom:0}}/></div><Btn variant="ghost" onClick={()=>{setFromDate("");setToDate(todayISO())}}>Reset</Btn></div></Card>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10,marginBottom:12}}>
+      <Card style={{background:C.ink,color:C.white}}><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:"#DCE9FF"}}>CURRENT CASH BALANCE</div><div style={{fontFamily:font.display,fontWeight:700,fontSize:28,marginTop:4}}>{inr(currentBalance)}</div></Card>
+      <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH IN</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredIn)}</div></Card>
+      <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH OUT</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredOut)}</div></Card>
     </div>
-  ));
-})()}
-      {txns.length === 0 && <EmptyNote text="No transactions yet." />}
-    </div>
-  );
+    <Card><Label>Add Cash Entry</Label><div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>setType("in")} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>setType("out")} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>Category</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<option>Other Expense</option>}</Select><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}><Plus size={16}/> Add Entry</Btn></Card>
+    <Label>Transactions</Label>
+    {(() => { const groups=[]; shown.slice(0,100).forEach(t=>{const last=groups[groups.length-1];if(last&&last.date===t.date)last.items.push(t);else groups.push({date:t.date,items:[t]});}); return groups.map(g=><div key={g.date}><div style={{fontFamily:font.mono,fontSize:10.5,fontWeight:700,color:C.brass,textTransform:"uppercase",letterSpacing:1,margin:"16px 0 6px"}}>{fmtDate(g.date)}</div>{g.items.map(t=><Card key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0,overflow:"hidden"}}><div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.label}</div></div><div style={{textAlign:"right",flexShrink:0}}><div style={{fontFamily:font.mono,fontWeight:700,color:t.type==="in"?C.sage:C.stamp}}>{t.type==="in"?"+":"−"}{inr(t.amount)}</div><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,marginTop:2}}>Bal: {inr(t.balanceAfter)}</div></div></Card>)}</div>); })()}
+    {shown.length===0 && <EmptyNote text="No cash transactions for the selected dates."/>}
+  </div>;
 }
 
 /* ================= USERS ================= */
