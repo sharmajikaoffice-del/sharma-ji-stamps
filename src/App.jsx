@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download,
-  Wand2
+  Wand2, ChevronLeft, ChevronRight
 } from "lucide-react";
 
 /* =====================================================================
@@ -144,14 +144,191 @@ function addInkTexture(ctx, w, h, color, seed) {
   ctx.restore();
 }
 
-const STAMP_INK_COLORS = [
-  { name: "Classic Red", value: "#B7302C" },
-  { name: "Registrar Navy", value: "#1F3A5F" },
-  { name: "Notary Black", value: "#1A1A1A" },
-  { name: "Archive Green", value: "#2F5D46" },
-  { name: "Violet Ledger", value: "#4A3466" },
-];
+const STAMP_INK_BLUE = "#2158A6";
 const STAMP_CANVAS_SIZE = 320;
+const STAMP_SHAPES = [
+  { id: "circle", label: "Round" },
+  { id: "rectangle", label: "Rectangle" },
+  { id: "square", label: "Square" },
+];
+
+/* Shared stamp renderer — used by both the live editor canvas and the
+   small template-picker thumbnails, so the drawing logic lives in one place. */
+function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
+  if (!canvas) return;
+  const { shape, topText = "", bottomText = "", centerLine1 = "", centerLine2 = "", rectLine1 = "", rectLine2 = "", rectLine3 = "", inkColor = STAMP_INK_BLUE, borderStyle = "double", texture = true, logo = null, radius = 138, strokeWidth = 3, letterSpacing = 2.5 } = cfg;
+  const dpr = window.devicePixelRatio || 1;
+  const size = STAMP_CANVAS_SIZE;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width = displaySize + "px";
+  canvas.style.height = displaySize + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, size, size);
+
+  const cx = size / 2;
+  const cy = size / 2;
+  ctx.strokeStyle = inkColor;
+  ctx.fillStyle = inkColor;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  if (shape === "circle") {
+    const outerR = radius;
+    const innerR = borderStyle === "double" ? outerR - 16 : outerR;
+    const textR = outerR - 25;
+    const scale = outerR / 138;
+
+    ctx.lineWidth = strokeWidth;
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (borderStyle === "double") {
+      ctx.lineWidth = strokeWidth * 0.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (borderStyle === "dashed") {
+      ctx.save();
+      ctx.setLineDash([6, 5]);
+      ctx.lineWidth = strokeWidth * 0.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR - 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.font = "600 12px Georgia, 'Times New Roman', serif";
+    drawArcText(ctx, topText.toUpperCase(), cx, cy, textR, -Math.PI / 2, 1, letterSpacing);
+    drawArcText(ctx, bottomText.toUpperCase(), cx, cy, textR, Math.PI / 2, -1, letterSpacing);
+
+    if (logo) {
+      const logoSize = 44;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.drawImage(logo, cx - logoSize / 2, cy - 54 * scale, logoSize, logoSize);
+      ctx.restore();
+    }
+
+    ctx.font = "700 16px Georgia, 'Times New Roman', serif";
+    ctx.fillText(centerLine1.toUpperCase(), cx, logo ? cy + 4 : cy - 4);
+    if (centerLine2) {
+      ctx.font = "400 11px Georgia, 'Times New Roman', serif";
+      ctx.fillText(centerLine2.toUpperCase(), cx, cy + (logo ? 24 : 16));
+    }
+
+    ctx.font = "12px Georgia, serif";
+    ctx.fillText("★", cx - 54 * scale, cy - (logo ? -4 : 4));
+    ctx.fillText("★", cx + 54 * scale, cy - (logo ? -4 : 4));
+  } else {
+    const w = 260;
+    const h = shape === "square" ? 200 : 170;
+    const x = cx - w / 2;
+    const y = cy - h / 2;
+
+    ctx.lineWidth = strokeWidth;
+    if (borderStyle === "dashed") ctx.setLineDash([6, 5]);
+    ctx.strokeRect(x, y, w, h);
+    if (borderStyle === "double") {
+      ctx.lineWidth = strokeWidth * 0.5;
+      ctx.strokeRect(x + 8, y + 8, w - 16, h - 16);
+    }
+    ctx.setLineDash([]);
+
+    let cursorY = y + 42;
+    if (logo) {
+      const logoSize = 36;
+      ctx.drawImage(logo, cx - logoSize / 2, cursorY - logoSize / 2, logoSize, logoSize);
+      cursorY += logoSize / 2 + 20;
+    }
+
+    ctx.font = "700 16px Georgia, 'Times New Roman', serif";
+    ctx.fillText(rectLine1.toUpperCase(), cx, cursorY);
+    cursorY += 22;
+
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 22, cursorY - 9);
+    ctx.lineTo(x + w - 22, cursorY - 9);
+    ctx.stroke();
+
+    ctx.font = "400 11px Georgia, 'Times New Roman', serif";
+    ctx.fillText(rectLine2, cx, cursorY + 4);
+    cursorY += 20;
+
+    ctx.font = "italic 400 10px Georgia, 'Times New Roman', serif";
+    ctx.fillText(rectLine3.toUpperCase(), cx, cursorY + 4);
+  }
+
+  if (texture) addInkTexture(ctx, size, size, inkColor, 42);
+}
+
+/* Slider row with prev/next step arrows — matches the "Radius / Stroke width / Line break" controls. */
+function SliderControl({ label, value, min, max, step = 0.1, onChange }) {
+  const fmt = (n) => (Math.round(n * 10) / 10).toString();
+  const clamp = (n) => Math.min(max, Math.max(min, n));
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontFamily: font.body, fontSize: 13, color: C.ink, marginBottom: 6 }}>
+        {label} <span style={{ color: C.brass, fontFamily: font.mono, fontSize: 12 }}>[ {fmt(value)} ]</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => onChange(clamp(value - step * 5))}
+          style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: C.white, color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          style={{ flex: 1, accentColor: STAMP_INK_BLUE, cursor: "pointer" }}
+        />
+        <button
+          type="button"
+          onClick={() => onChange(clamp(value + step * 5))}
+          style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: C.white, color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* Small outline icon used in the shape picker (Round / Rectangle / Square). */
+function ShapeIcon({ shape }) {
+  const base = { border: "2px solid currentColor", background: "transparent", boxSizing: "border-box" };
+  if (shape === "circle") return <div style={{ ...base, width: 22, height: 22, borderRadius: "50%" }} />;
+  if (shape === "square") return <div style={{ ...base, width: 20, height: 20, borderRadius: 4 }} />;
+  return <div style={{ ...base, width: 28, height: 16, borderRadius: 4 }} />;
+}
+
+/* Small live-rendered preview used in the template picker grid. */
+function TemplateThumb({ config, size = 140 }) {
+  const ref = useRef(null);
+  const [logoImg, setLogoImg] = useState(null);
+  useEffect(() => {
+    if (!config.logoDataUrl) { setLogoImg(null); return; }
+    const img = new Image();
+    img.onload = () => setLogoImg(img);
+    img.src = config.logoDataUrl;
+  }, [config.logoDataUrl]);
+  useEffect(() => {
+    drawStampOnCanvas(ref.current, { ...config, inkColor: config.inkColor || STAMP_INK_BLUE, logo: logoImg }, size);
+  }, [config, logoImg, size]);
+  return <canvas ref={ref} style={{ maxWidth: "100%", display: "block" }} />;
+}
 
 function useFonts() {
   useEffect(() => {
@@ -220,6 +397,18 @@ function Login({ users, onLogin }) {
       else { setError("Wrong PIN"); setTimeout(() => setPin(""), 400); }
     }
   };
+
+  // Keyboard support so desktop users can type their PIN, not just click with the mouse.
+  useEffect(() => {
+    const onKeyDown = (ev) => {
+      if (!selected) return;
+      if (ev.key >= "0" && ev.key <= "9") { press(ev.key); return; }
+      if (ev.key === "Backspace") { press("back"); return; }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   return (
     <div style={{ minHeight: "100vh", background: C.paper, display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px" }}>
       <StampMark size={110} />
@@ -257,6 +446,18 @@ function Login({ users, onLogin }) {
   );
 }
 
+/* ---------- responsive helper ---------- */
+function useIsDesktop(breakpoint = 900) {
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && window.innerWidth >= breakpoint);
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= breakpoint);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [breakpoint]);
+  return isDesktop;
+}
+const SIDEBAR_W = 236;
+
 /* ================= APP SHELL ================= */
 const TABS_ADMIN = [
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
@@ -282,9 +483,25 @@ const TABS_STAFF = [
 
 export default function SharmaJiStamps() {
   useFonts();
+  const isDesktop = useIsDesktop();
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState("");
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem("sjs_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const login = (u) => {
+    setUser(u);
+    try { localStorage.setItem("sjs_user", JSON.stringify(u)); } catch {}
+  };
+  const logout = () => {
+    setUser(null);
+    try { localStorage.removeItem("sjs_user"); } catch {}
+  };
   const [tab, setTab] = useState("entry");
 
   const [users, setUsers] = useState([]);
@@ -330,8 +547,58 @@ export default function SharmaJiStamps() {
     </div>
   );
 
-  if (!user) return <Login users={users} onLogin={setUser} />;
+  if (!user) return <Login users={users} onLogin={login} />;
   const tabs = user.role === "admin" ? TABS_ADMIN : TABS_STAFF;
+
+  const tabContent = (
+    <>
+      {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
+      {tab === "create" && <CreateStampTab />}
+      {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
+      {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
+      {tab === "rate" && <RateTab rubbers={rubbers} refresh={refreshAll} canEdit={user.role === "admin"} />}
+      {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
+      {tab === "purchase" && user.role === "admin" && <PurchaseTab rubbers={rubbers} purchases={purchases} refresh={refreshAll} />}
+      {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} rubbers={rubbers} refresh={refreshAll} />}
+      {tab === "users" && user.role === "admin" && <UsersTab users={users} refresh={refreshAll} currentUser={user} />}
+    </>
+  );
+
+  if (isDesktop) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, overflowX: "hidden" }}>
+        {/* ---- desktop sidebar ---- */}
+        <div style={{ position: "fixed", top: 0, bottom: 0, left: 0, width: SIDEBAR_W, background: C.headerGreen, color: C.white, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+          <div style={{ padding: "22px 18px 18px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.14)" }}>
+            <StampMark size={32} />
+            <div>
+              <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 15, lineHeight: 1.15 }}>Sharma Ji Stamps</div>
+              <div style={{ fontFamily: font.mono, fontSize: 9, letterSpacing: 1, color: "#C9BC9C", marginTop: 3 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: "10px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+            {tabs.map((t) => {
+              const Icon = t.icon; const active = tab === t.id;
+              return (
+                <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 10, background: active ? "rgba(255,255,255,0.14)" : "none", border: "none", borderRadius: 8, padding: "10px 12px", cursor: "pointer", color: active ? C.white : "#C9D6CE", fontFamily: font.body, fontSize: 13.5, textAlign: "left" }}>
+                  <Icon size={17} />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={logout} style={{ margin: 14, background: "none", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: font.body, fontSize: 12.5, padding: "9px 0" }}><LogOut size={15} /> Logout</button>
+        </div>
+
+        {/* ---- desktop content ---- */}
+        <div style={{ marginLeft: SIDEBAR_W, minHeight: "100vh" }}>
+          <div style={{ padding: "32px 44px 48px", maxWidth: 1140, width: "100%", margin: "0 auto" }}>
+            {tabContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column", overflowX: "hidden" }}>
@@ -343,19 +610,11 @@ export default function SharmaJiStamps() {
             <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: "#C9BC9C", marginTop: 2 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
           </div>
         </div>
-        <button onClick={() => setUser(null)} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
+        <button onClick={logout} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
       </div>
 
       <div style={{ flex: 1, padding: "16px 16px 90px", maxWidth: 760, width: "100%", margin: "0 auto" }}>
-        {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
-        {tab === "create" && <CreateStampTab />}
-        {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
-        {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
-        {tab === "rate" && <RateTab rubbers={rubbers} refresh={refreshAll} canEdit={user.role === "admin"} />}
-        {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
-        {tab === "purchase" && user.role === "admin" && <PurchaseTab rubbers={rubbers} purchases={purchases} refresh={refreshAll} />}
-        {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} rubbers={rubbers} refresh={refreshAll} />}
-        {tab === "users" && user.role === "admin" && <UsersTab users={users} refresh={refreshAll} currentUser={user} />}
+        {tabContent}
       </div>
 
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.white, borderTop: `1px solid ${C.line}`, display: "flex", overflowX: "auto" }}>
@@ -411,62 +670,78 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
     setBusy(false);
   };
 
+  const isDesktop = useIsDesktop();
+
+  const recentList = entries.slice(0, 8).map((e) => {
+    const r = rubbers.find((r) => r.id === e.rubber_id);
+    return (
+      <Card key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <div style={{ minWidth: 0, overflow: "hidden" }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r?.name || "—"}</div>
+          <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtDate(e.date)} · {e.mobile || "no mobile"}</div>
+        </div>
+        <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage, flexShrink: 0 }}>+{inr(e.amount)}</div>
+      </Card>
+    );
+  });
+
   return (
     <div>
       <SectionTitle icon={PenSquare} title="Make Stamp Entry" />
-      <Card>
-        <Label>Date</Label>
-        <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        <Label>Select Rubber</Label>
-        <Select value={rubberId} onChange={(e) => setRubberId(e.target.value)}>
-          {rubbers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </Select>
-        <Label>Customer Mobile No.</Label>
-        <Field type="tel" placeholder="98xxxxxxxx" value={mobile} onChange={(e) => setMobile(e.target.value)} />
-        <div style={{ display: "flex", gap: 10 }}>
-          <div style={{ flex: 1 }}><Label>Qty</Label><Field value="1" disabled style={{ background: C.paperDark, color: C.inkSoft }} /></div>
-          <div style={{ flex: 1 }}><Label>Rate (Auto)</Label><Field value={inr(rate)} disabled style={{ background: C.paperDark, color: C.inkSoft }} /></div>
-        </div>
-        <Label>Discount (₹)</Label>
-        <Field type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-        <Label>Amount (Auto = Rate − Discount)</Label>
-        <Field value={inr(amount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
-        <Label>Stamp Impression Image</Label>
-        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
-        {photoPreview ? (
-        <img src={photoPreview} alt="Stamp impression" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
-          ) : (
-        "📷 Tap to capture / upload impression"
-        )}
-        <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
-        </label>
-
-        <Label>Stamp Name (text engraved on stamp)</Label>
-        <Field placeholder="e.g. Dr. Sharma Clinic" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Save Entry"}</Btn>
-        {savedMsg && <div style={{ marginTop: 10, color: C.sage, fontFamily: font.mono, fontSize: 12, textAlign: "center" }}>{savedMsg}</div>}
-      </Card>
-      <Label>Recent Entries</Label>
-      {entries.slice(0, 8).map((e) => {
-        const r = rubbers.find((r) => r.id === e.rubber_id);
-        return (
-          <Card key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-            <div style={{ minWidth: 0, overflow: "hidden" }}>
-              <div style={{ fontWeight: 600, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r?.name || "—"}</div>
-              <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtDate(e.date)} · {e.mobile || "no mobile"}</div>
+      <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexDirection: isDesktop ? "row" : "column" }}>
+        <div style={{ width: isDesktop ? 420 : "100%", flexShrink: 0 }}>
+          <Card>
+            <Label>Date</Label>
+            <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Label>Select Rubber</Label>
+            <Select value={rubberId} onChange={(e) => setRubberId(e.target.value)}>
+              {rubbers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </Select>
+            <Label>Customer Mobile No.</Label>
+            <Field type="tel" placeholder="98xxxxxxxx" value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}><Label>Qty</Label><Field value="1" disabled style={{ background: C.paperDark, color: C.inkSoft }} /></div>
+              <div style={{ flex: 1 }}><Label>Rate (Auto)</Label><Field value={inr(rate)} disabled style={{ background: C.paperDark, color: C.inkSoft }} /></div>
             </div>
-            <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage, flexShrink: 0 }}>+{inr(e.amount)}</div>
+            <Label>Discount (₹)</Label>
+            <Field type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <Label>Amount (Auto = Rate − Discount)</Label>
+            <Field value={inr(amount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
+            <Label>Stamp Impression Image</Label>
+            <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
+            {photoPreview ? (
+            <img src={photoPreview} alt="Stamp impression" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+              ) : (
+            "📷 Tap to capture / upload impression"
+            )}
+            <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
+            </label>
+
+            <Label>Stamp Name (text engraved on stamp)</Label>
+            <Field placeholder="e.g. Dr. Sharma Clinic" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+            <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Save Entry"}</Btn>
+            {savedMsg && <div style={{ marginTop: 10, color: C.sage, fontFamily: font.mono, fontSize: 12, textAlign: "center" }}>{savedMsg}</div>}
           </Card>
-        );
-      })}
-      {entries.length === 0 && <EmptyNote text="No entries yet." />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
+          <Label>Recent Entries</Label>
+          {isDesktop ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>{recentList}</div>
+          ) : recentList}
+          {entries.length === 0 && <EmptyNote text="No entries yet." />}
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ================= CREATE STAMP ================= */
 function CreateStampTab() {
+  const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
+  const [view, setView] = useState("templates"); // "templates" | "editor"
+  const [pickShape, setPickShape] = useState("circle");
+
   const [shape, setShape] = useState("circle");
   const [topText, setTopText] = useState("YOUR COMPANY NAME");
   const [bottomText, setBottomText] = useState("AUTHORIZED SIGNATORY");
@@ -475,12 +750,15 @@ function CreateStampTab() {
   const [rectLine1, setRectLine1] = useState("YOUR COMPANY NAME");
   const [rectLine2, setRectLine2] = useState("123 Business Street, City");
   const [rectLine3, setRectLine3] = useState("AUTHORIZED SIGNATORY");
-  const [inkColor, setInkColor] = useState(STAMP_INK_COLORS[0].value);
   const [borderStyle, setBorderStyle] = useState("double");
   const [texture, setTexture] = useState(true);
+  const [radius, setRadius] = useState(138);
+  const [strokeWidth, setStrokeWidth] = useState(3);
+  const [letterSpacing, setLetterSpacing] = useState(2.5);
   const [logo, setLogo] = useState(null);
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [fileName, setFileName] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
 
   const [templates, setTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
@@ -519,10 +797,38 @@ function CreateStampTab() {
 
   const buildConfig = () => ({
     shape, topText, bottomText, centerLine1, centerLine2,
-    rectLine1, rectLine2, rectLine3, inkColor, borderStyle, texture, logoDataUrl,
+    rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logoDataUrl,
+    radius, strokeWidth, letterSpacing,
   });
 
-  const applyConfig = (config) => {
+  const resetDesign = (initialShape) => {
+    setShape(initialShape);
+    setTopText("YOUR COMPANY NAME");
+    setBottomText("AUTHORIZED SIGNATORY");
+    setCenterLine1("APPROVED");
+    setCenterLine2("");
+    setRectLine1("YOUR COMPANY NAME");
+    setRectLine2("123 Business Street, City");
+    setRectLine3("AUTHORIZED SIGNATORY");
+    setBorderStyle("double");
+    setTexture(true);
+    setRadius(138);
+    setStrokeWidth(3);
+    setLetterSpacing(2.5);
+    setLogo(null);
+    setLogoDataUrl(null);
+    setFileName("");
+    setTemplateName("");
+    setEditingTemplateId(null);
+  };
+
+  const startNew = () => {
+    resetDesign(pickShape);
+    setView("editor");
+  };
+
+  const openTemplate = (t) => {
+    const config = t.config || {};
     setShape(config.shape ?? "circle");
     setTopText(config.topText ?? "");
     setBottomText(config.bottomText ?? "");
@@ -531,9 +837,11 @@ function CreateStampTab() {
     setRectLine1(config.rectLine1 ?? "");
     setRectLine2(config.rectLine2 ?? "");
     setRectLine3(config.rectLine3 ?? "");
-    setInkColor(config.inkColor ?? STAMP_INK_COLORS[0].value);
     setBorderStyle(config.borderStyle ?? "double");
     setTexture(config.texture ?? true);
+    setRadius(config.radius ?? 138);
+    setStrokeWidth(config.strokeWidth ?? 3);
+    setLetterSpacing(config.letterSpacing ?? 2.5);
     if (config.logoDataUrl) {
       const img = new Image();
       img.onload = () => setLogo(img);
@@ -545,6 +853,10 @@ function CreateStampTab() {
       setLogoDataUrl(null);
       setFileName("");
     }
+    setTemplateName(t.name);
+    setEditingTemplateId(t.id);
+    setSaveStatus("");
+    setView("editor");
   };
 
   const handleSaveTemplate = async () => {
@@ -552,9 +864,13 @@ function CreateStampTab() {
     if (!name || saveStatus === "saving") return;
     setSaveStatus("saving");
     try {
-      await dbInsert("stamp_templates", { id: uid(), name, config: buildConfig() });
+      if (editingTemplateId) {
+        await dbUpdate("stamp_templates", editingTemplateId, { name, config: buildConfig() });
+      } else {
+        const [saved] = await dbInsert("stamp_templates", { id: uid(), name, config: buildConfig() });
+        if (saved?.id) setEditingTemplateId(saved.id);
+      }
       setSaveStatus("saved");
-      setTemplateName("");
       await loadTemplates();
       setTimeout(() => setSaveStatus(""), 2000);
     } catch {
@@ -562,122 +878,20 @@ function CreateStampTab() {
     }
   };
 
-  const handleDeleteTemplate = async (id) => {
+  const handleDeleteTemplate = async (id, e) => {
+    e.stopPropagation();
     await dbDelete("stamp_templates", id);
+    if (editingTemplateId === id) { setEditingTemplateId(null); }
     await loadTemplates();
   };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const size = STAMP_CANVAS_SIZE;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    canvas.style.width = size + "px";
-    canvas.style.height = size + "px";
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, size, size);
-
-    const cx = size / 2;
-    const cy = size / 2;
-    ctx.strokeStyle = inkColor;
-    ctx.fillStyle = inkColor;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    if (shape === "circle") {
-      const outerR = 138;
-      const innerR = borderStyle === "double" ? 122 : outerR;
-
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-      ctx.stroke();
-
-      if (borderStyle === "double") {
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-        ctx.stroke();
-      } else if (borderStyle === "dashed") {
-        ctx.save();
-        ctx.setLineDash([6, 5]);
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(cx, cy, outerR - 8, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      ctx.font = "600 12px Georgia, 'Times New Roman', serif";
-      drawArcText(ctx, topText.toUpperCase(), cx, cy, 113, -Math.PI / 2, 1, 2.5);
-      drawArcText(ctx, bottomText.toUpperCase(), cx, cy, 113, Math.PI / 2, -1, 2.5);
-
-      if (logo) {
-        const logoSize = 44;
-        ctx.save();
-        ctx.globalAlpha = 0.9;
-        ctx.drawImage(logo, cx - logoSize / 2, cy - 54, logoSize, logoSize);
-        ctx.restore();
-      }
-
-      ctx.font = "700 16px Georgia, 'Times New Roman', serif";
-      ctx.fillText(centerLine1.toUpperCase(), cx, logo ? cy + 4 : cy - 4);
-      if (centerLine2) {
-        ctx.font = "400 11px Georgia, 'Times New Roman', serif";
-        ctx.fillText(centerLine2.toUpperCase(), cx, cy + (logo ? 24 : 16));
-      }
-
-      ctx.font = "12px Georgia, serif";
-      ctx.fillText("★", cx - 54, cy - (logo ? -4 : 4));
-      ctx.fillText("★", cx + 54, cy - (logo ? -4 : 4));
-    } else {
-      const w = 260;
-      const h = shape === "square" ? 200 : 170;
-      const x = cx - w / 2;
-      const y = cy - h / 2;
-
-      ctx.lineWidth = 3;
-      if (borderStyle === "dashed") ctx.setLineDash([6, 5]);
-      ctx.strokeRect(x, y, w, h);
-      if (borderStyle === "double") {
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(x + 8, y + 8, w - 16, h - 16);
-      }
-      ctx.setLineDash([]);
-
-      let cursorY = y + 42;
-      if (logo) {
-        const logoSize = 36;
-        ctx.drawImage(logo, cx - logoSize / 2, cursorY - logoSize / 2, logoSize, logoSize);
-        cursorY += logoSize / 2 + 20;
-      }
-
-      ctx.font = "700 16px Georgia, 'Times New Roman', serif";
-      ctx.fillText(rectLine1.toUpperCase(), cx, cursorY);
-      cursorY += 22;
-
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x + 22, cursorY - 9);
-      ctx.lineTo(x + w - 22, cursorY - 9);
-      ctx.stroke();
-
-      ctx.font = "400 11px Georgia, 'Times New Roman', serif";
-      ctx.fillText(rectLine2, cx, cursorY + 4);
-      cursorY += 20;
-
-      ctx.font = "italic 400 10px Georgia, 'Times New Roman', serif";
-      ctx.fillText(rectLine3.toUpperCase(), cx, cursorY + 4);
-    }
-
-    if (texture) addInkTexture(ctx, size, size, inkColor, 42);
-  }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, inkColor, borderStyle, texture, logo]);
+    drawStampOnCanvas(canvasRef.current, {
+      shape, topText, bottomText, centerLine1, centerLine2,
+      rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logo,
+      radius, strokeWidth, letterSpacing,
+    });
+  }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, logo, radius, strokeWidth, letterSpacing]);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -688,20 +902,102 @@ function CreateStampTab() {
     link.click();
   };
 
+  /* ---------------- STEP 1: pick a shape / pick a saved template ---------------- */
+  if (view === "templates") {
+    return (
+      <div>
+        <SectionTitle icon={Wand2} title="Create Stamp" />
+        <Card style={{ padding: 14 }}>
+          <Label>Choose a shape to start</Label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {STAMP_SHAPES.map((s) => {
+              const active = pickShape === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setPickShape(s.id)}
+                  style={{
+                    flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                    padding: "14px 6px", borderRadius: 10, cursor: "pointer", fontFamily: font.body,
+                    background: active ? "#E9F0FB" : C.white,
+                    border: `2px solid ${active ? STAMP_INK_BLUE : C.line}`,
+                    color: active ? STAMP_INK_BLUE : C.ink,
+                  }}
+                >
+                  <ShapeIcon shape={s.id} />
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <Btn onClick={startNew} style={{ width: "100%", justifyContent: "center", marginTop: 14, background: STAMP_INK_BLUE }}>
+            <Plus size={16} /> New Stamp
+          </Btn>
+        </Card>
+
+        <Label>My Templates</Label>
+        {templatesLoading && <EmptyNote text="Loading…" />}
+        {templatesError && <EmptyNote text={templatesError} />}
+        {!templatesLoading && !templatesError && templates.length === 0 && (
+          <EmptyNote text="No saved templates yet — pick a shape above and create your first one." />
+        )}
+        {templates.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "repeat(2, 1fr)", gap: 10 }}>
+            {templates.map((t) => (
+              <div
+                key={t.id}
+                onClick={() => openTemplate(t)}
+                style={{ position: "relative", background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 8px 8px", cursor: "pointer", textAlign: "center" }}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => handleDeleteTemplate(t.id, e)}
+                  style={{ position: "absolute", top: 6, right: 6, background: C.white, border: `1px solid ${C.line}`, borderRadius: 6, color: C.stamp, cursor: "pointer", padding: 4, lineHeight: 0, zIndex: 1 }}
+                >
+                  <Trash2 size={13} />
+                </button>
+                <TemplateThumb config={t.config} size={110} />
+                <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, fontFamily: font.body, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {t.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ---------------- STEP 2: edit the design ---------------- */
   return (
     <div>
-      <SectionTitle icon={Wand2} title="Create Stamp" />
+      <button
+        type="button"
+        onClick={() => setView("templates")}
+        style={{ background: "none", border: "none", cursor: "pointer", color: STAMP_INK_BLUE, display: "flex", alignItems: "center", gap: 2, fontFamily: font.body, fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 12 }}
+      >
+        <ChevronLeft size={16} /> Templates
+      </button>
+
+      <SectionTitle icon={Wand2} title={editingTemplateId ? "Edit Stamp" : "Create Stamp"} />
+
       <Card style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 14px" }}>
         <canvas ref={canvasRef} style={{ maxWidth: "100%" }} />
-        <Btn onClick={handleDownload} style={{ marginTop: 14 }}><Download size={16} /> Download PNG</Btn>
+        <Btn onClick={handleDownload} style={{ marginTop: 14, background: STAMP_INK_BLUE }}><Download size={16} /> Download PNG</Btn>
       </Card>
 
       <Card>
         <Label>Shape</Label>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {["circle", "rectangle", "square"].map((s) => (
-            <Btn key={s} variant={shape === s ? "solid" : "ghost"} onClick={() => setShape(s)} style={{ flex: 1, justifyContent: "center" }}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+          {STAMP_SHAPES.map((s) => (
+            <Btn
+              key={s.id}
+              variant={shape === s.id ? "solid" : "ghost"}
+              onClick={() => setShape(s.id)}
+              style={{ flex: 1, justifyContent: "center", ...(shape === s.id ? { background: STAMP_INK_BLUE } : {}) }}
+            >
+              {s.label}
             </Btn>
           ))}
         </div>
@@ -728,30 +1024,28 @@ function CreateStampTab() {
           </>
         )}
 
-        <Label>Ink color</Label>
-        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-          {STAMP_INK_COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              title={c.name}
-              onClick={() => setInkColor(c.value)}
-              style={{
-                width: 28, height: 28, borderRadius: "50%", background: c.value, padding: 0, cursor: "pointer",
-                border: inkColor === c.value ? `2px solid ${C.ink}` : "2px solid transparent",
-                boxShadow: inkColor === c.value ? `0 0 0 2px ${C.white}` : "none",
-              }}
-            />
-          ))}
-        </div>
-
         <Label>Border</Label>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           {["single", "double", "dashed"].map((b) => (
-            <Btn key={b} variant={borderStyle === b ? "solid" : "ghost"} onClick={() => setBorderStyle(b)} style={{ flex: 1, justifyContent: "center" }}>
+            <Btn
+              key={b}
+              variant={borderStyle === b ? "solid" : "ghost"}
+              onClick={() => setBorderStyle(b)}
+              style={{ flex: 1, justifyContent: "center", ...(borderStyle === b ? { background: STAMP_INK_BLUE } : {}) }}
+            >
               {b.charAt(0).toUpperCase() + b.slice(1)}
             </Btn>
           ))}
+        </div>
+
+        <div style={{ marginTop: 4 }}>
+          {shape === "circle" && (
+            <SliderControl label="Radius" value={radius} min={90} max={150} step={0.5} onChange={setRadius} />
+          )}
+          <SliderControl label="Stroke width" value={strokeWidth} min={0.5} max={6} step={0.1} onChange={setStrokeWidth} />
+          {shape === "circle" && (
+            <SliderControl label="Line break" value={letterSpacing} min={0} max={8} step={0.1} onChange={setLetterSpacing} />
+          )}
         </div>
 
         <Label>Logo (optional)</Label>
@@ -767,7 +1061,7 @@ function CreateStampTab() {
       </Card>
 
       <Card>
-        <Label>Save this design as a template</Label>
+        <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
         <div style={{ display: "flex", gap: 8 }}>
           <Field
             placeholder="Template name, e.g. Invoice Stamp"
@@ -775,32 +1069,13 @@ function CreateStampTab() {
             onChange={(e) => setTemplateName(e.target.value)}
             style={{ flex: 1, marginBottom: 0 }}
           />
-          <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"}>
-            {saveStatus === "saving" ? "Saving…" : "Save"}
+          <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} style={{ background: STAMP_INK_BLUE }}>
+            {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update" : "Save"}
           </Btn>
         </div>
         {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
         {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 12 }}>Couldn't save — check the table exists in Supabase.</div>}
       </Card>
-
-      <Label>My Templates</Label>
-      {templatesLoading && <EmptyNote text="Loading…" />}
-      {templatesError && <EmptyNote text={templatesError} />}
-      {!templatesLoading && !templatesError && templates.length === 0 && <EmptyNote text="No saved templates yet." />}
-      {templates.map((t) => (
-        <Card key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={() => applyConfig(t.config)}
-            style={{ background: "none", border: "none", textAlign: "left", flex: 1, fontFamily: font.body, fontWeight: 600, fontSize: 13.5, color: C.ink, cursor: "pointer" }}
-          >
-            {t.name}
-          </button>
-          <button type="button" onClick={() => handleDeleteTemplate(t.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}>
-            <Trash2 size={16} />
-          </button>
-        </Card>
-      ))}
     </div>
   );
 }
@@ -874,16 +1149,19 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     exportToCSV(`stamp-sale-register-${todayISO()}.csv`, rows);
   };
 
+  const isDesktop = useIsDesktop();
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
         <SectionTitle icon={BookOpen} title="Stamp Sale Register" bare />
         <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
-      <div style={{ position: "relative", marginBottom: 10 }}>
+      <div style={{ position: "relative", marginBottom: 10, maxWidth: isDesktop ? 420 : "none" }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
         <Field placeholder="Search by rubber name, mobile, or stamp name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
       </div>
+      <div style={isDesktop ? { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 10, alignItems: "start" } : undefined}>
       {display.map((e) => {
         const r = rubbers.find((r) => r.id === e.rubber_id);
         return (
@@ -946,6 +1224,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
           </Card>
         );
       })}
+      </div>
       {display.length === 0 && <EmptyNote text={q ? "No matching entries." : "No entries yet."} />}
     </div>
   );
