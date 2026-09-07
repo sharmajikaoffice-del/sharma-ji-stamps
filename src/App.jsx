@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download,
-  Wand2, ChevronLeft, ChevronRight
+  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X
 } from "lucide-react";
 
 /* =====================================================================
@@ -156,13 +156,14 @@ const STAMP_SHAPES = [
    small template-picker thumbnails, so the drawing logic lives in one place. */
 function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
   if (!canvas) return;
-  const { shape, topText = "", bottomText = "", centerLine1 = "", centerLine2 = "", rectLine1 = "", rectLine2 = "", rectLine3 = "", inkColor = STAMP_INK_BLUE, borderStyle = "double", texture = true, logo = null, radius = 138, strokeWidth = 3, letterSpacing = 2.5 } = cfg;
+  const { shape, topText = "", bottomText = "", centerLine1 = "", centerLine2 = "", rectLine1 = "", rectLine2 = "", rectLine3 = "", inkColor = STAMP_INK_BLUE, borderStyle = "double", texture = true, logo = null, radius = 138, strokeWidth = 3, letterSpacing = 2.5, layers = [] } = cfg;
   const dpr = window.devicePixelRatio || 1;
   const size = STAMP_CANVAS_SIZE;
   canvas.width = size * dpr;
   canvas.height = size * dpr;
-  canvas.style.width = displaySize + "px";
-  canvas.style.height = displaySize + "px";
+  // Display size is controlled purely via CSS (width + aspect-ratio) on the
+  // <canvas> element itself, so it never gets stretched into an oval when the
+  // container is narrower than the canvas — see the JSX below.
   const ctx = canvas.getContext("2d");
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
@@ -182,25 +183,31 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     const innerR = borderStyle === "double" ? outerR - 16 : outerR;
     const textR = outerR - 25;
     const scale = outerR / 138;
+    const hasFrameLayers = layers.some((l) => l.type === "frame");
 
-    ctx.lineWidth = strokeWidth;
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-    ctx.stroke();
+    // When the two circles are represented by separate Frame layers, let those
+    // layers own the rings. This prevents the old built-in double border from
+    // being drawn a second time and makes each ring independently editable.
+    if (!hasFrameLayers) {
+      ctx.lineWidth = strokeWidth;
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+      ctx.stroke();
 
-    if (borderStyle === "double") {
-      ctx.lineWidth = strokeWidth * 0.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (borderStyle === "dashed") {
-      ctx.save();
-      ctx.setLineDash([6, 5]);
-      ctx.lineWidth = strokeWidth * 0.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy, outerR - 8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      if (borderStyle === "double") {
+        ctx.lineWidth = strokeWidth * 0.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (borderStyle === "dashed") {
+        ctx.save();
+        ctx.setLineDash([6, 5]);
+        ctx.lineWidth = strokeWidth * 0.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR - 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     ctx.font = "600 12px Georgia, 'Times New Roman', serif";
@@ -266,6 +273,66 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
   }
 
   if (texture) addInkTexture(ctx, size, size, inkColor, 42);
+
+  // Extra layers added from the toolbar — drawn on top, using percentage
+  // positions so they scale with the canvas.
+  layers.forEach((layer) => {
+    const lx = ((layer.x ?? 50) / 100) * size;
+    const ly = ((layer.y ?? 50) / 100) * size;
+    const rot = ((layer.rotation ?? 0) * Math.PI) / 180;
+    ctx.fillStyle = inkColor;
+    ctx.strokeStyle = inkColor;
+    if (layer.type === "circleText") {
+      ctx.save();
+      ctx.translate(cx, cy);
+      if (layer.flipX) ctx.scale(-1, 1);
+      ctx.translate(-cx, -cy);
+      const weight = layer.bold ? 700 : 400;
+      const family = layer.fontFamily || "Arial";
+      const size = layer.fontSize ?? 13;
+      ctx.font = `${weight} ${size}px ${family}`;
+      const startAngle = (((layer.start ?? 90) - 90) * Math.PI) / 180;
+      drawArcText(ctx, (layer.text || "").toUpperCase(), cx, cy, layer.radius ?? 130, startAngle, 1, layer.spacing ?? 4);
+      ctx.restore();
+    } else if (layer.type === "centerText") {
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(rot);
+      const weight = layer.bold ? 700 : 400;
+      const family = layer.fontFamily || "Arial";
+      ctx.font = `${weight} ${layer.fontSize ?? layer.size ?? 16}px ${family}`;
+      if (layer.flipX) ctx.scale(-1, 1);
+      ctx.fillText(layer.text || "", 0, 0);
+      ctx.restore();
+    } else if (layer.type === "frame") {
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(rot);
+      const r = Math.min(size * 0.48, layer.radius ?? 100);
+      const sw = layer.strokeWidth ?? 4;
+      const gap = Math.max(0, layer.lineBreak ?? 0);
+      ctx.lineWidth = sw;
+      // Line break now affects the actual circle stroke: it creates visible
+      // breaks in this Frame instead of incorrectly drawing a second dashed ring.
+      if (gap > 0) {
+        ctx.setLineDash([Math.max(2, gap * 1.6), Math.max(2, gap * 1.2)]);
+      } else {
+        ctx.setLineDash([]);
+      }
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    } else if (layer.type === "image" && layer.imageObj) {
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(rot);
+      const isz = ((layer.size ?? 15) / 100) * size;
+      ctx.drawImage(layer.imageObj, -isz / 2, -isz / 2, isz, isz);
+      ctx.restore();
+    }
+  });
 }
 
 /* Slider row with prev/next step arrows — matches the "Radius / Stroke width / Line break" controls. */
@@ -327,7 +394,7 @@ function TemplateThumb({ config, size = 140 }) {
   useEffect(() => {
     drawStampOnCanvas(ref.current, { ...config, inkColor: config.inkColor || STAMP_INK_BLUE, logo: logoImg }, size);
   }, [config, logoImg, size]);
-  return <canvas ref={ref} style={{ maxWidth: "100%", display: "block" }} />;
+  return <canvas ref={ref} style={{ width: size, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1", display: "block" }} />;
 }
 
 function useFonts() {
@@ -348,8 +415,8 @@ function useFonts() {
     style.id = "sjs-reset";
     style.textContent = `
       *, *::before, *::after { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }
-      #root { max-width: 100%; overflow-x: hidden; }
+      html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; background: ${C.paper}; }
+      #root { max-width: 100%; min-height: 100vh; overflow-x: hidden; background: ${C.paper}; }
     `;
     document.head.appendChild(style);
   }, []);
@@ -739,17 +806,18 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
 function CreateStampTab() {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
+  const logoInputRef = useRef(null);
   const [view, setView] = useState("templates"); // "templates" | "editor"
   const [pickShape, setPickShape] = useState("circle");
 
   const [shape, setShape] = useState("circle");
-  const [topText, setTopText] = useState("YOUR COMPANY NAME");
-  const [bottomText, setBottomText] = useState("AUTHORIZED SIGNATORY");
-  const [centerLine1, setCenterLine1] = useState("APPROVED");
+  const [topText, setTopText] = useState("");
+  const [bottomText, setBottomText] = useState("");
+  const [centerLine1, setCenterLine1] = useState("");
   const [centerLine2, setCenterLine2] = useState("");
-  const [rectLine1, setRectLine1] = useState("YOUR COMPANY NAME");
-  const [rectLine2, setRectLine2] = useState("123 Business Street, City");
-  const [rectLine3, setRectLine3] = useState("AUTHORIZED SIGNATORY");
+  const [rectLine1, setRectLine1] = useState("");
+  const [rectLine2, setRectLine2] = useState("");
+  const [rectLine3, setRectLine3] = useState("");
   const [borderStyle, setBorderStyle] = useState("double");
   const [texture, setTexture] = useState(true);
   const [radius, setRadius] = useState(138);
@@ -759,6 +827,53 @@ function CreateStampTab() {
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [fileName, setFileName] = useState("");
   const [editingTemplateId, setEditingTemplateId] = useState(null);
+
+  // Extra layers added from the toolbar (Text around the circle / Text in the
+  // centre / Circle / Images) — each becomes its own tab, like the reference editor.
+  const [layers, setLayers] = useState([]);
+  const [activeLayerId, setActiveLayerId] = useState(null);
+  const [layerCounter, setLayerCounter] = useState(0);
+  const layerImageInputRef = useRef(null);
+
+  const LAYER_TYPE_NAMES = { circleText: "Circle txt", centerText: "Text", frame: "Frame", image: "Image" };
+  const layerLabel = (l) => `${LAYER_TYPE_NAMES[l.type]} #${l.num}`;
+
+  const addLayer = (type) => {
+    const num = layerCounter + 1;
+    setLayerCounter(num);
+    const id = uid();
+    let layer = { id, type, num };
+    if (type === "circleText") layer = { ...layer, text: "NEW TEXT", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: false, flipX: false };
+    else if (type === "centerText") layer = { ...layer, text: "New text", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0 };
+    else if (type === "frame") layer = { ...layer, radius: 100, strokeWidth: 4, lineBreak: 0, x: 50, y: 50, rotation: 0 };
+    else if (type === "image") layer = { ...layer, size: 15, x: 50, y: 68, rotation: 0, imageDataUrl: null, imageObj: null };
+    setLayers((ls) => [...ls, layer]);
+    setActiveLayerId(id);
+  };
+
+  const updateLayer = (id, patch) => setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+
+  const removeLayer = (id) => {
+    setLayers((ls) => {
+      const next = ls.filter((l) => l.id !== id);
+      if (activeLayerId === id) setActiveLayerId(next.length ? next[next.length - 1].id : null);
+      return next;
+    });
+  };
+
+  const activeLayer = layers.find((l) => l.id === activeLayerId) || null;
+
+  const handleLayerImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file || !activeLayer) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => updateLayer(activeLayer.id, { imageObj: img, imageDataUrl: ev.target.result });
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [templates, setTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
@@ -799,17 +914,18 @@ function CreateStampTab() {
     shape, topText, bottomText, centerLine1, centerLine2,
     rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logoDataUrl,
     radius, strokeWidth, letterSpacing,
+    layers: layers.map(({ imageObj, ...l }) => l),
   });
 
   const resetDesign = (initialShape) => {
     setShape(initialShape);
-    setTopText("YOUR COMPANY NAME");
-    setBottomText("AUTHORIZED SIGNATORY");
-    setCenterLine1("APPROVED");
+    setTopText("");
+    setBottomText("");
+    setCenterLine1("");
     setCenterLine2("");
-    setRectLine1("YOUR COMPANY NAME");
-    setRectLine2("123 Business Street, City");
-    setRectLine3("AUTHORIZED SIGNATORY");
+    setRectLine1("");
+    setRectLine2("");
+    setRectLine3("");
     setBorderStyle("double");
     setTexture(true);
     setRadius(138);
@@ -820,10 +936,22 @@ function CreateStampTab() {
     setFileName("");
     setTemplateName("");
     setEditingTemplateId(null);
+    setLayers([]);
+    setActiveLayerId(null);
   };
 
   const startNew = () => {
     resetDesign(pickShape);
+    if (pickShape === "circle") {
+      const firstId = uid();
+      const secondId = uid();
+      setLayers([
+        { id: firstId, type: "frame", num: 1, radius: 138, strokeWidth: 3, lineBreak: 0, x: 50, y: 50, rotation: 0 },
+        { id: secondId, type: "frame", num: 2, radius: 122, strokeWidth: 1.5, lineBreak: 0, x: 50, y: 50, rotation: 0 },
+      ]);
+      setActiveLayerId(firstId);
+      setLayerCounter(2);
+    }
     setView("editor");
   };
 
@@ -856,6 +984,38 @@ function CreateStampTab() {
     setTemplateName(t.name);
     setEditingTemplateId(t.id);
     setSaveStatus("");
+
+    // Normalize preloaded/saved template items so every item has a stable id + number
+    // and can be selected/edited individually after the template is opened.
+    const rawLayers = Array.isArray(config.layers) ? config.layers : [];
+    const normalizedRaw = [...rawLayers];
+    const hasFrameLayer = normalizedRaw.some((l) => l.type === "frame");
+    // Legacy circle templates used borderStyle="double" instead of two Frame
+    // layers. Convert those two visible rings into separate editable Frames.
+    if (config.shape === "circle" && config.borderStyle === "double" && !hasFrameLayer) {
+      const baseRadius = config.radius ?? 138;
+      const baseStroke = config.strokeWidth ?? 3;
+      normalizedRaw.push(
+        { type: "frame", radius: baseRadius, strokeWidth: baseStroke, lineBreak: 0, x: 50, y: 50, rotation: 0 },
+        { type: "frame", radius: Math.max(20, baseRadius - 16), strokeWidth: baseStroke * 0.5, lineBreak: 0, x: 50, y: 50, rotation: 0 }
+      );
+    }
+    const savedLayers = normalizedRaw.map((l, index) => ({
+      ...l,
+      id: l.id || uid(),
+      num: l.num || index + 1,
+    }));
+    setLayers(savedLayers);
+    setActiveLayerId(savedLayers.length ? savedLayers[0].id : null);
+    setLayerCounter(savedLayers.reduce((max, l) => Math.max(max, l.num || 0), 0));
+    savedLayers.forEach((l) => {
+      if (l.type === "image" && l.imageDataUrl) {
+        const img = new Image();
+        img.onload = () => updateLayer(l.id, { imageObj: img });
+        img.src = l.imageDataUrl;
+      }
+    });
+
     setView("editor");
   };
 
@@ -889,9 +1049,75 @@ function CreateStampTab() {
     drawStampOnCanvas(canvasRef.current, {
       shape, topText, bottomText, centerLine1, centerLine2,
       rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logo,
-      radius, strokeWidth, letterSpacing,
+      radius, strokeWidth, letterSpacing, layers,
     });
-  }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, logo, radius, strokeWidth, letterSpacing]);
+  }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, logo, radius, strokeWidth, letterSpacing, layers]);
+
+  // Click any item directly on the stamp to make it the active/editable item.
+  // Preloaded template layers use the same hit-testing as newly added layers.
+  const handleCanvasClick = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !layers.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) / rect.width) * STAMP_CANVAS_SIZE;
+    const py = ((e.clientY - rect.top) / rect.height) * STAMP_CANVAS_SIZE;
+    const cx = STAMP_CANVAS_SIZE / 2;
+    const cy = STAMP_CANVAS_SIZE / 2;
+    const distance = (x, y) => Math.hypot(px - x, py - y);
+
+    const candidates = layers.map((layer, index) => {
+      let score = Infinity;
+
+      if (layer.type === "circleText") {
+        const r = Math.hypot(px - cx, py - cy);
+        const textRadius = layer.radius ?? 130;
+        const text = layer.text || "";
+        const chars = Math.max(1, text.length);
+        const spacing = layer.spacing ?? 4;
+        const arc = Math.max(0.16, (chars * (7 + spacing)) / textRadius);
+        const start = (((layer.start ?? 90) - 90) * Math.PI) / 180;
+        const pointerAngle = Math.atan2(py - cy, px - cx);
+        const diff = Math.atan2(
+          Math.sin(pointerAngle - start),
+          Math.cos(pointerAngle - start)
+        );
+        // Give curved text a generous clickable arc so old/preloaded templates
+        // remain editable even when their exact character positions differ.
+        if (Math.abs(r - textRadius) <= 30 && Math.abs(diff) <= Math.max(arc / 2, 0.45)) {
+          score = Math.abs(r - textRadius) + Math.abs(diff) * textRadius * 0.15;
+        }
+      } else if (layer.type === "frame") {
+        // Frames are rings, so their clickable area is around the actual radius,
+        // not at x/y=50% (which previously made preloaded frames hard to select).
+        const frameRadius = layer.radius ?? 100;
+        const r = Math.hypot(px - cx, py - cy);
+        const tolerance = Math.max(18, (layer.strokeWidth ?? 4) * 2.5 + 10);
+        if (Math.abs(r - frameRadius) <= tolerance) {
+          score = Math.abs(r - frameRadius);
+        }
+      } else if (layer.type === "centerText") {
+        const lx = ((layer.x ?? 50) / 100) * STAMP_CANVAS_SIZE;
+        const ly = ((layer.y ?? 50) / 100) * STAMP_CANVAS_SIZE;
+        const size = ((layer.fontSize ?? layer.size ?? 16) / 100) * STAMP_CANVAS_SIZE;
+        const hitRadius = Math.max(28, size * 2.2);
+        const d = distance(lx, ly);
+        if (d <= hitRadius) score = d;
+      } else if (layer.type === "image") {
+        const lx = ((layer.x ?? 50) / 100) * STAMP_CANVAS_SIZE;
+        const ly = ((layer.y ?? 50) / 100) * STAMP_CANVAS_SIZE;
+        const size = ((layer.size ?? 15) / 100) * STAMP_CANVAS_SIZE;
+        const hitRadius = Math.max(28, size * 0.8);
+        const d = distance(lx, ly);
+        if (d <= hitRadius) score = d;
+      }
+
+      // Later layers are drawn on top, so prefer the topmost matching layer.
+      if (Number.isFinite(score)) score += (layers.length - index) * 0.001;
+      return { layer, score };
+    }).filter((x) => Number.isFinite(x.score)).sort((a, b) => a.score - b.score);
+
+    if (candidates[0]) setActiveLayerId(candidates[0].layer.id);
+  };
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -970,95 +1196,305 @@ function CreateStampTab() {
   }
 
   /* ---------------- STEP 2: edit the design ---------------- */
+
+  // Left panel: shape picker + the text that goes on the stamp.
+  const textFields = (
+    <>
+      <Label>Shape</Label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        {STAMP_SHAPES.map((s) => (
+          <Btn
+            key={s.id}
+            variant={shape === s.id ? "solid" : "ghost"}
+            onClick={() => setShape(s.id)}
+            style={{ flex: 1, justifyContent: "center", ...(shape === s.id ? { background: STAMP_INK_BLUE } : {}) }}
+          >
+            {s.label}
+          </Btn>
+        ))}
+      </div>
+
+      {shape === "circle" ? (
+        <>
+          <Label>Top curved text</Label>
+          <Field placeholder="YOUR COMPANY NAME" value={topText} onChange={(e) => setTopText(e.target.value)} maxLength={40} />
+          <Label>Bottom curved text</Label>
+          <Field placeholder="AUTHORIZED SIGNATORY" value={bottomText} onChange={(e) => setBottomText(e.target.value)} maxLength={40} />
+          <Label>Center line</Label>
+          <Field placeholder="APPROVED" value={centerLine1} onChange={(e) => setCenterLine1(e.target.value)} maxLength={20} />
+          <Label>Center line (small, optional)</Label>
+          <Field value={centerLine2} onChange={(e) => setCenterLine2(e.target.value)} maxLength={24} />
+        </>
+      ) : (
+        <>
+          <Label>Line 1 (bold)</Label>
+          <Field placeholder="YOUR COMPANY NAME" value={rectLine1} onChange={(e) => setRectLine1(e.target.value)} maxLength={40} />
+          <Label>Line 2</Label>
+          <Field placeholder="123 Business Street, City" value={rectLine2} onChange={(e) => setRectLine2(e.target.value)} maxLength={50} />
+          <Label>Line 3 (italic)</Label>
+          <Field placeholder="AUTHORIZED SIGNATORY" value={rectLine3} onChange={(e) => setRectLine3(e.target.value)} maxLength={40} />
+        </>
+      )}
+    </>
+  );
+
+  // Right panel: border / sliders / logo / texture — this is the panel that
+  // scrolls on its own on desktop, like the reference editor.
+  const controlFields = (
+    <>
+      <div style={{ marginTop: 4 }}>
+        {shape === "circle" && (
+          <SliderControl label="Radius" value={radius} min={90} max={150} step={0.5} onChange={setRadius} />
+        )}
+        <SliderControl label="Stroke width" value={strokeWidth} min={0.5} max={6} step={0.1} onChange={setStrokeWidth} />
+        {shape === "circle" && (
+          <SliderControl label="Line break" value={letterSpacing} min={0} max={8} step={0.1} onChange={setLetterSpacing} />
+        )}
+      </div>
+
+      <Label>Logo (optional)</Label>
+      <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "14px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer" }}>
+        {fileName || "Tap to upload logo image"}
+        <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
+      </label>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer" }}>
+        <input type="checkbox" checked={texture} onChange={(e) => setTexture(e.target.checked)} />
+        Worn ink texture
+      </label>
+    </>
+  );
+
+  const fontOptions = ["Arial", "Georgia", "Times New Roman", "Verdana", "Courier New", "Trebuchet MS"];
+  const textPropertyPanel = (layer) => (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1.35fr .65fr", border: `1px solid ${C.line}`, background: C.white, margin: "-2px -2px 14px", borderRadius: 4, overflow: "hidden" }}>
+        <select value={layer.fontFamily || "Arial"} onChange={(e) => updateLayer(layer.id, { fontFamily: e.target.value })} style={{ border: "none", borderRight: `1px solid ${C.line}`, padding: "8px 10px", fontFamily: layer.fontFamily || "Arial", fontSize: 13, background: C.white, outline: "none" }}>
+          {fontOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <select value={layer.fontSize ?? layer.size ?? 16} onChange={(e) => updateLayer(layer.id, { fontSize: Number(e.target.value), size: Number(e.target.value) })} style={{ border: "none", padding: "8px 8px", fontSize: 13, background: C.white, outline: "none" }}>
+          {[10,12,14,16,18,20,22,24,28,32,36,40,48,56,64].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <button type="button" onClick={() => updateLayer(layer.id, { bold: !layer.bold })} style={{ border: "none", borderTop: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, background: layer.bold ? "#E9F0FB" : C.white, fontWeight: 700, padding: "7px 10px", cursor: "pointer" }}>B</button>
+        <button type="button" onClick={() => updateLayer(layer.id, { flipX: !layer.flipX })} style={{ border: "none", borderTop: `1px solid ${C.line}`, background: layer.flipX ? "#E9F0FB" : C.white, padding: "7px 10px", cursor: "pointer", fontSize: 12 }}>⇋ Flip text</button>
+      </div>
+    </>
+  );
+
+  const layerPanel = activeLayer && (
+    <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <Label>{layerLabel(activeLayer)}</Label>
+        <button type="button" onClick={() => removeLayer(activeLayer.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {(activeLayer.type === "circleText" || activeLayer.type === "centerText") && (
+        <>
+          <Label>Text</Label>
+          <Field value={activeLayer.text} onChange={(e) => updateLayer(activeLayer.id, { text: e.target.value })} maxLength={40} />
+          {textPropertyPanel(activeLayer)}
+        </>
+      )}
+
+      {activeLayer.type === "circleText" ? (
+        <>
+          <SliderControl label="Radius text" value={activeLayer.radius ?? 130} min={40} max={155} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
+          <SliderControl label="Spacing" value={activeLayer.spacing ?? 4} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { spacing: v })} />
+          <SliderControl label="Start point" value={activeLayer.start ?? 90} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { start: v })} />
+        </>
+      ) : activeLayer.type === "centerText" ? (
+        <>
+          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
+          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+        </>
+      ) : activeLayer.type === "frame" ? (
+        <>
+          <SliderControl label="Radius" value={activeLayer.radius ?? 100} min={30} max={150} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
+          <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <SliderControl label="Line break" value={activeLayer.lineBreak ?? 0} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
+          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
+          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+        </>
+      ) : (
+        <>
+          <SliderControl label="Size" value={activeLayer.size ?? 15} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { size: v })} />
+          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
+          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+          <Btn variant="ghost" onClick={() => layerImageInputRef.current?.click()} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}>Upload own</Btn>
+        </>
+      )}
+    </div>
+  );
+
+  // All three desktop panels share this exact height, so Left / Center / Right
+  // line up evenly — each one scrolls internally on its own if its content
+  // is taller than the available space, instead of growing the column.
+  const PANEL_HEIGHT = "calc(100vh - 230px)";
+
+  const sidePanelStyle = {
+    width: "100%",
+    minWidth: 0,
+    height: PANEL_HEIGHT,
+    overflowY: "auto",
+    position: "sticky",
+    top: 0,
+    borderRadius: 2,
+  };
+
+  const canvasBlock = (
+    <Card
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "12px 10px",
+        marginBottom: isDesktop ? 0 : 10,
+        ...(isDesktop ? { width: "100%", minWidth: 0, height: PANEL_HEIGHT, overflowY: "auto", position: "sticky", top: 14 } : {}),
+      }}
+    >
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <canvas
+          ref={canvasRef}
+          onClick={handleCanvasClick}
+          title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
+          style={{ width: STAMP_CANVAS_SIZE, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1", cursor: layers.length ? "pointer" : "default" }}
+        />
+        {layers.length > 0 && (
+          <div style={{ marginTop: 6, fontFamily: font.mono, fontSize: 10, color: C.inkSoft, textAlign: "center" }}>Click any item on the stamp to edit</div>
+        )}
+      </div>
+      <Btn onClick={handleDownload} style={{ marginTop: 14, background: STAMP_INK_BLUE }}><Download size={16} /> Download PNG</Btn>
+    </Card>
+  );
+
+  const toolbarPill = { padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13.5, fontFamily: font.body, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, border: "none" };
+  const toolbarIconBtn = {
+    display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none",
+    color: C.white, cursor: "pointer", fontFamily: font.body, fontSize: 11, fontWeight: 600, textAlign: "center", lineHeight: 1.15, padding: "4px 6px",
+  };
+  const toolbarIconBox = { width: 34, height: 34, borderRadius: 9, border: `2px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" };
+
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setView("templates")}
-        style={{ background: "none", border: "none", cursor: "pointer", color: STAMP_INK_BLUE, display: "flex", alignItems: "center", gap: 2, fontFamily: font.body, fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 12 }}
+      <div
+        style={{
+          background: `linear-gradient(90deg, ${STAMP_INK_BLUE}, ${C.sage})`,
+          borderRadius: 4,
+          padding: "8px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: isDesktop ? "nowrap" : "wrap",
+          marginBottom: 14,
+        }}
       >
-        <ChevronLeft size={16} /> Templates
-      </button>
+        <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white }}>
+          <ChevronLeft size={16} /> Templates
+        </button>
 
-      <SectionTitle icon={Wand2} title={editingTemplateId ? "Edit Stamp" : "Create Stamp"} />
-
-      <Card style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 14px" }}>
-        <canvas ref={canvasRef} style={{ maxWidth: "100%" }} />
-        <Btn onClick={handleDownload} style={{ marginTop: 14, background: STAMP_INK_BLUE }}><Download size={16} /> Download PNG</Btn>
-      </Card>
-
-      <Card>
-        <Label>Shape</Label>
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {STAMP_SHAPES.map((s) => (
-            <Btn
-              key={s.id}
-              variant={shape === s.id ? "solid" : "ghost"}
-              onClick={() => setShape(s.id)}
-              style={{ flex: 1, justifyContent: "center", ...(shape === s.id ? { background: STAMP_INK_BLUE } : {}) }}
-            >
-              {s.label}
-            </Btn>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: isDesktop ? 22 : 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <button type="button" onClick={() => addLayer("circleText")} style={toolbarIconBtn}>
+            <span style={toolbarIconBox}><CircleDot size={18} /></span>
+            Text around the circle
+          </button>
+          <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn}>
+            <span style={toolbarIconBox}><Type size={18} /></span>
+            Text in the centre
+          </button>
+          <button type="button" onClick={() => addLayer("frame")} style={toolbarIconBtn}>
+            <span style={toolbarIconBox}><Circle size={18} /></span>
+            Circle
+          </button>
+          <button
+            type="button"
+            onClick={() => { addLayer("image"); setTimeout(() => layerImageInputRef.current?.click(), 0); }}
+            style={toolbarIconBtn}
+          >
+            <span style={toolbarIconBox}><ImageIcon size={18} /></span>
+            Images
+          </button>
+          <input ref={layerImageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLayerImageUpload} />
         </div>
 
-        {shape === "circle" ? (
-          <>
-            <Label>Top curved text</Label>
-            <Field value={topText} onChange={(e) => setTopText(e.target.value)} maxLength={40} />
-            <Label>Bottom curved text</Label>
-            <Field value={bottomText} onChange={(e) => setBottomText(e.target.value)} maxLength={40} />
-            <Label>Center line</Label>
-            <Field value={centerLine1} onChange={(e) => setCenterLine1(e.target.value)} maxLength={20} />
-            <Label>Center line (small, optional)</Label>
-            <Field value={centerLine2} onChange={(e) => setCenterLine2(e.target.value)} maxLength={24} />
-          </>
-        ) : (
-          <>
-            <Label>Line 1 (bold)</Label>
-            <Field value={rectLine1} onChange={(e) => setRectLine1(e.target.value)} maxLength={40} />
-            <Label>Line 2</Label>
-            <Field value={rectLine2} onChange={(e) => setRectLine2(e.target.value)} maxLength={50} />
-            <Label>Line 3 (italic)</Label>
-            <Field value={rectLine3} onChange={(e) => setRectLine3(e.target.value)} maxLength={40} />
-          </>
-        )}
+        <button type="button" onClick={startNew} style={{ ...toolbarPill, background: C.sage, color: C.white }}>
+          <Plus size={16} /> New Stamp
+        </button>
+      </div>
 
-        <Label>Border</Label>
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {["single", "double", "dashed"].map((b) => (
-            <Btn
-              key={b}
-              variant={borderStyle === b ? "solid" : "ghost"}
-              onClick={() => setBorderStyle(b)}
-              style={{ flex: 1, justifyContent: "center", ...(borderStyle === b ? { background: STAMP_INK_BLUE } : {}) }}
-            >
-              {b.charAt(0).toUpperCase() + b.slice(1)}
-            </Btn>
-          ))}
+      {layers.length > 0 && (
+        <div style={{
+          display: "flex", alignItems: "stretch", height: 50, background: C.white,
+          borderBottom: `1px solid ${C.line}`, marginBottom: 0, overflow: "hidden"
+        }}>
+          <button type="button" onClick={() => {
+            const i = Math.max(0, layers.findIndex((l) => l.id === activeLayerId) - 1);
+            if (layers[i]) setActiveLayerId(layers[i].id);
+          }} style={{ width: 46, border: "none", background: C.white, color: C.inkSoft, cursor: "pointer", display: "grid", placeItems: "center" }}>
+            <ChevronLeft size={25} />
+          </button>
+          <div style={{ display: "flex", flex: 1, overflowX: "auto", minWidth: 0 }}>
+            {layers.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => setActiveLayerId(l.id)}
+                style={{
+                  position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  minWidth: 145, padding: "0 16px", border: "none", background: C.white, cursor: "pointer",
+                  fontFamily: font.body, fontSize: 13.5, whiteSpace: "nowrap",
+                  color: activeLayerId === l.id ? STAMP_INK_BLUE : C.ink,
+                  borderBottom: activeLayerId === l.id ? `3px solid ${STAMP_INK_BLUE}` : "3px solid transparent",
+                }}
+              >
+                {layerLabel(l)}
+                <span onClick={(e) => { e.stopPropagation(); removeLayer(l.id); }} style={{ display: "inline-flex", color: C.inkSoft, cursor: "pointer" }}>
+                  <X size={13} />
+                </span>
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => {
+            const i = Math.min(layers.length - 1, layers.findIndex((l) => l.id === activeLayerId) + 1);
+            if (layers[i]) setActiveLayerId(layers[i].id);
+          }} style={{ width: 46, border: "none", background: C.white, color: C.inkSoft, cursor: "pointer", display: "grid", placeItems: "center" }}>
+            <ChevronRight size={25} />
+          </button>
         </div>
+      )}
 
-        <div style={{ marginTop: 4 }}>
-          {shape === "circle" && (
-            <SliderControl label="Radius" value={radius} min={90} max={150} step={0.5} onChange={setRadius} />
-          )}
-          <SliderControl label="Stroke width" value={strokeWidth} min={0.5} max={6} step={0.1} onChange={setStrokeWidth} />
-          {shape === "circle" && (
-            <SliderControl label="Line break" value={letterSpacing} min={0} max={8} step={0.1} onChange={setLetterSpacing} />
-          )}
+      {isDesktop ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, alignItems: "stretch", width: "100%" }}>
+          <Card style={{ ...sidePanelStyle, padding: 0 }}>
+            <div style={{ display: "flex", height: 38, borderBottom: `1px solid ${C.line}`, background: C.paper }}>
+              {['All', 'Text', 'Figure'].map((t, i) => (
+                <button key={t} type="button" style={{ flex: 1, border: "none", borderRight: i < 2 ? `1px solid ${C.line}` : "none", background: i === 0 ? C.white : "transparent", color: C.ink, fontFamily: font.body, fontSize: 12.5, cursor: "pointer" }}>{t}</button>
+              ))}
+            </div>
+            <div style={{ padding: 10 }}>{textFields}</div>
+          </Card>
+          {canvasBlock}
+          <Card style={{ ...sidePanelStyle, padding: 12 }}>
+            {activeLayer ? layerPanel : <div style={{ padding: 8, color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>Select an item above or click an item on the stamp to edit.</div>}
+            {controlFields}
+          </Card>
         </div>
-
-        <Label>Logo (optional)</Label>
-        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "14px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer" }}>
-          {fileName || "Tap to upload logo image"}
-          <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
-        </label>
-
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer" }}>
-          <input type="checkbox" checked={texture} onChange={(e) => setTexture(e.target.checked)} />
-          Worn ink texture
-        </label>
-      </Card>
+      ) : (
+        <>
+          {canvasBlock}
+          <Card>
+            {layerPanel}
+            {textFields}
+            {controlFields}
+          </Card>
+        </>
+      )}
 
       <Card>
         <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
