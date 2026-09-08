@@ -2281,6 +2281,25 @@ function DashboardTab({ entries, purchases, cashManual, rubbers }) {
     return [...map.values()].sort((a,b)=>a.date.localeCompare(b.date));
   }, [sales, buys, manual]);
 
+  // Month-wise qty sold & average rate, last 12 months (independent of the from/to filter above,
+  // so it always shows a full trend even when a short date range is selected).
+  const monthly = useMemo(() => {
+    const map = new Map();
+    entries.forEach(e => {
+      const m = (e.date || "").slice(0, 7); // "YYYY-MM"
+      if (!m) return;
+      if (!map.has(m)) map.set(m, { month: m, qty: 0, rateSum: 0, count: 0 });
+      const r = map.get(m);
+      r.qty += Number(e.qty || 1);
+      r.rateSum += Number(e.rate || 0);
+      r.count += 1;
+    });
+    return [...map.values()]
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12)
+      .map(r => ({ month: r.month, qty: r.qty, rate: r.count ? r.rateSum / r.count : 0 }));
+  }, [entries]);
+
   return <div>
     <SectionTitle icon={CircleDot} title="Dashboard" />
     <Card style={{ marginBottom: 12 }}>
@@ -2300,6 +2319,11 @@ function DashboardTab({ entries, purchases, cashManual, rubbers }) {
       <div style={{fontWeight:800,fontSize:15,marginBottom:2}}>Cash Flow Trend</div>
       <div style={{fontSize:11,color:C.inkSoft,marginBottom:10}}>Daily money in vs money out for the selected period.</div>
       <LineChart data={daily} />
+    </Card>
+    <Card style={{marginBottom:12}}>
+      <div style={{fontWeight:800,fontSize:15,marginBottom:2}}>Monthly Sales Trend</div>
+      <div style={{fontSize:11,color:C.inkSoft,marginBottom:10}}>Qty sold aur average rate, month-wise (last 12 months).</div>
+      <MonthlyQtyRateChart data={monthly} />
     </Card>
     <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
       <Card>
@@ -2332,6 +2356,43 @@ function LineChart({ data }) {
     {data.map((d,i)=><g key={d.date}><circle cx={P+i*step} cy={H-P-(d.in/max)*(H-P*2)} r="3.5" fill="#3F7FE8"/><circle cx={P+i*step} cy={H-P-(d.out/max)*(H-P*2)} r="3.5" fill="#263241"/><text x={P+i*step} y={H-12} textAnchor="middle" fontSize="9" fill="#687587">{new Date(d.date).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}</text></g>)}
     <text x={P} y={18} fontSize="10" fill="#3F7FE8">IN</text><text x={P+25} y={18} fontSize="10" fill="#263241">OUT</text>
   </svg></div>;
+}
+
+function MonthlyQtyRateChart({ data }) {
+  if (!data.length) return <EmptyNote text="No sales data yet." />;
+  const W = 900, H = 280, P = 42;
+  const maxQty = Math.max(1, ...data.map(d => d.qty));
+  const maxRate = Math.max(1, ...data.map(d => d.rate));
+  const step = data.length === 1 ? 0 : (W - P * 2) / (data.length - 1);
+  const yQty = (v) => H - P - (v / maxQty) * (H - P * 2);
+  const yRate = (v) => H - P - (v / maxRate) * (H - P * 2);
+  const qtyPoints = data.map((d, i) => `${P + i * step},${yQty(d.qty)}`).join(" ");
+  const ratePoints = data.map((d, i) => `${P + i * step},${yRate(d.rate)}`).join(" ");
+  const monthLabel = (m) => {
+    const [y, mo] = m.split("-");
+    return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+  };
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="280" role="img" aria-label="Monthly qty and rate line chart">
+        {[0, .25, .5, .75, 1].map(v => (
+          <line key={v} x1={P} x2={W - P} y1={H - P - v * (H - P * 2)} y2={H - P - v * (H - P * 2)} stroke="#D7DEE8" strokeWidth="1" />
+        ))}
+        <polyline fill="none" stroke={C.stamp} strokeWidth="3" points={qtyPoints} />
+        <polyline fill="none" stroke={C.ink} strokeWidth="3" strokeDasharray="5 4" points={ratePoints} />
+        {data.map((d, i) => (
+          <g key={d.month}>
+            <circle cx={P + i * step} cy={yQty(d.qty)} r="3.5" fill={C.stamp} />
+            <circle cx={P + i * step} cy={yRate(d.rate)} r="3.5" fill={C.ink} />
+            <text x={P + i * step} y={H - 20} textAnchor="middle" fontSize="9" fill="#687587">{monthLabel(d.month)}</text>
+            <text x={P + i * step} y={H - 8} textAnchor="middle" fontSize="9.5" fontWeight="700" fill={C.stamp}>{d.qty}</text>
+          </g>
+        ))}
+        <text x={P} y={18} fontSize="10" fill={C.stamp}>QTY</text>
+        <text x={P + 32} y={18} fontSize="10" fill={C.ink}>RATE (avg ₹)</text>
+      </svg>
+    </div>
+  );
 }
 
 function DonutChart({ cash, bank }) {
