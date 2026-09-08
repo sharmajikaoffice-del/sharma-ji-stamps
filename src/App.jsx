@@ -1376,7 +1376,9 @@ function CreateStampTab() {
   // All three desktop panels share this exact height, so Left / Center / Right
   // line up evenly — each one scrolls internally on its own if its content
   // is taller than the available space, instead of growing the column.
-  const PANEL_HEIGHT = isDesktop ? "calc(100vh - 265px)" : "auto";
+  // Capped with min(...) so on shorter windows the panels don't eat the
+  // whole viewport and push the Plate size / Download / Save row off-screen.
+  const PANEL_HEIGHT = isDesktop ? "min(600px, calc(100vh - 320px))" : "auto";
 
   const sidePanelStyle = {
     width: "100%",
