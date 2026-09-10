@@ -380,6 +380,8 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       ctx.rotate(rot);
       const sw = layer.strokeWidth ?? 4;
       const gap = Math.max(0, layer.lineBreak ?? 0);
+      // Keep the outer edge fixed: increasing Stroke makes the border bolder
+      // by growing inward only. The Break gap remains an independent value.
       const style = layer.borderStyle || "single";
       const frameShape = layer.shape || "circle";
 
@@ -410,23 +412,56 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
         }
       };
 
-      // "Break" always creates dashed gaps in the stroke; the "Dashed" border
-      // style just guarantees a visible dash even if Break is left at 0.
-      const dashGap = style === "dashed" && gap === 0 ? 8 : gap;
-      ctx.setLineDash(dashGap > 0 ? [Math.max(2, dashGap * 1.6), Math.max(2, dashGap * 1.2)] : []);
+      // Line Break controls the NUMBER OF BREAKS around the border.
+      // 0 = continuous border. Every +1 on the slider adds 5 breaks:
+      // 1 => 5 breaks, 10 => 50 breaks, 100 => 500 breaks.
+      // Stroke width is independent and remains inward-only.
+      ctx.lineCap = "butt";
+      ctx.lineJoin = "miter";
+      ctx.setLineDash([]);
+
+      const drawTraceWithBreak = (inset, breakValue) => {
+        if (frameShape === "circle" && breakValue > 0) {
+          const r = Math.max(4, Math.min(size * 0.48, layer.radius ?? 100) - inset);
+          const breakCount = Math.max(1, Math.round(breakValue * 5));
+          const step = (Math.PI * 2) / breakCount;
+          // Each break is a sharp, evenly distributed gap. The gap fraction is
+          // intentionally modest so even 500 breaks remain visible as fine segments.
+          const gapFraction = breakCount >= 300 ? 0.38 : breakCount >= 50 ? 0.32 : 0.28;
+          const gapAngle = step * gapFraction;
+          const drawAngle = step - gapAngle;
+          const offset = -Math.PI / 2 + gapAngle / 2;
+
+          for (let i = 0; i < breakCount; i++) {
+            const start = offset + i * step;
+            const end = start + drawAngle;
+            ctx.beginPath();
+            ctx.arc(0, 0, r, start, end, false);
+            ctx.stroke();
+          }
+        } else {
+          tracePath(inset);
+          ctx.stroke();
+        }
+      };
 
       if (style === "double" || style === "triple") {
         const ringGap = Math.max(6, sw * 2.2);
         const rings = style === "triple" ? 3 : 2;
         for (let i = 0; i < rings; i++) {
           ctx.lineWidth = i === 0 ? sw : sw * 0.6;
-          tracePath(i * ringGap);
-          ctx.stroke();
+          // Keep the outer edge fixed. Every ring is shifted inward by half
+          // its own stroke width so increasing Stroke only makes it bolder inward.
+          const ringStroke = i === 0 ? sw : sw * 0.6;
+          ctx.lineWidth = ringStroke;
+          drawTraceWithBreak(ringStroke / 2 + i * ringGap, gap);
         }
       } else {
+        // Keep the outside boundary fixed: the stroke is centered half a
+        // stroke-width inside the original radius, so increasing Stroke
+        // grows only toward the inside. Break remains independent.
         ctx.lineWidth = sw;
-        tracePath(0);
-        ctx.stroke();
+        drawTraceWithBreak(sw / 2, gap);
       }
       ctx.setLineDash([]);
       ctx.restore();
@@ -1043,6 +1078,19 @@ function CreateStampTab({ rubbers = [] }) {
   const editorAspect = selectedDimensions.heightMm / selectedDimensions.widthMm;
   const editorWidth = STAMP_CANVAS_SIZE;
   const editorHeight = Math.max(80, Math.round(editorWidth * editorAspect));
+  // Scale the visible stamp boundary according to the selected rubber size.
+  // The largest configured size uses the full editor width; smaller sizes are
+  // visibly smaller, while preserving the selected size's width/height ratio.
+  const maxConfiguredStampWidthMm = Math.max(
+    1,
+    ...rubberSizes.map((r) => Number(r.parsed?.widthMm) || 0)
+  );
+  const selectedStampPreviewWidth = Math.max(80, Math.min(320, Math.round(
+    320 * ((Number(selectedDimensions.widthMm) || 1) / maxConfiguredStampWidthMm)
+  )));
+  const selectedStampPreviewHeight = Math.max(80, Math.round(
+    selectedStampPreviewWidth * editorAspect
+  ));
 
   const addLayer = (type, opts = {}) => {
     const num = layerCounter + 1;
@@ -1672,7 +1720,7 @@ function CreateStampTab({ rubbers = [] }) {
             <SliderControl label="Radius" value={activeLayer.radius ?? 100} min={30} max={150} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
           )}
           <SliderControl label="Stroke" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
-          <SliderControl label="Break" value={activeLayer.lineBreak ?? 0} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
+          <SliderControl label="Break" value={activeLayer.lineBreak ?? 0} min={0} max={200} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
           <Label>Border Style</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 4 }}>
             {FRAME_BORDER_STYLES.map((opt) => {
@@ -1759,12 +1807,47 @@ function CreateStampTab({ rubbers = [] }) {
           overflow: "hidden",
         }}
       >
-        <canvas
-          ref={canvasRef}
-          onClick={handleCanvasClick}
-          title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
-          style={{ width: Math.min(STAMP_CANVAS_SIZE, 330), maxWidth: "88%", height: "auto", aspectRatio: `${editorWidth} / ${editorHeight}`, cursor: layers.length ? "pointer" : "default" }}
-        />
+        <div
+          style={{
+            position: "relative",
+            width: `${selectedStampPreviewWidth}px`,
+            height: `${selectedStampPreviewHeight}px`,
+            maxWidth: "88%",
+            maxHeight: "88%",
+            border: `2px dashed ${STAMP_INK_BLUE}`,
+            borderRadius: 3,
+            boxShadow: "0 0 0 4px rgba(63,127,232,.10)",
+            background: "rgba(63,127,232,.035)",
+            flexShrink: 0,
+            transition: "width .18s ease, height .18s ease",
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            onClick={handleCanvasClick}
+            title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
+            style={{ width: "100%", height: "100%", display: "block", cursor: layers.length ? "pointer" : "default" }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: -10,
+              left: 10,
+              padding: "2px 7px",
+              borderRadius: 10,
+              background: STAMP_INK_BLUE,
+              color: C.white,
+              fontFamily: font.mono,
+              fontSize: 9.5,
+              fontWeight: 700,
+              letterSpacing: .2,
+              pointerEvents: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {selectedDimensions.widthMm} × {selectedDimensions.heightMm} mm
+          </div>
+        </div>
         {layers.length > 0 && (
           <div style={{ marginTop: 5, fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft, textAlign: "center", background: "rgba(255,255,255,.8)", padding: "2px 7px", borderRadius: 10 }}>Click any item on the stamp to edit</div>
         )}
@@ -1803,7 +1886,7 @@ function CreateStampTab({ rubbers = [] }) {
         <div style={{ display: "flex", alignItems: "center", gap: isDesktop ? 22 : 12, flexWrap: "wrap", justifyContent: "center" }}>
           <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn}>
             <span style={toolbarIconBox}><Type size={18} /></span>
-            Text in the centre
+            Add Text
           </button>
           <button type="button" onClick={() => addLayer("frame", { shape: "circle" })} style={toolbarIconBtn}>
             <span style={toolbarIconBox}><Circle size={18} /></span>
@@ -2047,10 +2130,28 @@ function CreateStampTab({ rubbers = [] }) {
                           setPlateSize(r.parsed.widthMm);
                           setSizeMenuOpen(false);
                         }}
-                        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "none", borderBottom: `1px solid ${C.paperDark}`, background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.ink, cursor: "pointer", textAlign: "left" }}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          padding: active ? "8px 10px 8px 8px" : "8px 10px",
+                          border: "none",
+                          borderBottom: `1px solid ${C.paperDark}`,
+                          borderLeft: active ? `3px solid ${STAMP_INK_BLUE}` : "3px solid transparent",
+                          background: active ? "#EAF2FF" : C.white,
+                          color: active ? STAMP_INK_BLUE : C.ink,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          fontWeight: active ? 700 : 500,
+                        }}
                       >
                         {r.photo_url ? <img src={r.photo_url} alt="" style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <span style={{ width: 44, height: 44, borderRadius: 6, background: C.paperDark, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={18} color={C.inkSoft} /></span>}
-                        <span style={{ minWidth: 0 }}><span style={{ display: "block", fontWeight: 650, fontSize: 12.5 }}>{r.name}</span><span style={{ display: "block", marginTop: 2, color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5 }}>{r.size} · {r.parsed.widthMm} × {r.parsed.heightMm} mm</span></span>
+                        <span style={{ minWidth: 0, flex: 1 }}>
+                          <span style={{ display: "block", fontWeight: active ? 750 : 650, fontSize: 12.5 }}>{r.name}</span>
+                          <span style={{ display: "block", marginTop: 2, color: active ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.mono, fontSize: 10.5 }}>{r.size} · {r.parsed.widthMm} × {r.parsed.heightMm} mm</span>
+                        </span>
+                        {active && <span style={{ width: 22, height: 22, borderRadius: "50%", background: STAMP_INK_BLUE, color: C.white, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>✓</span>}
                       </button>
                     );
                   })}
