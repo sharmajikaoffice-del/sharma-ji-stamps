@@ -1075,6 +1075,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
   // Mobile UX: remember scroll direction so the editor header can hide while
   // scrolling up and reappear while scrolling down.
   const [mobileHeaderVisible, setMobileHeaderVisible] = useState(true);
+  const [mobileBottomTab, setMobileBottomTab] = useState("layers");
   const lastScrollYRef = useRef(0);
   useEffect(() => {
     if (isDesktop) return;
@@ -2168,10 +2169,11 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
 
   const toolbarPill = { padding: "8px 14px", borderRadius: 7, fontWeight: 700, fontSize: 13, fontFamily: font.body, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, border: "none" };
   const toolbarIconBtn = {
-    display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none",
-    color: C.white, cursor: "pointer", fontFamily: font.body, fontSize: 10.5, fontWeight: 600, textAlign: "center", lineHeight: 1.1, padding: "2px 6px", flexShrink: 0,
+    display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none",
+    color: C.white, cursor: "pointer", fontFamily: font.body, fontSize: isDesktop ? 10.5 : 7.5, fontWeight: 600, textAlign: "center", lineHeight: 1.05,
+    padding: isDesktop ? "2px 6px" : "1px", flexShrink: 0,
   };
-  const toolbarIconBox = { width: 40, height: 40, borderRadius: 7, border: `2px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" };
+  const toolbarIconBox = { width: isDesktop ? 40 : 34, height: isDesktop ? 40 : 30, borderRadius: 6, border: `${isDesktop ? 2 : 1.5}px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" };
 
   return (
     <div>
@@ -2179,34 +2181,44 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         style={{
           background: STAMP_INK_BLUE,
           borderRadius: 4,
-          padding: isDesktop ? "8px 14px" : "10px",
-          minHeight: 54,
+          padding: isDesktop ? "8px 14px" : "6px 5px",
+          minHeight: isDesktop ? 54 : 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 10,
-          flexWrap: isDesktop ? "nowrap" : "wrap",
+          gap: isDesktop ? 10 : 4,
+          flexWrap: isDesktop ? "nowrap" : "nowrap",
           marginBottom: 0,
           boxShadow: "0 1px 2px rgba(36,95,196,.12)",
           ...(isDesktop ? {} : {
-            position: "sticky",
-            top: 0,
-            zIndex: 80,
-            transform: mobileHeaderVisible ? "translateY(0)" : "translateY(-110%)",
+            position: "fixed",
+            top: 8,
+            right: 6,
+            zIndex: 90,
+            width: 54,
+            maxWidth: 54,
+            flexDirection: "column",
+            transform: mobileHeaderVisible ? "translateX(0)" : "translateX(76px)",
             transition: "transform .18s ease",
+            borderRadius: 9,
+            boxShadow: "0 3px 14px rgba(38,50,65,.22)",
           }),
         }}
       >
-        <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white }}>
-          <ChevronLeft size={16} /> Templates
+        <button type="button" onClick={() => setView("templates")} style={{
+          ...toolbarPill,
+          background: C.sage, color: C.white,
+          ...(isDesktop ? {} : { width: 44, height: 38, padding: 0, justifyContent: "center", flexDirection: "column", gap: 1, fontSize: 8.5, borderRadius: 7 }),
+        }}>
+          <ChevronLeft size={isDesktop ? 16 : 15} />{!isDesktop && <span>Back</span>}{isDesktop && " Templates"}
         </button>
 
         <div style={{
-          display: "flex", alignItems: "center", gap: isDesktop ? 22 : 8,
-          flexWrap: "nowrap", justifyContent: isDesktop ? "center" : "flex-start",
-          overflowX: isDesktop ? "visible" : "auto", minWidth: 0,
-          flex: isDesktop ? 1 : "1 1 auto", WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none", padding: isDesktop ? 0 : "0 2px"
+          display: "flex", alignItems: "center", gap: isDesktop ? 22 : 3,
+          flexWrap: "nowrap", justifyContent: isDesktop ? "center" : "center",
+          overflowX: "visible", minWidth: 0,
+          flex: isDesktop ? 1 : "0 0 auto", padding: 0,
+          flexDirection: isDesktop ? "row" : "column",
         }}>
           <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn}>
             <span style={toolbarIconBox}><Type size={18} /></span>
@@ -2235,8 +2247,11 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
           <input ref={layerImageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLayerImageUpload} />
         </div>
 
-        <button type="button" onClick={startNew} style={{ ...toolbarPill, background: C.sage, color: C.white }}>
-          <Plus size={16} /> New Stamp
+        <button type="button" onClick={startNew} style={{
+          ...toolbarPill, background: C.sage, color: C.white,
+          ...(isDesktop ? {} : { width: 44, height: 38, padding: 0, justifyContent: "center", flexDirection: "column", gap: 1, fontSize: 8.5, borderRadius: 7 }),
+        }}>
+          <Plus size={isDesktop ? 16 : 15} />{!isDesktop && <span>New</span>}{isDesktop && " New Stamp"}
         </button>
       </div>
 
@@ -2410,11 +2425,90 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         <>
           {canvasBlock}
           {mobileCanvasSpacer}
-          <Card>
-            {layerPanel}
-            {textFields}
-            {!activeLayer && controlFields}
-          </Card>
+
+          <div style={{ paddingBottom: 76 }}>
+            <Card>
+              {mobileBottomTab === "layers" && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Layers</div>
+                  {layerPanel}
+                </div>
+              )}
+
+              {mobileBottomTab === "edit" && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Edit</div>
+                  {textFields}
+                  {!activeLayer && controlFields}
+                  {activeLayer && layerPanel}
+                </div>
+              )}
+
+              {mobileBottomTab === "submit" && (
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
+                    {customerMode ? "Submit Design" : "Save / Download"}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                    <Btn onClick={handleDownload} style={{ flex: 1, justifyContent: "center", background: STAMP_INK_BLUE, borderRadius: 8 }}>
+                      <Download size={15} /> {customerMode ? "Preview" : "Download"}
+                    </Btn>
+                    {!customerMode && (
+                      <Btn onClick={handlePrint} style={{ flex: 1, justifyContent: "center", background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, borderRadius: 8 }}>
+                        <Printer size={15} /> Print
+                      </Btn>
+                    )}
+                  </div>
+
+                  {customerMode ? (
+                    <>
+                      <div style={{ color: C.inkSoft, fontSize: 11.5, lineHeight: 1.4, marginBottom: 10 }}>
+                        Enter your name and mobile number to send this design to Sharma Ji Stamps.
+                      </div>
+                      <Field placeholder="Your name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                      <Field placeholder="Mobile number" inputMode="tel" value={customerMobile} onChange={(e) => setCustomerMobile(e.target.value)} />
+                      <Btn onClick={handleCustomerSubmit} style={{ width: "100%", justifyContent: "center", background: STAMP_INK_BLUE }}>
+                        Submit design
+                      </Btn>
+                      {customerSubmitStatus && <div style={{ marginTop: 9, color: C.inkSoft, fontFamily: font.mono, fontSize: 11.5 }}>{customerSubmitStatus}</div>}
+                    </>
+                  ) : (
+                    <div style={{ color: C.inkSoft, fontSize: 11.5, lineHeight: 1.4 }}>
+                      Your downloaded design is automatically added to Download History and remains editable.
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <div style={{
+            position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 95,
+            height: 62, background: C.white, borderTop: `1px solid ${C.line}`,
+            display: "flex", alignItems: "stretch", boxShadow: "0 -3px 14px rgba(38,50,65,.12)",
+          }}>
+            {[
+              { id: "layers", label: "Layer", icon: Layers },
+              { id: "edit", label: "Edit", icon: SlidersHorizontal },
+              { id: "submit", label: "Submit", icon: Send },
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = mobileBottomTab === item.id;
+              return (
+                <button key={item.id} type="button" onClick={() => setMobileBottomTab(item.id)} style={{
+                  flex: 1, border: "none", background: active ? "#EEF4FF" : C.white,
+                  color: active ? STAMP_INK_BLUE : C.inkSoft, display: "flex",
+                  flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  gap: 3, fontFamily: font.body, fontWeight: active ? 750 : 600,
+                  fontSize: 11, cursor: "pointer", borderTop: active ? `3px solid ${STAMP_INK_BLUE}` : "3px solid transparent",
+                }}>
+                  <Icon size={18} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
         </>
       )}
 
@@ -2516,7 +2610,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 12 }}>Couldn't save — check the table exists in Supabase.</div>}
       </Card>}
 
-      {customerMode && (
+      {customerMode && isDesktop && (
         <Card style={{ marginBottom: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Submit your stamp design</div>
           <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
