@@ -2382,7 +2382,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       ctx.font = `700 ${Math.max(24, Math.round(exportCanvas.width * 0.055))}px Arial`;
       ctx.globalAlpha = 0.22;
       ctx.fillStyle = "#555";
-      ctx.fillText("PREVIEW • GRD MOTORS", 0, 0);
+      ctx.fillText("SHARMA JI STAMPS • PREVIEW", 0, 0);
       ctx.restore();
 
       const dataUrl = exportCanvas.toDataURL("image/png");
