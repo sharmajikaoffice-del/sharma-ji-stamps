@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2,
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
-  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer
+  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal
 } from "lucide-react";
 
 /* =====================================================================
@@ -708,6 +708,7 @@ const TABS_ADMIN = [
   { id: "dashboard", label: "Dashboard", icon: CircleDot },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
+  { id: "orders", label: "Orders", icon: Inbox },
   { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
   { id: "rubber", label: "Rubber", icon: Stamp },
@@ -720,11 +721,16 @@ const TABS_STAFF = [
   { id: "dashboard", label: "Dashboard", icon: CircleDot },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
+  { id: "orders", label: "Orders", icon: Inbox },
   { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
   { id: "ledger", label: "Cash Register", icon: Wallet },
   
 ];
+
+// On the mobile bottom bar these tabs collapse into a single "More" button
+// so the bar doesn't get crowded — the desktop sidebar still shows all tabs.
+const MORE_TAB_IDS = ["stock", "rubber", "purchase", "ledger", "users"];
 
 function SharmaJiStampsAdmin() {
   useFonts();
@@ -748,6 +754,30 @@ function SharmaJiStampsAdmin() {
     try { localStorage.removeItem("sjs_user"); } catch {}
   };
   const [tab, setTab] = useState("dashboard");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [orderToEdit, setOrderToEdit] = useState(null);
+  const editOrder = (order) => { setOrderToEdit(order); setTab("create"); };
+
+  // Back button / swipe-back gesture: whenever the user leaves the dashboard
+  // (opens any other tab, or opens the More sheet), push one history entry so
+  // the phone's back action is caught here first and just returns to the
+  // dashboard, instead of exiting the app straight away.
+  const wasHomeRef = useRef(true);
+  useEffect(() => {
+    const isHome = tab === "dashboard" && !moreOpen;
+    if (wasHomeRef.current && !isHome) {
+      window.history.pushState({ sjsAway: true }, "");
+    }
+    wasHomeRef.current = isHome;
+  }, [tab, moreOpen]);
+  useEffect(() => {
+    const onPopState = () => {
+      setMoreOpen(false);
+      setTab("dashboard");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const [users, setUsers] = useState([]);
   const [rubbers, setRubbers] = useState([]);
@@ -794,12 +824,16 @@ function SharmaJiStampsAdmin() {
 
   if (!user) return <Login users={users} onLogin={login} />;
   const tabs = user.role === "admin" ? TABS_ADMIN : TABS_STAFF;
+  const primaryTabs = tabs.filter((t) => !MORE_TAB_IDS.includes(t.id));
+  const moreTabs = tabs.filter((t) => MORE_TAB_IDS.includes(t.id));
+  const moreActive = moreTabs.some((t) => t.id === tab);
 
   const tabContent = (
     <>
       {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
-      {tab === "create" && <CreateStampTab rubbers={rubbers} />}
+      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} />}
+      {tab === "orders" && <OrdersTab onEditOrder={editOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
       {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
@@ -862,17 +896,43 @@ function SharmaJiStampsAdmin() {
         {tabContent}
       </div>
 
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.white, borderTop: `1px solid ${C.line}`, display: "flex", overflowX: "auto" }}>
-        {tabs.map((t) => {
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.white, borderTop: `1px solid ${C.line}`, display: "flex", overflowX: "auto", zIndex: 20 }}>
+        {primaryTabs.map((t) => {
           const Icon = t.icon; const active = tab === t.id;
           return (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: "1 0 auto", minWidth: 70, background: "none", border: "none", padding: "10px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? C.stamp : C.inkSoft }}>
+            <button key={t.id} onClick={() => { setTab(t.id); setMoreOpen(false); }} style={{ flex: "1 0 auto", minWidth: 70, background: "none", border: "none", padding: "10px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? C.stamp : C.inkSoft }}>
               <Icon size={18} />
               <span style={{ fontSize: 10, fontFamily: font.mono, letterSpacing: 0.5 }}>{t.label}</span>
             </button>
           );
         })}
+        {moreTabs.length > 0 && (
+          <button onClick={() => setMoreOpen((v) => !v)} style={{ flex: "1 0 auto", minWidth: 70, background: "none", border: "none", padding: "10px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: moreOpen || moreActive ? C.stamp : C.inkSoft }}>
+            <MoreHorizontal size={18} />
+            <span style={{ fontSize: 10, fontFamily: font.mono, letterSpacing: 0.5 }}>More</span>
+          </button>
+        )}
       </div>
+
+      {moreOpen && (
+        <>
+          <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(38,50,65,0.35)", zIndex: 25 }} />
+          <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.white, borderTopLeftRadius: 16, borderTopRightRadius: 16, boxShadow: "0 -4px 20px rgba(38,50,65,0.18)", padding: "10px 10px 22px", zIndex: 30 }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: C.line, margin: "2px auto 12px" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {moreTabs.map((t) => {
+                const Icon = t.icon; const active = tab === t.id;
+                return (
+                  <button key={t.id} onClick={() => { setTab(t.id); setMoreOpen(false); }} style={{ background: active ? "#EAF2FF" : C.paper, border: `1px solid ${active ? C.stamp : C.line}`, borderRadius: 10, padding: "14px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: active ? C.stamp : C.ink }}>
+                    <Icon size={20} />
+                    <span style={{ fontSize: 11, fontFamily: font.mono, letterSpacing: 0.3, textAlign: "center" }}>{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -914,6 +974,85 @@ function SharmaJiStamps() {
 }
 
 export default SharmaJiStamps;
+
+/* ================= ORDERS (customer submissions) ================= */
+// Customer designs come in via the public /customer designer and land in the
+// "customer_designs" Supabase table (status: new -> accepted -> printed).
+// This tab is how staff accept them, open the design in the normal editor to
+// tweak it, and print it — same editor, just pre-loaded with the customer's config.
+function OrdersTab({ onEditOrder }) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState("new");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const rows = await dbGet("customer_designs");
+      setOrders(Array.isArray(rows) ? rows : []);
+      setError("");
+    } catch {
+      setError("Could not load customer orders. Make sure the \"customer_designs\" table exists in Supabase (see setup notes).");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const setStatus = async (order, status) => {
+    await dbUpdate("customer_designs", order.id, { status });
+    await load();
+  };
+  const remove = async (order) => {
+    await dbDelete("customer_designs", order.id);
+    await load();
+  };
+
+  const shown = orders.filter((o) => filter === "all" || (o.status || "new") === filter);
+  const counts = { new: 0, accepted: 0, printed: 0 };
+  orders.forEach((o) => { const s = o.status || "new"; if (counts[s] !== undefined) counts[s]++; });
+
+  return (
+    <div>
+      <SectionTitle icon={Inbox} title="Customer Orders" />
+      {error && <div style={{ marginBottom: 10, padding: 9, background: "#FFF4E5", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11.5, color: C.inkSoft }}>{error}</div>}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {[["new", `New (${counts.new})`], ["accepted", `Accepted (${counts.accepted})`], ["printed", `Printed (${counts.printed})`], ["all", "All"]].map(([id, label]) => (
+          <Btn key={id} variant={filter === id ? "solid" : "ghost"} onClick={() => setFilter(id)} style={{ padding: "6px 12px", fontSize: 12 }}>{label}</Btn>
+        ))}
+      </div>
+      {loading && <EmptyNote text="Loading orders…" />}
+      {!loading && shown.length === 0 && <EmptyNote text="No orders here." />}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 12 }}>
+        {shown.map((o) => (
+          <Card key={o.id} style={{ textAlign: "center" }}>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+              <TemplateThumb config={o.config || {}} size={120} />
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>{o.customer_name}</div>
+            <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginBottom: 4 }}>{o.customer_mobile}</div>
+            <div style={{ fontSize: 12, color: C.inkSoft, marginBottom: 6 }}>{o.design_name}</div>
+            <div style={{ marginBottom: 8 }}><Tag tone={o.status === "printed" ? "in" : "out"}>{o.status || "new"}</Tag></div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <Btn onClick={() => { onEditOrder(o); if ((o.status || "new") === "new") setStatus(o, "accepted"); }} style={{ justifyContent: "center", width: "100%" }}>
+                <PenSquare size={14} /> Edit & Print
+              </Btn>
+              <div style={{ display: "flex", gap: 6 }}>
+                {(o.status || "new") !== "printed" && (
+                  <Btn variant="ghost" onClick={() => setStatus(o, "printed")} style={{ flex: 1, justifyContent: "center", padding: "6px 8px", fontSize: 11.5 }}>
+                    <Check size={13} /> Printed
+                  </Btn>
+                )}
+                <button onClick={() => remove(o)} style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 8, color: C.stamp, cursor: "pointer", padding: "6px 10px" }}><Trash2 size={14} /></button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /* ================= STAMP ENTRY ================= */
 function StampEntryTab({ rubbers, entries, refresh, user }) {
@@ -1041,7 +1180,7 @@ function rubberSizeKey(sizeText) {
   return parsed ? `${parsed.widthMm}x${parsed.heightMm}` : String(sizeText ?? "").trim().toLowerCase();
 }
 
-function CreateStampTab({ rubbers = [], customerMode = false }) {
+function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed }) {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -1362,6 +1501,19 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     setView("editor");
   };
 
+  // When an admin/staff picks "Edit & Print" on a customer order (Orders tab),
+  // load that order's saved config straight into the editor, same as opening
+  // a template — but never as an existing template (id: null) so "Save" below
+  // offers to save it as a new template instead of overwriting something.
+  useEffect(() => {
+    if (!initialOrder) return;
+    openTemplate({ id: null, name: initialOrder.design_name || "Customer Order", config: initialOrder.config || {} });
+    setCustomerName(initialOrder.customer_name || "");
+    setCustomerMobile(initialOrder.customer_mobile || "");
+    if (onOrderConsumed) onOrderConsumed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialOrder]);
+
   const openHistoryDesign = (h) => {
     openTemplate({ id: null, name: h.name || "Downloaded design", config: h.config || {} });
     setEditingTemplateId(null);
@@ -1597,20 +1749,15 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     if (!/^[0-9+ ()-]{8,20}$/.test(mobile)) return setCustomerSubmitStatus("Please enter a valid mobile number.");
     setCustomerSubmitStatus("Submitting…");
     try {
-      const res = await fetch("/api/customer-designs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: uid(),
-          customer_name: name,
-          customer_mobile: mobile,
-          design_name: `Stamp ${selectedDimensions.widthMm}x${selectedDimensions.heightMm}mm`,
-          config: buildConfig(),
-        }),
+      await dbInsert("customer_designs", {
+        id: uid(),
+        customer_name: name,
+        customer_mobile: mobile,
+        design_name: `Stamp ${selectedDimensions.widthMm}x${selectedDimensions.heightMm}mm`,
+        config: buildConfig(),
+        status: "new",
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || "Submit failed");
-      setCustomerSubmitStatus("Design submitted successfully.");
+      setCustomerSubmitStatus("Design submitted successfully. Sharma Ji Stamps will contact you shortly.");
     } catch (err) {
       setCustomerSubmitStatus(err.message || "Couldn't submit design.");
     }
@@ -2632,6 +2779,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
                 <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                   {selectedRubber?.photo_url ? <img src={selectedRubber.photo_url} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 5, border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <span style={{ width: 30, height: 30, borderRadius: 5, background: C.paperDark, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={15} color={C.inkSoft} /></span>}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedRubber ? `${selectedRubber.name} — ${selectedRubber.size}` : "Select rubber size"}</span>
+                  {selectedRubber && <span style={{ fontFamily: font.mono, fontWeight: 700, color: STAMP_INK_BLUE, flexShrink: 0 }}>{inr(selectedRubber.rate)}</span>}
                 </span>
                 <ChevronRight size={15} style={{ transform: sizeMenuOpen ? "rotate(90deg)" : "none", flexShrink: 0 }} />
               </button>
@@ -2671,6 +2819,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
                           <span style={{ display: "block", fontWeight: active ? 750 : 650, fontSize: 12.5 }}>{r.name}</span>
                           <span style={{ display: "block", marginTop: 2, color: active ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.mono, fontSize: 10.5 }}>{r.size} · {r.parsed.widthMm} × {r.parsed.heightMm} mm</span>
                         </span>
+                        <span style={{ fontFamily: font.mono, fontWeight: 800, fontSize: 12.5, color: active ? STAMP_INK_BLUE : C.ink, flexShrink: 0 }}>{inr(r.rate)}</span>
                         {active && <span style={{ width: 22, height: 22, borderRadius: "50%", background: STAMP_INK_BLUE, color: C.white, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>✓</span>}
                       </button>
                     );
@@ -2698,6 +2847,16 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
           Set the stamp width and height. Changes are applied to the selected stamp canvas.
         </div>
+        {selectedRubber && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 8, marginBottom: 12 }}>
+            {selectedRubber.photo_url ? <img src={selectedRubber.photo_url} alt="" style={{ width: 38, height: 38, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <span style={{ width: 38, height: 38, borderRadius: 6, background: C.paperDark, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={17} color={C.inkSoft} /></span>}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontWeight: 650, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedRubber.name}</div>
+              <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft }}>{selectedDimensions.widthMm} × {selectedDimensions.heightMm} mm</div>
+            </div>
+            <div style={{ fontFamily: font.mono, fontWeight: 800, fontSize: 15, color: STAMP_INK_BLUE, flexShrink: 0 }}>{inr(selectedRubber.rate)}</div>
+          </div>
+        )}
         {sizeControls}
       </Card>}
 
@@ -2742,7 +2901,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
       {!isDesktop && view === "editor" && (
         <div style={{
           position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 100,
-          display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+          display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
           background: C.white, borderTop: `1px solid ${C.line}`,
           boxShadow: "0 -4px 18px rgba(38,50,65,.10)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
