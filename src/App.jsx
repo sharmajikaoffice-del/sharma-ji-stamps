@@ -726,7 +726,7 @@ const TABS_STAFF = [
   
 ];
 
-export default function SharmaJiStamps() {
+function SharmaJiStampsAdmin() {
   useFonts();
   const isDesktop = useIsDesktop();
   const [loading, setLoading] = useState(true);
@@ -876,6 +876,44 @@ export default function SharmaJiStamps() {
     </div>
   );
 }
+
+/* ================= CUSTOMER DESIGNER ================= */
+function CustomerDesigner() {
+  const [rubbers, setRubbers] = useState([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await dbGet("customer_rubbers");
+        if (!cancelled) setRubbers(Array.isArray(rows) ? rows : []);
+      } catch {
+        if (!cancelled) setError("Stamp sizes could not be loaded. The default size is still available.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return (
+    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink }}>
+      <div style={{ maxWidth: 1100, width: "100%", margin: "0 auto", padding: "12px 10px 70px" }}>
+        <div style={{ marginBottom: 10, textAlign: "center" }}>
+          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 21 }}>Sharma Ji Stamps</div>
+          <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 1.2 }}>CUSTOMER STAMP DESIGNER</div>
+        </div>
+        {error && <div style={{ marginBottom: 8, padding: 9, background: "#FFF4E5", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11.5, color: C.inkSoft }}>{error}</div>}
+        <CreateStampTab rubbers={rubbers} customerMode />
+      </div>
+    </div>
+  );
+}
+
+function SharmaJiStamps() {
+  const isCustomerRoute = typeof window !== "undefined" &&
+    window.location.pathname.replace(/\/$/, "") === "/customer";
+  return isCustomerRoute ? <CustomerDesigner /> : <SharmaJiStampsAdmin />;
+}
+
+export default SharmaJiStamps;
 
 /* ================= STAMP ENTRY ================= */
 function StampEntryTab({ rubbers, entries, refresh, user }) {
@@ -1030,6 +1068,9 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
   const [selectedRubberId, setSelectedRubberId] = useState("");
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
+  const [customerName, setCustomerName] = useState("");
+  const [customerMobile, setCustomerMobile] = useState("");
+  const [customerSubmitStatus, setCustomerSubmitStatus] = useState("");
 
   // Mobile UX: remember scroll direction so the editor header can hide while
   // scrolling up and reappear while scrolling down.
@@ -1279,17 +1320,9 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     // and can be selected/edited individually after the template is opened.
     const rawLayers = Array.isArray(config.layers) ? config.layers : [];
     const normalizedRaw = [...rawLayers];
-    const hasFrameLayer = normalizedRaw.some((l) => l.type === "frame");
-    // Legacy circle templates used borderStyle="double" instead of two Frame
-    // layers. Convert those two visible rings into separate editable Frames.
-    if (config.shape === "circle" && config.borderStyle === "double" && !hasFrameLayer) {
-      const baseRadius = config.radius ?? 138;
-      const baseStroke = config.strokeWidth ?? 3;
-      normalizedRaw.push(
-        { type: "frame", radius: baseRadius, strokeWidth: baseStroke, lineBreak: 0, x: 50, y: 50, rotation: 0 },
-        { type: "frame", radius: Math.max(20, baseRadius - 16), strokeWidth: baseStroke * 0.5, lineBreak: 0, x: 50, y: 50, rotation: 0 }
-      );
-    }
+    // Do not inject extra Frame/Circle layers when opening a template. The
+    // template's saved border is already represented by its config; injecting
+    // frames here made a circle unexpectedly appear and could not be removed.
     const savedLayers = normalizedRaw.map((l, index) => ({
       ...l,
       id: l.id || uid(),
@@ -1447,13 +1480,83 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     return { dataUrl: exportCanvas.toDataURL("image/png"), widthMm, heightMm };
   };
 
-  const handleDownload = () => {
-    // PNG is lossless. Export at 600 DPI so the downloaded stamp is print-ready.
-    const { dataUrl, widthMm, heightMm } = generateStampDataUrl(600);
+  const generateCustomerDownloadDataUrl = () => {
+    const { dataUrl, widthMm, heightMm } = generateStampDataUrl(300);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const grid = Math.max(40, Math.round(canvas.width / 12));
+        ctx.strokeStyle = "rgba(60,80,100,.14)";
+        ctx.lineWidth = Math.max(1, Math.round(canvas.width / 900));
+        for (let x = 0; x <= canvas.width; x += grid) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        }
+        for (let y = 0; y <= canvas.height; y += grid) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        }
+        ctx.drawImage(img, 0, 0);
+
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(-Math.PI / 6);
+        ctx.textAlign = "center";
+        ctx.font = `700 ${Math.max(18, Math.round(canvas.width / 22))}px Arial`;
+        ctx.fillStyle = "rgba(50,70,90,.20)";
+        const gapX = Math.max(260, Math.round(canvas.width / 2.4));
+        const gapY = Math.max(120, Math.round(canvas.height / 4.5));
+        for (let y = -canvas.height * 2; y <= canvas.height * 2; y += gapY) {
+          for (let x = -canvas.width * 2; x <= canvas.width * 2; x += gapX) {
+            ctx.fillText("SHARMA JI STAMPS • PREVIEW", x, y);
+          }
+        }
+        ctx.restore();
+        resolve({ dataUrl: canvas.toDataURL("image/jpeg", 0.82), widthMm, heightMm });
+      };
+      img.src = dataUrl;
+    });
+  };
+
+  const handleDownload = async () => {
+    const result = customerMode
+      ? await generateCustomerDownloadDataUrl()
+      : generateStampDataUrl(600);
     const link = document.createElement("a");
-    link.download = `stamp-${widthMm}x${heightMm}mm.png`;
-    link.href = dataUrl;
+    link.download = `stamp-${result.widthMm}x${result.heightMm}mm${customerMode ? "-preview" : ""}.png`;
+    link.href = result.dataUrl;
     link.click();
+  };
+
+  const handleCustomerSubmit = async () => {
+    const name = customerName.trim();
+    const mobile = customerMobile.trim();
+    if (name.length < 2) return setCustomerSubmitStatus("Please enter your name.");
+    if (!/^[0-9+ ()-]{8,20}$/.test(mobile)) return setCustomerSubmitStatus("Please enter a valid mobile number.");
+    setCustomerSubmitStatus("Submitting…");
+    try {
+      const res = await fetch("/api/customer-designs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: uid(),
+          customer_name: name,
+          customer_mobile: mobile,
+          design_name: `Stamp ${selectedDimensions.widthMm}x${selectedDimensions.heightMm}mm`,
+          config: buildConfig(),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Submit failed");
+      setCustomerSubmitStatus("Design submitted successfully.");
+    } catch (err) {
+      setCustomerSubmitStatus(err.message || "Couldn't submit design.");
+    }
   };
 
   // Prints the stamp directly (no PNG download, no Word import, no size headaches).
@@ -1531,15 +1634,20 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         <SectionTitle icon={Wand2} title="Create Stamp" />
         <Card style={{ padding: 14 }}>
           <Btn onClick={startNew} style={{ width: "100%", justifyContent: "center", background: STAMP_INK_BLUE }}>
-            <Plus size={16} /> New Stamp
+            <Plus size={16} /> {customerMode ? "Start Blank Stamp" : "New Stamp"}
           </Btn>
+          {customerMode && (
+            <div style={{ marginTop: 8, fontFamily: font.body, fontSize: 12, color: C.inkSoft, textAlign: "center" }}>
+              Ya neeche diye gaye templates mein se koi design open karke edit karein.
+            </div>
+          )}
         </Card>
 
-        <Label>My Templates</Label>
+        <Label>{customerMode ? "Choose a Template" : "My Templates"}</Label>
         {templatesLoading && <EmptyNote text="Loading…" />}
         {templatesError && <EmptyNote text={templatesError} />}
         {!templatesLoading && !templatesError && templates.length === 0 && (
-          <EmptyNote text="No saved templates yet — pick a shape above and create your first one." />
+          <EmptyNote text="No templates available yet." />
         )}
         {templates.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "repeat(2, 1fr)", gap: 10 }}>
@@ -1549,13 +1657,15 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
                 onClick={() => openTemplate(t)}
                 style={{ position: "relative", background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 8px 8px", cursor: "pointer", textAlign: "center" }}
               >
-                <button
-                  type="button"
-                  onClick={(e) => handleDeleteTemplate(t.id, e)}
-                  style={{ position: "absolute", top: 6, right: 6, background: C.white, border: `1px solid ${C.line}`, borderRadius: 6, color: C.stamp, cursor: "pointer", padding: 4, lineHeight: 0, zIndex: 1 }}
-                >
-                  <Trash2 size={13} />
-                </button>
+                {!customerMode && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteTemplate(t.id, e)}
+                    style={{ position: "absolute", top: 6, right: 6, background: C.white, border: `1px solid ${C.line}`, borderRadius: 6, color: C.stamp, cursor: "pointer", padding: 4, lineHeight: 0, zIndex: 1 }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
                 <TemplateThumb config={t.config} size={110} />
                 <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, fontFamily: font.body, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {t.name}
@@ -1883,11 +1993,16 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         ...(isDesktop
           ? { width: "100%", minWidth: 0, height: PANEL_HEIGHT, overflow: "hidden" }
           : {
-              position: "sticky",
-              top: 54,
-              zIndex: 60,
+              position: "fixed",
+              top: mobileHeaderVisible ? 54 : 0,
+              left: 0,
+              right: 0,
+              zIndex: 70,
               width: "100%",
-              boxShadow: "0 2px 10px rgba(38,50,65,.10)",
+              height: "42vh",
+              minHeight: 210,
+              maxHeight: 330,
+              boxShadow: "0 2px 10px rgba(38,50,65,.14)",
             }),
       }}
     >
@@ -1895,8 +2010,9 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         style={{
           width: "100%",
           height: "100%",
-          minHeight: isDesktop ? 0 : 220,
-          maxHeight: isDesktop ? "none" : "42vh",
+          minHeight: 0,
+          height: "100%",
+          maxHeight: "none",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -1957,10 +2073,14 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     </Card>
   );
 
+  const mobileCanvasSpacer = !isDesktop
+    ? <div aria-hidden="true" style={{ height: "42vh", minHeight: 210, maxHeight: 330, marginBottom: 10 }} />
+    : null;
+
   const toolbarPill = { padding: "8px 14px", borderRadius: 7, fontWeight: 700, fontSize: 13, fontFamily: font.body, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, border: "none" };
   const toolbarIconBtn = {
     display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none",
-    color: C.white, cursor: "pointer", fontFamily: font.body, fontSize: 10.5, fontWeight: 600, textAlign: "center", lineHeight: 1.1, padding: "2px 7px",
+    color: C.white, cursor: "pointer", fontFamily: font.body, fontSize: 10.5, fontWeight: 600, textAlign: "center", lineHeight: 1.1, padding: "2px 6px", flexShrink: 0,
   };
   const toolbarIconBox = { width: 40, height: 40, borderRadius: 7, border: `2px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" };
 
@@ -1992,7 +2112,13 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
           <ChevronLeft size={16} /> Templates
         </button>
 
-        <div style={{ display: "flex", alignItems: "center", gap: isDesktop ? 22 : 12, flexWrap: "wrap", justifyContent: "center" }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: isDesktop ? 22 : 8,
+          flexWrap: "nowrap", justifyContent: isDesktop ? "center" : "flex-start",
+          overflowX: isDesktop ? "visible" : "auto", minWidth: 0,
+          flex: isDesktop ? 1 : "1 1 auto", WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "none", padding: isDesktop ? 0 : "0 2px"
+        }}>
           <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn}>
             <span style={toolbarIconBox}><Type size={18} /></span>
             Add Text
@@ -2177,6 +2303,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
             </div>
           </Card>
           {canvasBlock}
+          {mobileCanvasSpacer}
           <Card style={{ ...sidePanelStyle, padding: 12 }}>
             {activeLayer ? (
               layerPanel
@@ -2193,6 +2320,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
       ) : (
         <>
           {canvasBlock}
+          {mobileCanvasSpacer}
           <Card>
             {layerPanel}
             {textFields}
@@ -2271,16 +2399,18 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
           </div>
           <div style={{ display: "flex", gap: 8, width: isDesktop ? "auto" : "100%" }}>
             <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: isDesktop ? 184 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
-              <Download size={16} /> Download stamp
+              <Download size={16} /> {customerMode ? "Download preview" : "Download stamp"}
             </Btn>
-            <Btn onClick={handlePrint} style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: isDesktop ? 130 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
-              <Printer size={16} /> Print
-            </Btn>
+            {!customerMode && (
+              <Btn onClick={handlePrint} style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: isDesktop ? 130 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
+                <Printer size={16} /> Print
+              </Btn>
+            )}
           </div>
         </div>
       )}
 
-      <Card>
+      {!customerMode && <Card>
         <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
         <div style={{ display: "flex", gap: 8 }}>
           <Field
@@ -2295,7 +2425,22 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         </div>
         {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
         {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 12 }}>Couldn't save — check the table exists in Supabase.</div>}
-      </Card>
+      </Card>}
+
+      {customerMode && (
+        <Card style={{ marginBottom: 24 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Submit your stamp design</div>
+          <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
+            Enter your name and mobile number. Download is a protected preview.
+          </div>
+          <Field placeholder="Your name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+          <Field placeholder="Mobile number" inputMode="tel" value={customerMobile} onChange={(e) => setCustomerMobile(e.target.value)} />
+          <Btn onClick={handleCustomerSubmit} style={{ width: "100%", justifyContent: "center", background: STAMP_INK_BLUE }}>
+            Submit design
+          </Btn>
+          {customerSubmitStatus && <div style={{ marginTop: 9, color: C.inkSoft, fontFamily: font.mono, fontSize: 11.5 }}>{customerSubmitStatus}</div>}
+        </Card>
+      )}
     </div>
   );
 }
