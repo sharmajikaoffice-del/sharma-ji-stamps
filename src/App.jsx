@@ -2169,15 +2169,57 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     ? <div aria-hidden="true" style={{ height: "42vh", minHeight: 210, maxHeight: 330, marginBottom: 10 }} />
     : null;
 
+  const downloadCustomerStampPreview = async () => {
+    try {
+      const canvas = document.querySelector("canvas");
+      if (!canvas) {
+        setCustomerSubmitStatus("Stamp preview is not ready. Please try again.");
+        return;
+      }
+
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = canvas.width;
+      exportCanvas.height = canvas.height;
+      const ctx = exportCanvas.getContext("2d");
+      ctx.drawImage(canvas, 0, 0);
+
+      // Customer downloads are intentionally watermarked previews.
+      ctx.save();
+      ctx.translate(exportCanvas.width / 2, exportCanvas.height / 2);
+      ctx.rotate(-Math.PI / 6);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `700 ${Math.max(24, Math.round(exportCanvas.width * 0.055))}px Arial`;
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = "#555";
+      ctx.fillText("PREVIEW • GRD MOTORS", 0, 0);
+      ctx.restore();
+
+      const dataUrl = exportCanvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `stamp-preview-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setCustomerSubmitStatus("Submitted successfully. Watermarked PNG downloaded.");
+    } catch (err) {
+      console.error(err);
+      setCustomerSubmitStatus("Submit succeeded, but preview download failed. Please try again.");
+    }
+  };
+
   const scrollToMobileEditorSection = (section) => {
     setMobileEditorPanel(section);
-    const id = section === "layers"
-      ? "mobile-stamp-layers"
-      : section === "submit"
-        ? "mobile-stamp-submit"
-        : "mobile-stamp-edit";
+    const idMap = {
+      layers: "mobile-stamp-layers",
+      edit: "mobile-stamp-edit",
+      size: "mobile-stamp-size",
+      submit: "mobile-stamp-submit",
+    };
     setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(idMap[section])?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 40);
   };
 
@@ -2436,9 +2478,13 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
           {canvasBlock}
           {mobileCanvasSpacer}
           <Card id="mobile-stamp-edit">
-            {layerPanel}
-            {textFields}
-            {!activeLayer && controlFields}
+            {mobileEditorPanel === "layers" ? layerPanel : null}
+            {mobileEditorPanel === "edit" ? (
+              <>
+                {textFields}
+                {activeLayer ? null : controlFields}
+              </>
+            ) : null}
           </Card>
         </>
       )}
@@ -2524,7 +2570,15 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
         </div>
       )}
 
-      {!customerMode && <Card id="mobile-stamp-submit">
+      {!isDesktop && view === "editor" && mobileEditorPanel !== "size" ? null : <Card id="mobile-stamp-size">
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Stamp Size</div>
+        <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
+          Set the stamp width and height. Changes are applied to the selected stamp canvas.
+        </div>
+        {sizeControls}
+      </Card>}
+
+      {!isDesktop && view === "editor" && mobileEditorPanel !== "submit" ? null : !customerMode && <Card id="mobile-stamp-submit">
         <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
         <div style={{ display: "flex", gap: 8 }}>
           <Field
@@ -2542,15 +2596,21 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
       </Card>}
 
       {customerMode && (
-        <Card id="mobile-stamp-submit" style={{ marginBottom: 24 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Submit your stamp design</div>
+        (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : <Card id="mobile-stamp-submit" style={{ marginBottom: 24 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Submit & Download Preview</div>
           <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
             Enter your name and mobile number. Download is a protected preview.
           </div>
           <Field placeholder="Your name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
           <Field placeholder="Mobile number" inputMode="tel" value={customerMobile} onChange={(e) => setCustomerMobile(e.target.value)} />
-          <Btn onClick={handleCustomerSubmit} style={{ width: "100%", justifyContent: "center", background: STAMP_INK_BLUE }}>
-            Submit design
+          <Btn
+            onClick={async () => {
+              await handleCustomerSubmit();
+              await downloadCustomerStampPreview();
+            }}
+            style={{ width: "100%", justifyContent: "center", background: STAMP_INK_BLUE }}
+          >
+            Submit & Download Preview
           </Btn>
           {customerSubmitStatus && <div style={{ marginTop: 9, color: C.inkSoft, fontFamily: font.mono, fontSize: 11.5 }}>{customerSubmitStatus}</div>}
         </Card>
@@ -2567,6 +2627,7 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
           {[
             { id: "layers", label: "Layer", icon: Package },
             { id: "edit", label: "Edit", icon: PenSquare },
+            { id: "size", label: "Size", icon: Maximize2 },
             { id: "submit", label: "Submit", icon: Download },
           ].map((item) => {
             const Icon = item.icon;
