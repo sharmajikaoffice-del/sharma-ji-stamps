@@ -2,8 +2,12 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download,
+<<<<<<< HEAD
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff
+=======
+  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 } from "lucide-react";
 
 /* =====================================================================
@@ -41,11 +45,15 @@ async function dbUpdate(table, id, patch) {
     headers: { ...HEADERS, Prefer: "return=representation" },
     body: JSON.stringify(patch),
   });
+<<<<<<< HEAD
   if (!res.ok) {
     const detail = await res.text();
     console.error(`UPDATE ${table} failed:`, detail);
     throw new Error(`UPDATE ${table} failed: ${detail}`);
   }
+=======
+  if (!res.ok) throw new Error(`UPDATE ${table} failed`);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   return res.json();
 }
 async function dbDelete(table, id) {
@@ -96,10 +104,16 @@ function exportToCSV(filename, rows) {
 }
 
 /* ---------- stamp canvas helpers ---------- */
+<<<<<<< HEAD
 function drawArcText(ctx, text, cx, cy, radius, startAngle, direction, letterSpacing, opts = {}) {
   // direction: 1 = clockwise (top text), -1 = counter-clockwise (bottom text, reads upright)
   if (!text) return;
   const { tall = false, invert = false, invertColor = "#000", textColor = null } = opts;
+=======
+function drawArcText(ctx, text, cx, cy, radius, startAngle, direction, letterSpacing) {
+  // direction: 1 = clockwise (top text), -1 = counter-clockwise (bottom text, reads upright)
+  if (!text) return;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(startAngle);
@@ -114,6 +128,7 @@ function drawArcText(ctx, text, cx, cy, radius, startAngle, direction, letterSpa
   });
   const totalAngle = angle;
 
+<<<<<<< HEAD
   // "Invert" draws a solid ink band under the arc and flips the letters to white,
   // matching the negative/reversed-type look real rubber stamps use for emphasis.
   if (invert) {
@@ -130,6 +145,8 @@ function drawArcText(ctx, text, cx, cy, radius, startAngle, direction, letterSpa
     ctx.restore();
   }
 
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   ctx.rotate((-totalAngle / 2) * direction);
 
   chars.forEach((ch, i) => {
@@ -137,6 +154,7 @@ function drawArcText(ctx, text, cx, cy, radius, startAngle, direction, letterSpa
     ctx.rotate((a / 2) * direction);
     ctx.save();
     ctx.translate(0, -radius * direction);
+<<<<<<< HEAD
     // No extra rotation here: the "* direction" sign on the translate above
     // already makes letters land upright — tops pointing outward for the top
     // arc, and tops pointing toward the circle's centre for the bottom arc
@@ -144,6 +162,9 @@ function drawArcText(ctx, text, cx, cy, radius, startAngle, direction, letterSpa
     // flipping bottom-arc text upside-down and out of order — removed.
     if (tall) ctx.scale(1, 1.35); // "Height" toggle — stretches letters vertically, classic stamp look
     if (textColor) ctx.fillStyle = textColor;
+=======
+    ctx.rotate(direction === 1 ? 0 : Math.PI);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     ctx.fillText(ch, 0, 0);
     ctx.restore();
     ctx.rotate((a / 2) * direction);
@@ -185,20 +206,33 @@ const STAMP_SHAPES = [
    small template-picker thumbnails, so the drawing logic lives in one place. */
 function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
   if (!canvas) return;
+<<<<<<< HEAD
   const { shape, topText = "", bottomText = "", centerLine1 = "", centerLine2 = "", rectLine1 = "", rectLine2 = "", rectLine3 = "", inkColor = STAMP_INK_BLUE, borderStyle = "double", texture = true, logo = null, radius = 138, strokeWidth = 3, letterSpacing = 2.5, layers = [], width = STAMP_CANVAS_SIZE, height = STAMP_CANVAS_SIZE, pixelRatio = window.devicePixelRatio || 1, monochrome = false } = cfg;
   const dpr = pixelRatio;
   const size = STAMP_CANVAS_SIZE;
   const canvasHeight = Math.max(40, STAMP_CANVAS_SIZE * (height / Math.max(1, width)));
   canvas.width = Math.max(1, Math.round(width * dpr));
   canvas.height = Math.max(1, Math.round(height * dpr));
+=======
+  const { shape, topText = "", bottomText = "", centerLine1 = "", centerLine2 = "", rectLine1 = "", rectLine2 = "", rectLine3 = "", inkColor = STAMP_INK_BLUE, borderStyle = "double", texture = true, logo = null, radius = 138, strokeWidth = 3, letterSpacing = 2.5, layers = [] } = cfg;
+  const dpr = window.devicePixelRatio || 1;
+  const size = STAMP_CANVAS_SIZE;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   // Display size is controlled purely via CSS (width + aspect-ratio) on the
   // <canvas> element itself, so it never gets stretched into an oval when the
   // container is narrower than the canvas — see the JSX below.
   const ctx = canvas.getContext("2d");
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+<<<<<<< HEAD
   const geometryScale = width / STAMP_CANVAS_SIZE;
   ctx.scale(dpr * geometryScale, dpr * geometryScale);
   ctx.clearRect(0, 0, size, canvasHeight);
+=======
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, size, size);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 
   // A brand-new stamp must open completely blank. Draw nothing until the user
   // adds content/layers or enters actual text/logo content.
@@ -209,7 +243,11 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
   if (!hasContent) return;
 
   const cx = size / 2;
+<<<<<<< HEAD
   const cy = canvasHeight / 2;
+=======
+  const cy = size / 2;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   ctx.strokeStyle = inkColor;
   ctx.fillStyle = inkColor;
   ctx.lineCap = "round";
@@ -218,7 +256,11 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
   ctx.textBaseline = "middle";
 
   if (shape === "circle") {
+<<<<<<< HEAD
     const outerR = Math.min(radius, Math.min(size, canvasHeight) * 0.43);
+=======
+    const outerR = radius;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     const innerR = borderStyle === "double" ? outerR - 16 : outerR;
     const textR = outerR - 25;
     const scale = outerR / 138;
@@ -252,8 +294,13 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     }
 
     ctx.font = "600 12px Georgia, 'Times New Roman', serif";
+<<<<<<< HEAD
     drawArcText(ctx, topText.toUpperCase(), cx, cy, textR, 0, 1, letterSpacing);
     drawArcText(ctx, bottomText.toUpperCase(), cx, cy, textR, 0, -1, letterSpacing);
+=======
+    drawArcText(ctx, topText.toUpperCase(), cx, cy, textR, -Math.PI / 2, 1, letterSpacing);
+    drawArcText(ctx, bottomText.toUpperCase(), cx, cy, textR, Math.PI / 2, -1, letterSpacing);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 
     if (logo) {
       const logoSize = 44;
@@ -271,8 +318,13 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     }
 
   } else {
+<<<<<<< HEAD
     const w = Math.min(size * 0.84, size - 24);
     const h = Math.min(canvasHeight * 0.72, canvasHeight - 24);
+=======
+    const w = 260;
+    const h = shape === "square" ? 200 : 170;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     const x = cx - w / 2;
     const y = cy - h / 2;
 
@@ -310,19 +362,29 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     ctx.fillText(rectLine3.toUpperCase(), cx, cursorY + 4);
   }
 
+<<<<<<< HEAD
   if (texture) addInkTexture(ctx, size, canvasHeight, inkColor, 42);
+=======
+  if (texture) addInkTexture(ctx, size, size, inkColor, 42);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 
   // Extra layers added from the toolbar — drawn on top, using percentage
   // positions so they scale with the canvas.
   layers.forEach((layer) => {
+<<<<<<< HEAD
     if (layer.hidden) return; // Skip layers the user has hidden.
     const lx = ((layer.x ?? 50) / 100) * size;
     const ly = ((layer.y ?? 50) / 100) * canvasHeight;
+=======
+    const lx = ((layer.x ?? 50) / 100) * size;
+    const ly = ((layer.y ?? 50) / 100) * size;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     const rot = ((layer.rotation ?? 0) * Math.PI) / 180;
     ctx.fillStyle = inkColor;
     ctx.strokeStyle = inkColor;
     if (layer.type === "circleText") {
       ctx.save();
+<<<<<<< HEAD
       const weight = layer.bold ? 700 : 400;
       const style = layer.fontStyle === "italic" ? "italic " : "";
       const family = layer.fontFamily || "Arial";
@@ -339,10 +401,22 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
         invertColor: inkColor,
         textColor: layer.invert ? "#fff" : null,
       });
+=======
+      ctx.translate(cx, cy);
+      if (layer.flipX) ctx.scale(-1, 1);
+      ctx.translate(-cx, -cy);
+      const weight = layer.bold ? 700 : 400;
+      const family = layer.fontFamily || "Arial";
+      const size = layer.fontSize ?? 13;
+      ctx.font = `${weight} ${size}px ${family}`;
+      const startAngle = (((layer.start ?? 90) - 90) * Math.PI) / 180;
+      drawArcText(ctx, (layer.text || "").toUpperCase(), cx, cy, layer.radius ?? 130, startAngle, 1, layer.spacing ?? 4);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
       ctx.restore();
     } else if (layer.type === "centerText") {
       ctx.save();
       ctx.translate(lx, ly);
+<<<<<<< HEAD
       // "Flip text" turns the text upside-down (180°) instead of mirroring each
       // letter — a mirror flip made the text backwards/unreadable.
       ctx.rotate(rot + (layer.flipX ? Math.PI : 0));
@@ -373,11 +447,20 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       } else {
         ctx.fillText(text, 0, 0);
       }
+=======
+      ctx.rotate(rot);
+      const weight = layer.bold ? 700 : 400;
+      const family = layer.fontFamily || "Arial";
+      ctx.font = `${weight} ${layer.fontSize ?? layer.size ?? 16}px ${family}`;
+      if (layer.flipX) ctx.scale(-1, 1);
+      ctx.fillText(layer.text || "", 0, 0);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
       ctx.restore();
     } else if (layer.type === "frame") {
       ctx.save();
       ctx.translate(lx, ly);
       ctx.rotate(rot);
+<<<<<<< HEAD
       const sw = layer.strokeWidth ?? 4;
       const gap = Math.max(0, layer.lineBreak ?? 0);
       const style = layer.borderStyle || "single";
@@ -428,17 +511,38 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
         tracePath(0);
         ctx.stroke();
       }
+=======
+      const r = Math.min(size * 0.48, layer.radius ?? 100);
+      const sw = layer.strokeWidth ?? 4;
+      const gap = Math.max(0, layer.lineBreak ?? 0);
+      ctx.lineWidth = sw;
+      // Line break now affects the actual circle stroke: it creates visible
+      // breaks in this Frame instead of incorrectly drawing a second dashed ring.
+      if (gap > 0) {
+        ctx.setLineDash([Math.max(2, gap * 1.6), Math.max(2, gap * 1.2)]);
+      } else {
+        ctx.setLineDash([]);
+      }
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
       ctx.setLineDash([]);
       ctx.restore();
     } else if (layer.type === "image" && layer.imageObj) {
       ctx.save();
       ctx.translate(lx, ly);
       ctx.rotate(rot);
+<<<<<<< HEAD
       const isz = ((layer.size ?? 15) / 100) * Math.min(size, canvasHeight);
+=======
+      const isz = ((layer.size ?? 15) / 100) * size;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
       ctx.drawImage(layer.imageObj, -isz / 2, -isz / 2, isz, isz);
       ctx.restore();
     }
   });
+<<<<<<< HEAD
 
   // Final export pass: convert every non-transparent pixel to pure black.
   // This also removes colored logos/images and prevents the old blue/speckled PNG issue.
@@ -476,6 +580,8 @@ function binarizeCanvasToBlack(canvas, alphaThreshold = 90) {
     }
   }
   ctx.putImageData(imageData, 0, 0);
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 }
 
 /* Slider row with prev/next step arrows — matches the "Radius / Stroke width / Line break" controls. */
@@ -579,7 +685,11 @@ function StampMark({ size = 64 }) {
 }
 
 /* ---------- atoms ---------- */
+<<<<<<< HEAD
 const Label = ({ children, style }) => <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase", color: C.inkSoft, marginBottom: 4, ...style }}>{children}</div>;
+=======
+const Label = ({ children }) => <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase", color: C.inkSoft, marginBottom: 4 }}>{children}</div>;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 const Field = (props) => <input {...props} style={{ width: "100%", background: C.white, border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 12px", fontSize: 14, color: C.ink, marginBottom: 12, fontFamily: font.body, outline: "none", ...props.style }} />;
 const Select = ({ children, ...props }) => <select {...props} style={{ width: "100%", background: C.white, border: `1px solid ${C.line}`, borderRadius: 8, padding: "10px 12px", fontSize: 14, color: C.ink, marginBottom: 12, fontFamily: font.body }}>{children}</select>;
 const Card = ({ children, style }) => <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px", marginBottom: 10, ...style }}>{children}</div>;
@@ -675,6 +785,10 @@ const TABS_ADMIN = [
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
+<<<<<<< HEAD
+=======
+  { id: "rate", label: "Rates", icon: TagIcon },
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   { id: "rubber", label: "Rubber", icon: Stamp },
   { id: "purchase", label: "Purchase", icon: ShoppingCart },
   { id: "ledger", label: "Cash Register", icon: Wallet },
@@ -687,6 +801,10 @@ const TABS_STAFF = [
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
+<<<<<<< HEAD
+=======
+  { id: "rate", label: "Rates", icon: TagIcon },
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   { id: "ledger", label: "Cash Register", icon: Wallet },
   
 ];
@@ -764,9 +882,16 @@ export default function SharmaJiStamps() {
     <>
       {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
+<<<<<<< HEAD
       {tab === "create" && <CreateStampTab rubbers={rubbers} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
+=======
+      {tab === "create" && <CreateStampTab />}
+      {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
+      {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
+      {tab === "rate" && <RateTab rubbers={rubbers} refresh={refreshAll} canEdit={user.role === "admin"} />}
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
       {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
       {tab === "purchase" && user.role === "admin" && <PurchaseTab rubbers={rubbers} purchases={purchases} refresh={refreshAll} />}
       {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} rubbers={rubbers} refresh={refreshAll} />}
@@ -953,6 +1078,7 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
 }
 
 /* ================= CREATE STAMP ================= */
+<<<<<<< HEAD
 function parseRubberSize(sizeText) {
   const raw = String(sizeText ?? "").trim().toLowerCase().replace(/,/g, ".");
   const values = raw.match(/\d+(?:\.\d+)?/g)?.map(Number) || [];
@@ -969,6 +1095,9 @@ function rubberSizeKey(sizeText) {
 }
 
 function CreateStampTab({ rubbers = [] }) {
+=======
+function CreateStampTab() {
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -992,8 +1121,11 @@ function CreateStampTab({ rubbers = [] }) {
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [fileName, setFileName] = useState("");
   const [plateSize, setPlateSize] = useState(38);
+<<<<<<< HEAD
   const [selectedRubberId, setSelectedRubberId] = useState("");
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const [editingTemplateId, setEditingTemplateId] = useState(null);
 
   // Extra layers added from the toolbar (Text around the circle / Text in the
@@ -1005,6 +1137,7 @@ function CreateStampTab({ rubbers = [] }) {
   const layerImageInputRef = useRef(null);
 
   const LAYER_TYPE_NAMES = { circleText: "Text around the circle", centerText: "Text in the centre", frame: "Frame", image: "Image" };
+<<<<<<< HEAD
   const FRAME_SHAPE_NAMES = { circle: "Circle", square: "Square", triangle: "Triangle" };
   // Text layers show their own typed content as the name (renaming the text
   // field renames the layer everywhere it's listed); other layer types keep
@@ -1017,11 +1150,15 @@ function CreateStampTab({ rubbers = [] }) {
     const base = l.type === "frame" ? FRAME_SHAPE_NAMES[l.shape || "circle"] : LAYER_TYPE_NAMES[l.type];
     return `${base} #${l.num}`;
   };
+=======
+  const layerLabel = (l) => `${LAYER_TYPE_NAMES[l.type]} #${l.num}`;
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const layerTypeMatchesFilter = (layer, filter) => {
     if (filter === "All") return true;
     if (filter === "Text") return layer.type === "circleText" || layer.type === "centerText";
     return layer.type === "frame" || layer.type === "image";
   };
+<<<<<<< HEAD
   const rubberSizes = useMemo(() => {
     const seen = new Set();
     return rubbers
@@ -1045,11 +1182,17 @@ function CreateStampTab({ rubbers = [] }) {
   const editorHeight = Math.max(80, Math.round(editorWidth * editorAspect));
 
   const addLayer = (type, opts = {}) => {
+=======
+  const filteredLayers = layers.filter((l) => layerTypeMatchesFilter(l, layerFilter));
+
+  const addLayer = (type) => {
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     const num = layerCounter + 1;
     setLayerCounter(num);
     const id = uid();
     let layer = { id, type, num };
     if (type === "circleText") {
+<<<<<<< HEAD
       layer = { ...layer, text: "NEW TEXT", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: false, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
     } else if (type === "centerText") {
       layer = { ...layer, text: "New text", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "center" };
@@ -1060,6 +1203,16 @@ function CreateStampTab({ rubbers = [] }) {
       const radius = Math.max(30, 100 - existingCount * 16);
       const dim = Math.max(10, 45 - existingCount * 7);
       layer = { ...layer, radius, width: dim, height: dim, strokeWidth: 4, lineBreak: 0, borderStyle: "single", shape };
+=======
+      layer = { ...layer, text: "NEW TEXT", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: false, flipX: false };
+    } else if (type === "centerText") {
+      layer = { ...layer, text: "New text", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0 };
+    } else if (type === "frame") {
+      // Each newly added circle sits slightly inside the previous circle.
+      const existingCircleCount = layers.filter((l) => l.type === "frame").length;
+      const radius = Math.max(30, 100 - existingCircleCount * 16);
+      layer = { ...layer, radius, strokeWidth: 4, lineBreak: 0 };
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     } else if (type === "image") {
       layer = { ...layer, size: 15, x: 50, y: 68, rotation: 0, imageDataUrl: null, imageObj: null };
     }
@@ -1078,7 +1231,10 @@ function CreateStampTab({ rubbers = [] }) {
   };
 
   const activeLayer = layers.find((l) => l.id === activeLayerId) || null;
+<<<<<<< HEAD
   const filteredLayers = layers.filter((l) => layerTypeMatchesFilter(l, layerFilter));
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 
   const handleLayerImageUpload = (e) => {
     const file = e.target.files[0];
@@ -1113,6 +1269,7 @@ function CreateStampTab({ rubbers = [] }) {
 
   useEffect(() => { loadTemplates(); }, []);
 
+<<<<<<< HEAD
   useEffect(() => {
     if (!selectedRubberId && rubberSizes.length) {
       setSelectedRubberId(rubberSizes[0].id);
@@ -1121,6 +1278,8 @@ function CreateStampTab({ rubbers = [] }) {
     }
   }, [rubberSizes, selectedRubberId]);
 
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1139,7 +1298,10 @@ function CreateStampTab({ rubbers = [] }) {
     shape, topText, bottomText, centerLine1, centerLine2,
     rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logoDataUrl,
     radius, strokeWidth, letterSpacing,
+<<<<<<< HEAD
     rubberId: selectedRubberId, rubberSize: selectedRubber?.size || null,
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     layers: layers.map(({ imageObj, ...l }) => l),
   });
 
@@ -1179,9 +1341,12 @@ function CreateStampTab({ rubbers = [] }) {
   const openTemplate = (t) => {
     const config = t.config || {};
     setShape(config.shape ?? "circle");
+<<<<<<< HEAD
     setSelectedRubberId(config.rubberId ?? "");
     const templateDims = parseRubberSize(config.rubberSize);
     if (templateDims) setPlateSize(templateDims.widthMm);
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     setTopText(config.topText ?? "");
     setBottomText(config.bottomText ?? "");
     setCenterLine1(config.centerLine1 ?? "");
@@ -1274,7 +1439,10 @@ function CreateStampTab({ rubbers = [] }) {
       shape, topText, bottomText, centerLine1, centerLine2,
       rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logo,
       radius, strokeWidth, letterSpacing, layers,
+<<<<<<< HEAD
       width: editorWidth, height: editorHeight, pixelRatio: window.devicePixelRatio || 1,
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     });
   }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, logo, radius, strokeWidth, letterSpacing, layers]);
 
@@ -1292,7 +1460,10 @@ function CreateStampTab({ rubbers = [] }) {
 
     const candidates = layers.map((layer, index) => {
       let score = Infinity;
+<<<<<<< HEAD
       if (layer.hidden) return { layer, index, score }; // Hidden layers aren't clickable on the canvas.
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 
       if (layer.type === "circleText") {
         const r = Math.hypot(px - cx, py - cy);
@@ -1313,6 +1484,7 @@ function CreateStampTab({ rubbers = [] }) {
           score = Math.abs(r - textRadius) + Math.abs(diff) * textRadius * 0.15;
         }
       } else if (layer.type === "frame") {
+<<<<<<< HEAD
         // Frames are outlines, so their clickable area is around the actual
         // outline, not at x/y=50% (which previously made preloaded frames hard to select).
         const tolerance = Math.max(18, (layer.strokeWidth ?? 4) * 2.5 + 10);
@@ -1330,6 +1502,15 @@ function CreateStampTab({ rubbers = [] }) {
           if (Math.abs(r - frameRadius) <= tolerance) {
             score = Math.abs(r - frameRadius);
           }
+=======
+        // Frames are rings, so their clickable area is around the actual radius,
+        // not at x/y=50% (which previously made preloaded frames hard to select).
+        const frameRadius = layer.radius ?? 100;
+        const r = Math.hypot(px - cx, py - cy);
+        const tolerance = Math.max(18, (layer.strokeWidth ?? 4) * 2.5 + 10);
+        if (Math.abs(r - frameRadius) <= tolerance) {
+          score = Math.abs(r - frameRadius);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
         }
       } else if (layer.type === "centerText") {
         const lx = ((layer.x ?? 50) / 100) * STAMP_CANVAS_SIZE;
@@ -1356,6 +1537,7 @@ function CreateStampTab({ rubbers = [] }) {
   };
 
   const handleDownload = () => {
+<<<<<<< HEAD
     const { widthMm, heightMm } = selectedDimensions;
     const dpi = 600;
     const pxPerMm = dpi / 25.4;
@@ -1380,6 +1562,13 @@ function CreateStampTab({ rubbers = [] }) {
     link.download = `stamp-${widthMm}x${heightMm}mm.png`;
     // PNG is lossless. Export at 600 DPI so the downloaded stamp is print-ready.
     link.href = exportCanvas.toDataURL("image/png");
+=======
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = "stamp.png";
+    link.href = canvas.toDataURL("image/png");
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     link.click();
   };
 
@@ -1389,7 +1578,34 @@ function CreateStampTab({ rubbers = [] }) {
       <div>
         <SectionTitle icon={Wand2} title="Create Stamp" />
         <Card style={{ padding: 14 }}>
+<<<<<<< HEAD
           <Btn onClick={startNew} style={{ width: "100%", justifyContent: "center", background: STAMP_INK_BLUE }}>
+=======
+          <Label>Choose a shape to start</Label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {STAMP_SHAPES.map((s) => {
+              const active = pickShape === s.id;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setPickShape(s.id)}
+                  style={{
+                    flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                    padding: "14px 6px", borderRadius: 10, cursor: "pointer", fontFamily: font.body,
+                    background: active ? "#EAF2FF" : C.white,
+                    border: `2px solid ${active ? STAMP_INK_BLUE : C.line}`,
+                    color: active ? STAMP_INK_BLUE : C.ink,
+                  }}
+                >
+                  <ShapeIcon shape={s.id} />
+                  <span style={{ fontSize: 12, fontWeight: 600 }}>{s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <Btn onClick={startNew} style={{ width: "100%", justifyContent: "center", marginTop: 14, background: STAMP_INK_BLUE }}>
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
             <Plus size={16} /> New Stamp
           </Btn>
         </Card>
@@ -1456,7 +1672,11 @@ function CreateStampTab({ rubbers = [] }) {
         </>
       ) : activeLayer?.type === "frame" ? (
         <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5, lineHeight: 1.5, textAlign: "center" }}>
+<<<<<<< HEAD
           {FRAME_SHAPE_NAMES[activeLayer.shape || "circle"]} selected — edit its shape properties on the right.
+=======
+          Circle selected — edit its circle properties on the right.
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
         </div>
       ) : !activeLayer ? (
         <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5, lineHeight: 1.5, textAlign: "center" }}>
@@ -1514,6 +1734,7 @@ function CreateStampTab({ rubbers = [] }) {
   );
 
   const fontOptions = ["Arial", "Georgia", "Times New Roman", "Verdana", "Courier New", "Trebuchet MS"];
+<<<<<<< HEAD
 
   // Six text-layout presets, matching the reference editor: Center / Top Arc / Bottom Arc /
   // Top Left / Top Right / Bottom. Each preset just picks the layer type + arc angle/direction
@@ -1647,13 +1868,51 @@ function CreateStampTab({ rubbers = [] }) {
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
       {(activeLayer.type === "circleText" || activeLayer.type === "centerText") && (
         textPropertyPanel(activeLayer)
+=======
+  const textPropertyPanel = (layer) => (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1.35fr .65fr", border: `1px solid ${C.line}`, background: C.white, margin: "-2px -2px 14px", borderRadius: 4, overflow: "hidden" }}>
+        <select value={layer.fontFamily || "Arial"} onChange={(e) => updateLayer(layer.id, { fontFamily: e.target.value })} style={{ border: "none", borderRight: `1px solid ${C.line}`, padding: "8px 10px", fontFamily: layer.fontFamily || "Arial", fontSize: 13, background: C.white, outline: "none" }}>
+          {fontOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <select value={layer.fontSize ?? layer.size ?? 16} onChange={(e) => updateLayer(layer.id, { fontSize: Number(e.target.value), size: Number(e.target.value) })} style={{ border: "none", padding: "8px 8px", fontSize: 13, background: C.white, outline: "none" }}>
+          {[10,12,14,16,18,20,22,24,28,32,36,40,48,56,64].map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <button type="button" onClick={() => updateLayer(layer.id, { bold: !layer.bold })} style={{ border: "none", borderTop: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, background: layer.bold ? "#EAF2FF" : C.white, fontWeight: 700, padding: "7px 10px", cursor: "pointer" }}>B</button>
+        <button type="button" onClick={() => updateLayer(layer.id, { flipX: !layer.flipX })} style={{ border: "none", borderTop: `1px solid ${C.line}`, background: layer.flipX ? "#EAF2FF" : C.white, padding: "7px 10px", cursor: "pointer", fontSize: 12 }}>⇋ Flip text</button>
+      </div>
+    </>
+  );
+
+  const layerPanel = activeLayer && (
+    <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <Label>{layerLabel(activeLayer)}</Label>
+        <button type="button" onClick={() => removeLayer(activeLayer.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {(activeLayer.type === "circleText" || activeLayer.type === "centerText") && (
+        <>
+          <Label>Text</Label>
+          <Field value={activeLayer.text} onChange={(e) => updateLayer(activeLayer.id, { text: e.target.value })} maxLength={40} />
+          {textPropertyPanel(activeLayer)}
+        </>
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
       )}
 
       {activeLayer.type === "circleText" ? (
         <>
+<<<<<<< HEAD
           <SliderControl label="Radius Text" value={activeLayer.radius ?? 130} min={40} max={155} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
           <SliderControl label="Distribution" value={activeLayer.spacing ?? 4} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { spacing: v })} />
           <SliderControl label="Start Point" value={activeLayer.start ?? 90} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { start: v })} />
+=======
+          <SliderControl label="Radius text" value={activeLayer.radius ?? 130} min={40} max={155} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
+          <SliderControl label="Spacing" value={activeLayer.spacing ?? 4} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { spacing: v })} />
+          <SliderControl label="Star point" value={activeLayer.start ?? 90} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { start: v })} />
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
         </>
       ) : activeLayer.type === "centerText" ? (
         <>
@@ -1663,6 +1922,7 @@ function CreateStampTab({ rubbers = [] }) {
         </>
       ) : activeLayer.type === "frame" ? (
         <>
+<<<<<<< HEAD
           {activeLayer.shape === "square" ? (
             <>
               <SliderControl label="Width" value={activeLayer.width ?? 45} min={10} max={95} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
@@ -1701,6 +1961,11 @@ function CreateStampTab({ rubbers = [] }) {
               );
             })}
           </div>
+=======
+          <SliderControl label="Radius" value={activeLayer.radius ?? 100} min={30} max={150} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
+          <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <SliderControl label="Line break" value={activeLayer.lineBreak ?? 0} min={0} max={20} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
         </>
       ) : (
         <>
@@ -1763,7 +2028,11 @@ function CreateStampTab({ rubbers = [] }) {
           ref={canvasRef}
           onClick={handleCanvasClick}
           title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
+<<<<<<< HEAD
           style={{ width: Math.min(STAMP_CANVAS_SIZE, 330), maxWidth: "88%", height: "auto", aspectRatio: `${editorWidth} / ${editorHeight}`, cursor: layers.length ? "pointer" : "default" }}
+=======
+          style={{ width: Math.min(STAMP_CANVAS_SIZE, 330), maxWidth: "88%", height: "auto", aspectRatio: "1 / 1", cursor: layers.length ? "pointer" : "default" }}
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
         />
         {layers.length > 0 && (
           <div style={{ marginTop: 5, fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft, textAlign: "center", background: "rgba(255,255,255,.8)", padding: "2px 7px", borderRadius: 10 }}>Click any item on the stamp to edit</div>
@@ -1801,10 +2070,18 @@ function CreateStampTab({ rubbers = [] }) {
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: isDesktop ? 22 : 12, flexWrap: "wrap", justifyContent: "center" }}>
+<<<<<<< HEAD
+=======
+          <button type="button" onClick={() => addLayer("circleText")} style={toolbarIconBtn}>
+            <span style={toolbarIconBox}><CircleDot size={18} /></span>
+            Text around the circle
+          </button>
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
           <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn}>
             <span style={toolbarIconBox}><Type size={18} /></span>
             Text in the centre
           </button>
+<<<<<<< HEAD
           <button type="button" onClick={() => addLayer("frame", { shape: "circle" })} style={toolbarIconBtn}>
             <span style={toolbarIconBox}><Circle size={18} /></span>
             Circle
@@ -1817,6 +2094,12 @@ function CreateStampTab({ rubbers = [] }) {
             <span style={toolbarIconBox}><Triangle size={18} /></span>
             Triangle
           </button>
+=======
+          <button type="button" onClick={() => addLayer("frame")} style={toolbarIconBtn}>
+            <span style={toolbarIconBox}><Circle size={18} /></span>
+            Circle
+          </button>
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
           <button
             type="button"
             onClick={() => { addLayer("image"); setTimeout(() => layerImageInputRef.current?.click(), 0); }}
@@ -1833,10 +2116,14 @@ function CreateStampTab({ rubbers = [] }) {
         </button>
       </div>
 
+<<<<<<< HEAD
       {/* This layer-switcher tab strip is only needed on mobile, where there's
           no separate layer list like the desktop's left "All/Text/Figure"
           panel — keeping it there would just duplicate that list. */}
       {!isDesktop && layers.length > 0 && (
+=======
+      {layers.length > 0 && (
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
         <div style={{
           display: "flex", alignItems: "stretch", height: 50, background: C.white,
           borderBottom: `1px solid ${C.line}`, marginBottom: 0, overflow: "hidden"
@@ -1862,6 +2149,12 @@ function CreateStampTab({ rubbers = [] }) {
                 }}
               >
                 {layerLabel(l)}
+<<<<<<< HEAD
+=======
+                <span onClick={(e) => { e.stopPropagation(); removeLayer(l.id); }} style={{ display: "inline-flex", color: C.inkSoft, cursor: "pointer" }}>
+                  <X size={13} />
+                </span>
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
               </button>
             ))}
           </div>
@@ -1897,6 +2190,7 @@ function CreateStampTab({ rubbers = [] }) {
                   No items in this category.
                 </div>
               ) : (
+<<<<<<< HEAD
                 filteredLayers.map((l) => {
                   const isTextLayer = l.type === "circleText" || l.type === "centerText";
                   const active = activeLayerId === l.id;
@@ -1981,6 +2275,26 @@ function CreateStampTab({ rubbers = [] }) {
                     </div>
                   );
                 })
+=======
+                filteredLayers.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => setActiveLayerId(l.id)}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                      background: activeLayerId === l.id ? "#EAF2FF" : "transparent",
+                      border: "none", borderBottom: `1px solid ${C.line}`,
+                      padding: "10px 2px", cursor: "pointer", textAlign: "left"
+                    }}
+                  >
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: font.body, fontSize: 12.5, color: activeLayerId === l.id ? STAMP_INK_BLUE : C.ink }}>
+                      <span style={{ fontFamily: font.mono, color: C.inkSoft, marginRight: 6 }}>{l.num}#</span>{LAYER_TYPE_NAMES[l.type]}
+                    </span>
+                    <span style={{ color: C.inkSoft, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>⋮</span>
+                  </button>
+                ))
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
               )}
             </div>
           </Card>
@@ -2009,6 +2323,7 @@ function CreateStampTab({ rubbers = [] }) {
         </>
       )}
 
+<<<<<<< HEAD
       {(
         <div style={{
           minHeight: isDesktop ? 60 : "auto",
@@ -2060,6 +2375,24 @@ function CreateStampTab({ rubbers = [] }) {
             <span style={{ color: C.inkSoft, whiteSpace: "nowrap" }}>{selectedDimensions.widthMm} × {selectedDimensions.heightMm} mm</span>
           </div>
           <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: isDesktop ? 184 : "100%", justifyContent: "center", borderRadius: 8 }}>
+=======
+      {isDesktop && (
+        <div style={{
+          height: 60, display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 16, padding: "8px 10px", background: C.white, border: `1px solid ${C.line}`,
+          borderTop: "none", marginBottom: 10,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: font.body, fontSize: 13.5, color: C.ink }}>
+            <span style={{ fontWeight: 600 }}>Plate size:</span>
+            <input
+              type="number" min="10" max="100" value={plateSize}
+              onChange={(e) => setPlateSize(Number(e.target.value) || 0)}
+              style={{ width: 52, border: "none", borderBottom: `2px solid ${STAMP_INK_BLUE}`, outline: "none", color: STAMP_INK_BLUE, fontWeight: 700, fontSize: 16, textAlign: "center", background: "transparent" }}
+            />
+            <span style={{ color: C.inkSoft }}>/mm</span>
+          </div>
+          <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: 184, justifyContent: "center", borderRadius: 8 }}>
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
             <Download size={16} /> Download stamp
           </Btn>
         </div>
@@ -2247,11 +2580,15 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
 
 
 function StockTab({ rubbers, stockByRubber }) {
+<<<<<<< HEAD
   const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
+=======
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   return (
     <div>
       <SectionTitle icon={Package} title="Stock Report" />
       <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" }}>
+<<<<<<< HEAD
         <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "34%" }} /><col style={{ width: "14%" }} /><col style={{ width: "13%" }} /><col style={{ width: "13%" }} /><col style={{ width: "13%" }} /><col style={{ width: "13%" }} />
@@ -2277,6 +2614,52 @@ function StockTab({ rubbers, stockByRubber }) {
           </tbody>
         </table>
         {rubberOnly.length === 0 && <EmptyNote text="No rubber items found." />}
+=======
+        <table style={{ width: "100%", minWidth: 340, borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "40%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "15%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th style={thStyle}>Name</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Open</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>In</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Out</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Close</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rubbers.map((r) => {
+              const s = stockByRubber[r.id];
+              const low = s.balance <= 15;
+              return (
+                <tr key={r.id}>
+                  <td style={tdStyle}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {r.photo_url ? (
+                        <img src={r.photo_url} alt={r.name} style={{ width: 26, height: 26, borderRadius: 6, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 26, height: 26, borderRadius: 6, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Stamp size={12} color={C.brass} />
+                        </div>
+                      )}
+                      <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                    </div>
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>{s.opening}</td>
+                  <td style={{ ...tdStyle, textAlign: "right", color: C.sage }}>+{s.purchased}</td>
+                  <td style={{ ...tdStyle, textAlign: "right", color: C.stamp }}>−{s.used}</td>
+                  <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: low ? C.stamp : C.ink }}>{low ? `${s.balance} ⚠` : s.balance}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
       </div>
     </div>
   );
@@ -2288,6 +2671,7 @@ function Row({ label, value, color, bold }) {
 }
 
 
+<<<<<<< HEAD
 /* ================= ITEM MASTER ================= */
 function RubberTab({ rubbers, refresh }) {
   const [name, setName] = useState("");
@@ -2295,32 +2679,118 @@ function RubberTab({ rubbers, refresh }) {
   const [size, setSize] = useState("");
   const [opening, setOpening] = useState(0);
   const [rate, setRate] = useState(0);
+=======
+/* ================= RATE ================= */
+function RateTab({ rubbers, refresh, canEdit }) {
+  const [busyId, setBusyId] = useState(null);
+  const update = async (id, rate) => {
+    setBusyId(id);
+    try { await dbUpdate("rubbers", id, { rate: Number(rate) || 0 }); await refresh(); } finally { setBusyId(null); }
+  };
+  return (
+    <div>
+      <SectionTitle icon={TagIcon} title="Rate Master" />
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" }}>
+        <table style={{ width: "100%", minWidth: 260, borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "60%" }} />
+            <col style={{ width: "40%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th style={thStyle}>Name</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Rate (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rubbers.map((r) => (
+              <tr key={r.id}>
+                <td style={tdStyle}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {r.photo_url ? (
+                      <img src={r.photo_url} alt={r.name} style={{ width: 26, height: 26, borderRadius: 6, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 26, height: 26, borderRadius: 6, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Stamp size={12} color={C.brass} />
+                      </div>
+                    )}
+                    <span style={{ fontFamily: font.body, fontWeight: 600, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                  </div>
+                </td>
+                <td style={{ ...tdStyle, textAlign: "right" }}>
+                  {canEdit ? (
+                    <input
+                      type="number"
+                      defaultValue={r.rate}
+                      onBlur={(e) => update(r.id, e.target.value)}
+                      style={{ width: "100%", maxWidth: 76, textAlign: "right", background: C.paperDark, border: `1px solid ${C.line}`, borderRadius: 6, padding: "6px 8px", fontFamily: font.mono, fontSize: 12.5, color: C.ink, opacity: busyId === r.id ? 0.5 : 1 }}
+                    />
+                  ) : (
+                    <span style={{ fontFamily: font.mono, fontWeight: 700, fontSize: 12.5 }}>{inr(r.rate)}</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {canEdit && <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, textAlign: "center", marginTop: 8 }}>ⓘ rate changes apply to new entries only · tap outside the field to save</div>}
+    </div>
+  );
+}
+
+/* ================= RUBBER MASTER ================= */
+function RubberTab({ rubbers, refresh }) {
+  const [name, setName] = useState("");
+  const [opening, setOpening] = useState(0);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const [q, setQ] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [editId, setEditId] = useState(null);
   const [editName, setEditName] = useState("");
+<<<<<<< HEAD
   const [editCategory, setEditCategory] = useState("rubber");
   const [editSize, setEditSize] = useState("");
   const [editOpening, setEditOpening] = useState(0);
   const [editRate, setEditRate] = useState(0);
+=======
+  const [editOpening, setEditOpening] = useState(0);
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const [editPhotoPreview, setEditPhotoPreview] = useState(null);
   const [editPhotoFile, setEditPhotoFile] = useState(null);
   const [editPhotoUrl, setEditPhotoUrl] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const startEdit = (r) => {
+<<<<<<< HEAD
     setEditId(r.id); setEditName(r.name); setEditCategory(r.category || "rubber");
     setEditSize(r.size || ""); setEditOpening(r.opening_stock || 0); setEditRate(r.rate || 0);
     setEditPhotoPreview(r.photo_url || null); setEditPhotoUrl(r.photo_url || null); setEditPhotoFile(null);
   };
   const handleEditPhotoChange = (e) => { const file=e.target.files[0]; if(!file)return; setEditPhotoFile(file); setEditPhotoPreview(URL.createObjectURL(file)); };
+=======
+    setEditId(r.id);
+    setEditName(r.name);
+    setEditOpening(r.opening_stock);
+    setEditPhotoPreview(r.photo_url || null);
+    setEditPhotoUrl(r.photo_url || null);
+    setEditPhotoFile(null);
+  };
+  const handleEditPhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setEditPhotoFile(file);
+    setEditPhotoPreview(URL.createObjectURL(file));
+  };
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const saveEdit = async () => {
     if (!editName.trim() || busy) return;
     setBusy(true);
     try {
       let photo_url = editPhotoUrl;
       if (editPhotoFile) photo_url = await uploadPhoto(editPhotoFile, "rubbers");
+<<<<<<< HEAD
       await dbUpdate("rubbers", editId, {
         name: editName.trim(), category: editCategory, size: editCategory === "rubber" ? editSize.trim() || null : null,
         opening_stock: Number(editOpening) || 0, rate: Number(editRate) || 0, photo_url
@@ -2329,12 +2799,28 @@ function RubberTab({ rubbers, refresh }) {
     } finally { setBusy(false); }
   };
   const handlePhotoChange = (e) => { const file=e.target.files[0]; if(!file)return; setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); };
+=======
+      await dbUpdate("rubbers", editId, { name: editName.trim(), opening_stock: Number(editOpening) || 0, photo_url });
+      setEditId(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
   const add = async () => {
     if (!name.trim() || busy) return;
     setBusy(true);
     try {
       let photo_url = null;
       if (photoFile) photo_url = await uploadPhoto(photoFile, "rubbers");
+<<<<<<< HEAD
       await dbInsert("rubbers", {
         id: uid(), name: name.trim(), category, size: category === "rubber" ? size.trim() || null : null,
         opening_stock: Number(opening) || 0, rate: Number(rate) || 0, photo_url
@@ -2384,12 +2870,93 @@ function RubberTab({ rubbers, refresh }) {
           </div><div style={{display:"flex",gap:6}}><button onClick={()=>startEdit(r)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer"}}><PenSquare size={16}/></button><button onClick={()=>remove(r.id)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={16}/></button></div>
         </div>}
       </Card>)}
+=======
+      await dbInsert("rubbers", { id: uid(), name: name.trim(), opening_stock: Number(opening) || 0, rate: 0, photo_url });
+      setName(""); setOpening(0); setPhotoPreview(null); setPhotoFile(null);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (id) => { await dbDelete("rubbers", id); await refresh(); };
+  const filtered = rubbers.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div>
+      <SectionTitle icon={Stamp} title="Rubber Master" />
+      <Card>
+        <Label>Rubber Name</Label>
+        <Field value={name} onChange={(e) => setName(e.target.value)} placeholder='e.g. Round Seal 2"' />
+        <Label>Opening Stock</Label>
+        <Field type="number" value={opening} onChange={(e) => setOpening(e.target.value)} />
+        <Label>Rubber Stamp Photo</Label>
+        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
+          {photoPreview ? (
+            <img src={photoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+          ) : (
+            "📷 Tap to capture / upload rubber stamp photo"
+          )}
+          <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
+        </label>
+        <Btn onClick={add} disabled={busy} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> {busy ? "Saving…" : "Add Rubber"}</Btn>
+      </Card>
+      <div style={{ position: "relative", marginBottom: 10 }}>
+        <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
+        <Field placeholder="Search rubber name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
+      </div>
+      {filtered.map((r) => (
+        <Card key={r.id}>
+          {editId === r.id ? (
+            <div>
+              <Label>Rubber Name</Label>
+              <Field value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <Label>Opening Stock</Label>
+              <Field type="number" value={editOpening} onChange={(e) => setEditOpening(e.target.value)} />
+              <Label>Rubber Stamp Photo</Label>
+              <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
+                {editPhotoPreview ? (
+                  <img src={editPhotoPreview} alt="Rubber stamp" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+                ) : (
+                  "📷 Tap to capture / upload rubber stamp photo"
+                )}
+                <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handleEditPhotoChange} />
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={saveEdit} disabled={busy} style={{ flex: 1, justifyContent: "center" }}>{busy ? "Saving…" : "Save"}</Btn>
+                <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                {r.photo_url ? (
+                  <img src={r.photo_url} alt={r.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", border: `1px solid ${C.line}` }} />
+                ) : (
+                  <div style={{ width: 40, height: 40, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Stamp size={18} color={C.brass} />
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{r.name}</div>
+                  <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>Opening: {r.opening_stock}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => startEdit(r)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={16} /></button>
+                <button onClick={() => remove(r.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={16} /></button>
+              </div>
+            </div>
+          )}
+        </Card>
+      ))}
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
     </div>
   );
 }
 
 /* ================= PURCHASE ================= */
 function PurchaseTab({ rubbers, purchases, refresh }) {
+<<<<<<< HEAD
   const [date,setDate]=useState(todayISO()); const [paymentMode,setPaymentMode]=useState("Cash");
   const [items,setItems]=useState([{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]); const [busy,setBusy]=useState(false);
   const [editId,setEditId]=useState(null); const [editRubberId,setEditRubberId]=useState(""); const [editQty,setEditQty]=useState(0); const [editRate,setEditRate]=useState(0); const [editDate,setEditDate]=useState(todayISO()); const [editPaymentMode,setEditPaymentMode]=useState("Cash"); const [editBusy,setEditBusy]=useState(false);
@@ -2414,6 +2981,199 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
     {grouped.slice(0,30).map(g=>{const mode=g.modes.size===1?[...g.modes][0]:"Mixed";return <Card key={g.date}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}><div><div style={{fontWeight:800,fontSize:14}}>{fmtDate(g.date)}</div><div style={{display:"inline-flex",marginTop:5,padding:"2px 8px",borderRadius:999,background:mode==="Bank"?"#EAF2FF":"#EEF8F1",color:mode==="Bank"?C.stampDark:"#2D7A4A",fontFamily:font.mono,fontSize:10,fontWeight:700}}>{mode==="Bank"?"🏦 BANK":mode==="Cash"?"💵 CASH":"CASH + BANK"}</div></div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:800,fontSize:15}}>{inr(g.total)}</div></div><div style={{borderTop:`1px solid ${C.line}`}}>{g.items.map((p,i)=>{const r=rubbers.find(r=>r.id===p.rubber_id);return editId===p.id?<div key={p.id} style={{padding:"10px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Date</Label><Field type="date" value={editDate} onChange={e=>setEditDate(e.target.value)}/></div><div><Label>Payment Mode</Label><div style={{display:"flex",gap:6}}><Btn variant={editPaymentMode==="Cash"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Cash")} style={{flex:1,justifyContent:"center"}}>Cash</Btn><Btn variant={editPaymentMode==="Bank"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Bank")} style={{flex:1,justifyContent:"center"}}>Bank</Btn></div></div></div><Label>Item / Category / Size</Label><Select value={editRubberId} onChange={e=>setEditRubberId(e.target.value)}>{rubbers.map(rb=><option key={rb.id} value={rb.id}>{optionLabel(rb)}</option>)}</Select><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Qty</Label><Field type="number" value={editQty} onChange={e=>setEditQty(e.target.value)}/></div><div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={e=>setEditRate(e.target.value)}/></div></div><div style={{display:"flex",gap:8}}><Btn onClick={saveEdit} disabled={editBusy} style={{flex:1,justifyContent:"center"}}>{editBusy?"Saving…":"Save"}</Btn><Btn variant="ghost" onClick={()=>setEditId(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn></div></div>:<div key={p.id} style={{display:"grid",gridTemplateColumns:"32px minmax(160px,1fr) 80px 100px 110px 50px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{fontFamily:font.mono,color:C.inkSoft}}>{i+1}</div><div><div style={{fontWeight:600}}>{r?.name||"Unknown Item"}</div><div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:2}}><span style={{fontFamily:font.mono,fontSize:9,padding:"1px 6px",borderRadius:999,background:C.paperDark}}>{catLabel(r?.category)}</span>{r?.category==="rubber"&&r?.size&&<span style={{fontFamily:font.mono,fontSize:9,color:C.inkSoft}}>Size: {r.size}</span>}</div></div><div style={{fontFamily:font.mono}}>Qty {p.qty}</div><div style={{fontFamily:font.mono}}>₹{Number(p.purchase_rate||0).toFixed(2)}</div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:700}}>{inr(p.total??p.amount??0)}</div><div style={{display:"flex",gap:2,justifyContent:"flex-end"}}><button onClick={()=>startEdit(p)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer"}}><PenSquare size={15}/></button><button onClick={()=>removePurchase(p.id)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={15}/></button></div></div>})}</div><div style={{display:"flex",justifyContent:"flex-end",paddingTop:10,fontFamily:font.mono,fontWeight:800}}>TOTAL&nbsp;&nbsp; {inr(g.total)}</div></Card>})}
     {purchases.length===0&&<EmptyNote text="No purchases recorded yet."/>}
   </div>;
+=======
+  const [date, setDate] = useState(todayISO());
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [items, setItems] = useState([{ rubberId: rubbers[0]?.id || "", qty: "", purchaseRate: "" }]);
+  const [busy, setBusy] = useState(false);
+
+  const [editId, setEditId] = useState(null);
+  const [editRubberId, setEditRubberId] = useState("");
+  const [editQty, setEditQty] = useState(0);
+  const [editRate, setEditRate] = useState(0);
+  const [editDate, setEditDate] = useState(todayISO());
+  const [editPaymentMode, setEditPaymentMode] = useState("Cash");
+  const [editBusy, setEditBusy] = useState(false);
+
+  const addRow = () => setItems([...items, { rubberId: rubbers[0]?.id || "", qty: "", purchaseRate: "" }]);
+  const removeRow = (idx) => setItems(items.filter((_, i) => i !== idx));
+  const updateRow = (idx, patch) => setItems(items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+
+  const itemsAmount = items.reduce((s, it) => s + Number(it.qty || 0) * Number(it.purchaseRate || 0), 0);
+
+  const save = async () => {
+    const validItems = items.filter((it) => it.rubberId && Number(it.qty) > 0);
+    if (validItems.length === 0 || busy) return;
+    setBusy(true);
+    try {
+      for (const it of validItems) {
+        const amount = Number(it.qty) * Number(it.purchaseRate || 0);
+        await dbInsert("purchases", {
+          id: uid(), date, rubber_id: it.rubberId, qty: Number(it.qty),
+          purchase_rate: Number(it.purchaseRate || 0), amount,
+          courier: 0, total: amount, payment_mode: paymentMode,
+        });
+      }
+      setItems([{ rubberId: rubbers[0]?.id || "", qty: "", purchaseRate: "" }]);
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEdit = (p) => {
+    setEditId(p.id);
+    setEditRubberId(p.rubber_id);
+    setEditQty(p.qty);
+    setEditRate(p.purchase_rate);
+    setEditPaymentMode(p.payment_mode || "Cash");
+    setEditDate(p.date);
+  };
+  const saveEdit = async () => {
+    if (!editRubberId || !editQty || editBusy) return;
+    setEditBusy(true);
+    try {
+      const amount = Number(editQty) * Number(editRate || 0);
+      await dbUpdate("purchases", editId, {
+        date: editDate, rubber_id: editRubberId, qty: Number(editQty),
+        purchase_rate: Number(editRate || 0), amount, courier: 0,
+        total: amount, payment_mode: editPaymentMode,
+      });
+      setEditId(null);
+      await refresh();
+    } finally {
+      setEditBusy(false);
+    }
+  };
+  const removePurchase = async (id) => { await dbDelete("purchases", id); await refresh(); };
+
+  // All rows having the same date are shown as ONE purchase in the list.
+  const grouped = useMemo(() => {
+    const map = new Map();
+    purchases.forEach((p) => {
+      const key = p.date;
+      if (!map.has(key)) map.set(key, { date: key, items: [], total: 0, modes: new Set() });
+      const g = map.get(key);
+      g.items.push(p);
+      g.total += Number(p.total ?? p.amount ?? 0);
+      g.modes.add(p.payment_mode || "Cash");
+    });
+    return [...map.values()].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [purchases]);
+
+  const exportCSV = () => {
+    const rows = [...purchases].sort((a, b) => new Date(b.date) - new Date(a.date)).map((p) => {
+      const r = rubbers.find((r) => r.id === p.rubber_id);
+      return {
+        Date: fmtDate(p.date),
+        "Payment Mode": p.payment_mode || "Cash",
+        "Item Name": r?.name || "",
+        Qty: p.qty,
+        Rate: p.purchase_rate,
+        Total: Number(p.total ?? p.amount ?? 0),
+      };
+    });
+    exportToCSV(`purchases-${todayISO()}.csv`, rows);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
+        <SectionTitle icon={ShoppingCart} title="Purchase Entry" bare />
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
+      </div>
+
+      <Card>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+          <div>
+            <Label>Date</Label>
+            <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ marginBottom: 0 }} />
+          </div>
+          <div>
+            <Label>Payment Mode</Label>
+            <div style={{ display: "flex", gap: 7 }}>
+              <Btn variant={paymentMode === "Cash" ? "solid" : "ghost"} onClick={() => setPaymentMode("Cash")} style={{ flex: 1, justifyContent: "center", padding: "9px 10px" }}>💵 Cash</Btn>
+              <Btn variant={paymentMode === "Bank" ? "solid" : "ghost"} onClick={() => setPaymentMode("Bank")} style={{ flex: 1, justifyContent: "center", padding: "9px 10px" }}>🏦 Bank</Btn>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "38px minmax(180px, 1fr) 120px 140px 110px 34px", gap: 8, alignItems: "center", padding: "8px 10px", background: C.paperDark, borderRadius: 7, fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: .5 }}>
+          <span>#</span><span>ITEM NAME</span><span>QTY</span><span>RATE (₹)</span><span style={{ textAlign: "right" }}>AMOUNT</span><span />
+        </div>
+
+        {items.map((it, idx) => {
+          const rowAmount = Number(it.qty || 0) * Number(it.purchaseRate || 0);
+          return (
+            <div key={idx} style={{ display: "grid", gridTemplateColumns: "38px minmax(180px, 1fr) 120px 140px 110px 34px", gap: 8, alignItems: "center", padding: "9px 10px", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.inkSoft }}>{idx + 1}</div>
+              <Select value={it.rubberId} onChange={(e) => updateRow(idx, { rubberId: e.target.value })} style={{ marginBottom: 0 }}>
+                {rubbers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </Select>
+              <Field type="number" min="0" value={it.qty} onChange={(e) => updateRow(idx, { qty: e.target.value })} placeholder="Qty" style={{ marginBottom: 0 }} />
+              <Field type="number" min="0" value={it.purchaseRate} onChange={(e) => updateRow(idx, { purchaseRate: e.target.value })} placeholder="Rate" style={{ marginBottom: 0 }} />
+              <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 700 }}>{inr(rowAmount)}</div>
+              {items.length > 1 ? <button onClick={() => removeRow(idx)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button> : <span />}
+            </div>
+          );
+        })}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
+          <Btn variant="ghost" onClick={addRow}><Plus size={15} /> Add Item</Btn>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 1 }}>TOTAL</div>
+            <div style={{ fontFamily: font.display, fontSize: 24, fontWeight: 800 }}>{inr(itemsAmount)}</div>
+          </div>
+        </div>
+        <Btn onClick={save} disabled={busy} style={{ width: "100%", justifyContent: "center", marginTop: 12 }}><Plus size={16} /> {busy ? "Saving…" : "Save Purchase"}</Btn>
+      </Card>
+
+      <Label>Purchase List</Label>
+      {grouped.slice(0, 30).map((g) => {
+        const mode = g.modes.size === 1 ? [...g.modes][0] : "Mixed";
+        return (
+          <Card key={g.date}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 14 }}>{fmtDate(g.date)}</div>
+                <div style={{ display: "inline-flex", marginTop: 5, padding: "2px 8px", borderRadius: 999, background: mode === "Bank" ? "#EAF2FF" : "#EEF8F1", color: mode === "Bank" ? C.stampDark : "#2D7A4A", fontFamily: font.mono, fontSize: 10, fontWeight: 700 }}>{mode === "Bank" ? "🏦 BANK" : mode === "Cash" ? "💵 CASH" : "CASH + BANK"}</div>
+              </div>
+              <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 800, fontSize: 15 }}>{inr(g.total)}</div>
+            </div>
+            <div style={{ borderTop: `1px solid ${C.line}` }}>
+              {g.items.map((p, i) => {
+                const r = rubbers.find((r) => r.id === p.rubber_id);
+                return editId === p.id ? (
+                  <div key={p.id} style={{ padding: "10px 0", borderBottom: i < g.items.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div><Label>Date</Label><Field type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} /></div>
+                      <div><Label>Payment Mode</Label><div style={{ display: "flex", gap: 6 }}><Btn variant={editPaymentMode === "Cash" ? "solid" : "ghost"} onClick={() => setEditPaymentMode("Cash")} style={{ flex: 1, justifyContent: "center" }}>Cash</Btn><Btn variant={editPaymentMode === "Bank" ? "solid" : "ghost"} onClick={() => setEditPaymentMode("Bank")} style={{ flex: 1, justifyContent: "center" }}>Bank</Btn></div></div>
+                    </div>
+                    <Label>Item Name</Label>
+                    <Select value={editRubberId} onChange={(e) => setEditRubberId(e.target.value)}>{rubbers.map((rb) => <option key={rb.id} value={rb.id}>{rb.name}</option>)}</Select>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}><div><Label>Qty</Label><Field type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} /></div><div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={(e) => setEditRate(e.target.value)} /></div></div>
+                    <div style={{ display: "flex", gap: 8 }}><Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 1, justifyContent: "center" }}>{editBusy ? "Saving…" : "Save"}</Btn><Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn></div>
+                  </div>
+                ) : (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "32px minmax(160px, 1fr) 80px 100px 110px 50px", gap: 8, alignItems: "center", padding: "9px 0", borderBottom: i < g.items.length - 1 ? `1px solid ${C.line}` : "none" }}>
+                    <div style={{ fontFamily: font.mono, color: C.inkSoft }}>{i + 1}</div>
+                    <div style={{ fontWeight: 600 }}>{r?.name || "Unknown Item"}</div>
+                    <div style={{ fontFamily: font.mono }}>Qty {p.qty}</div>
+                    <div style={{ fontFamily: font.mono }}>₹{Number(p.purchase_rate || 0).toFixed(2)}</div>
+                    <div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 700 }}>{inr(p.total ?? p.amount ?? 0)}</div>
+                    <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}><button onClick={() => startEdit(p)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={15} /></button><button onClick={() => removePurchase(p.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button></div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 10, fontFamily: font.mono, fontWeight: 800 }}>TOTAL&nbsp;&nbsp; {inr(g.total)}</div>
+          </Card>
+        );
+      })}
+      {purchases.length === 0 && <EmptyNote text="No purchases recorded yet." />}
+    </div>
+  );
+>>>>>>> a773703dbf28b59e7f5cf40ef89f14e1bde67c10
 }
 
 /* ================= CASH LEDGER ================= */
