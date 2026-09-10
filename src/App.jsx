@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
-  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download,
+  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2,
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer
 } from "lucide-react";
@@ -679,7 +679,7 @@ function Login({ users, onLogin }) {
             ))}
           </div>
           <div style={{ height: 18, color: C.stamp, fontFamily: font.mono, fontSize: 11, marginBottom: 6 }}>{error}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: 220 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, width: 220 }}>
             {["1","2","3","4","5","6","7","8","9","","0","back"].map((k, i) => (
               k === "" ? <div key={i} /> :
               <button key={i} onClick={() => press(k)} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 0", fontFamily: font.mono, fontSize: 16, color: C.ink, cursor: "pointer" }}>{k === "back" ? "⌫" : k}</button>
@@ -1856,6 +1856,49 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     </>
   );
 
+  const sizeControls = (
+    <div>
+      <Label>Choose stamp size</Label>
+      {rubberSizes.length === 0 ? (
+        <div style={{ color: C.inkSoft, fontFamily: font.mono, fontSize: 11.5, padding: "8px 0" }}>
+          No rubber sizes configured.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8 }}>
+          {rubberSizes.map((r) => {
+            const active = r.id === selectedRubberId;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => {
+                  setSelectedRubberId(r.id);
+                  setPlateSize(r.parsed.widthMm);
+                  setSizeMenuOpen(false);
+                }}
+                style={{
+                  border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
+                  background: active ? "#EAF2FF" : C.white,
+                  color: active ? STAMP_INK_BLUE : C.ink,
+                  borderRadius: 8,
+                  padding: "9px 7px",
+                  cursor: "pointer",
+                  textAlign: "center",
+                  fontFamily: font.body,
+                }}
+              >
+                <div style={{ fontWeight: active ? 750 : 600, fontSize: 12 }}>{r.name}</div>
+                <div style={{ marginTop: 3, fontFamily: font.mono, fontSize: 10.5 }}>
+                  {r.parsed.widthMm} × {r.parsed.heightMm} mm
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   const fontOptions = ["Arial", "Georgia", "Times New Roman", "Verdana", "Courier New", "Trebuchet MS"];
 
   // Six text-layout presets, matching the reference editor: Center / Top Arc / Bottom Arc /
@@ -2478,11 +2521,17 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
           {canvasBlock}
           {mobileCanvasSpacer}
           <Card id="mobile-stamp-edit">
-            {mobileEditorPanel === "layers" ? layerPanel : null}
+            {mobileEditorPanel === "layers" ? (
+              layerPanel || (
+                <div style={{ padding: 8, color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>
+                  No layer selected. Add a layer from the toolbar above.
+                </div>
+              )
+            ) : null}
             {mobileEditorPanel === "edit" ? (
               <>
                 {textFields}
-                {activeLayer ? null : controlFields}
+                {activeLayer ? layerPanel : controlFields}
               </>
             ) : null}
           </Card>
