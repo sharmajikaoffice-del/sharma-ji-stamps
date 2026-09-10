@@ -2522,17 +2522,91 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
           {mobileCanvasSpacer}
           <Card id="mobile-stamp-edit">
             {mobileEditorPanel === "layers" ? (
-              layerPanel || (
-                <div style={{ padding: 8, color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>
-                  No layer selected. Add a layer from the toolbar above.
-                </div>
-              )
-            ) : null}
-            {mobileEditorPanel === "edit" ? (
-              <>
-                {textFields}
-                {activeLayer ? layerPanel : controlFields}
-              </>
+              <div id="mobile-stamp-layers">
+                <Label>Layers</Label>
+                {layers.length === 0 ? (
+                  <div style={{ padding: "12px 0", color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>
+                    No layers yet.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...layers].reverse().map((layer) => {
+                      const selected = activeLayer?.id === layer.id;
+                      const layerName =
+                        layer.type === "text" ? (layer.text || "Text") :
+                        layer.type === "image" ? "Image" :
+                        layer.type === "circle" ? "Circle" :
+                        layer.type === "rectangle" ? "Rectangle" :
+                        layer.type === "line" ? "Line" :
+                        layer.type || "Layer";
+                      return (
+                        <div
+                          key={layer.id}
+                          style={{
+                            width: "100%",
+                            border: `1px solid ${selected ? STAMP_INK_BLUE : C.line}`,
+                            background: selected ? "#EAF2FF" : C.white,
+                            borderRadius: 8,
+                            padding: "8px 9px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setActiveLayerId(layer.id)}
+                            style={{
+                              flex: 1, minWidth: 0, border: "none", background: "transparent",
+                              color: C.ink, cursor: "pointer", textAlign: "left",
+                              fontFamily: font.body, fontWeight: selected ? 750 : 600, fontSize: 12,
+                            }}
+                          >
+                            {layerName}
+                          </button>
+                          <button
+                            type="button"
+                            title={layer.visible === false ? "Show layer" : "Hide layer"}
+                            onClick={() => {
+                              setLayers(prev => prev.map(l =>
+                                l.id === layer.id ? { ...l, visible: l.visible === false } : l
+                              ));
+                            }}
+                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: C.inkSoft }}
+                          >
+                            {layer.visible === false ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            title="Delete layer"
+                            onClick={() => {
+                              setLayers(prev => prev.filter(l => l.id !== layer.id));
+                              if (activeLayer?.id === layer.id) setActiveLayerId(null);
+                            }}
+                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: "#B42318" }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : mobileEditorPanel === "edit" ? (
+              <div id="mobile-stamp-edit-properties">
+                {activeLayer ? (
+                  <>
+                    <Label>Edit properties</Label>
+                    {textFields}
+                    {layerPanel}
+                  </>
+                ) : (
+                  <div style={{ padding: "12px 0", color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>
+                    Select a layer from Layer tab first.
+                  </div>
+                )}
+              </div>
             ) : null}
           </Card>
         </>
@@ -2689,9 +2763,10 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
                 style={{
                   border: "none", background: active ? "#EAF2FF" : C.white,
                   color: active ? STAMP_INK_BLUE : C.inkSoft,
-                  minHeight: 58, display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", gap: 3,
-                  fontFamily: font.mono, fontSize: 10.5, fontWeight: active ? 800 : 600,
+                  minWidth: 0, height: 58, display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", gap: 2,
+                  fontFamily: font.mono, fontSize: 10, fontWeight: active ? 800 : 600,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   cursor: "pointer",
                 }}
               >
