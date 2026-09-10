@@ -1036,7 +1036,7 @@ function OrdersTab({ onEditOrder }) {
             <div style={{ marginBottom: 8 }}><Tag tone={o.status === "printed" ? "in" : "out"}>{o.status || "new"}</Tag></div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {(o.status || "new") === "new" && (
-                <Btn onClick={() => setStatus(o, "accepted")} style={{ justifyContent: "center", width: "100%", background: C.sage }}>
+                <Btn onClick={() => setStatus(o, "accepted")} style={{ justifyContent: "center", width: "100%", background: "#2D7A4A" }}>
                   <Check size={14} /> Accept
                 </Btn>
               )}
