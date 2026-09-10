@@ -1202,6 +1202,23 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
   const [templates, setTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState("");
+  const [downloadHistory, setDownloadHistory] = useState([]);
+
+  const DOWNLOAD_HISTORY_KEY = "sjs_download_history_v1";
+
+  const loadDownloadHistory = () => {
+    try {
+      const raw = localStorage.getItem(DOWNLOAD_HISTORY_KEY);
+      const rows = raw ? JSON.parse(raw) : [];
+      setDownloadHistory(Array.isArray(rows) ? rows : []);
+    } catch {
+      setDownloadHistory([]);
+    }
+  };
+
+  useEffect(() => {
+    loadDownloadHistory();
+  }, []);
   const [templateName, setTemplateName] = useState("");
   const [saveStatus, setSaveStatus] = useState(""); // "", "saving", "saved", "error"
 
@@ -1340,6 +1357,13 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     });
 
     setView("editor");
+  };
+
+  const openHistoryDesign = (h) => {
+    openTemplate({ id: null, name: h.name || "Downloaded design", config: h.config || {} });
+    setEditingTemplateId(null);
+    setTemplateName("");
+    setSaveStatus("");
   };
 
   const handleSaveTemplate = async () => {
@@ -1523,7 +1547,37 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
     });
   };
 
+  const saveDownloadToHistory = () => {
+    // Keep the editable source config, not the protected preview image.
+    // This makes every downloaded design reopenable just like a template.
+    const entry = {
+      id: uid(),
+      name: `${selectedDimensions.widthMm}×${selectedDimensions.heightMm} mm`,
+      config: buildConfig(),
+      created_at: new Date().toISOString(),
+    };
+    try {
+      const raw = localStorage.getItem(DOWNLOAD_HISTORY_KEY);
+      const current = raw ? JSON.parse(raw) : [];
+      const next = [entry, ...(Array.isArray(current) ? current : [])].slice(0, 100);
+      localStorage.setItem(DOWNLOAD_HISTORY_KEY, JSON.stringify(next));
+      setDownloadHistory(next);
+    } catch {}
+  };
+
+  const handleDeleteHistory = (id, e) => {
+    e?.stopPropagation?.();
+    try {
+      const next = downloadHistory.filter((h) => h.id !== id);
+      localStorage.setItem(DOWNLOAD_HISTORY_KEY, JSON.stringify(next));
+      setDownloadHistory(next);
+    } catch {}
+  };
+
   const handleDownload = async () => {
+    // A normal download creates an editable history item. Customer protected
+    // previews stay protected and are not stored as clean downloadable files.
+    if (!customerMode) saveDownloadToHistory();
     const result = customerMode
       ? await generateCustomerDownloadDataUrl()
       : generateStampDataUrl(600);
@@ -1673,6 +1727,41 @@ function CreateStampTab({ rubbers = [], customerMode = false }) {
               </div>
             ))}
           </div>
+        )}
+
+        {!customerMode && (
+          <>
+            <Label style={{ marginTop: 18 }}>Download History</Label>
+            {downloadHistory.length === 0 ? (
+              <EmptyNote text="Downloaded designs will appear here and stay editable." />
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "repeat(2, 1fr)", gap: 10 }}>
+                {downloadHistory.map((h) => (
+                  <div
+                    key={h.id}
+                    onClick={() => openHistoryDesign(h)}
+                    style={{ position: "relative", background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 8px 8px", cursor: "pointer", textAlign: "center" }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteHistory(h.id, e)}
+                      aria-label="Delete history item"
+                      style={{ position: "absolute", top: 6, right: 6, background: C.white, border: `1px solid ${C.line}`, borderRadius: 6, color: C.stamp, cursor: "pointer", padding: 4, lineHeight: 0, zIndex: 1 }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                    <TemplateThumb config={h.config} size={110} />
+                    <div style={{ marginTop: 4, fontSize: 12, fontWeight: 600, fontFamily: font.body, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {h.name}
+                    </div>
+                    <div style={{ marginTop: 2, fontSize: 9.5, color: C.inkSoft, fontFamily: font.mono }}>
+                      {new Date(h.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     );
