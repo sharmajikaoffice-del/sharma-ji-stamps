@@ -60,7 +60,10 @@ async function uploadPhoto(file, folder) {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type },
     body: file,
   });
-  if (!res.ok) throw new Error("Photo upload failed");
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Photo upload failed${detail ? ` — ${detail}` : ""}. Check the "rubber-photos" storage bucket exists in Supabase and is public.`);
+  }
   return `${SUPABASE_URL}/storage/v1/object/public/rubber-photos/${path}`;
 }
 
@@ -757,6 +760,15 @@ function SharmaJiStampsAdmin() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [orderToEdit, setOrderToEdit] = useState(null);
   const editOrder = (order) => { setOrderToEdit(order); setTab("create"); };
+  const [entryToFill, setEntryToFill] = useState(null);
+  const billOrder = (order) => {
+    setEntryToFill({
+      rubberId: order.config?.rubberId || null,
+      mobile: order.customer_mobile || "",
+      remarks: order.customer_name ? `Order: ${order.customer_name}` : "",
+    });
+    setTab("entry");
+  };
 
   // Back button / swipe-back gesture: whenever the user leaves the dashboard
   // (opens any other tab, or opens the More sheet), push one history entry so
@@ -831,9 +843,9 @@ function SharmaJiStampsAdmin() {
   const tabContent = (
     <>
       {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
-      {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} />}
+      {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
       {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} />}
-      {tab === "orders" && <OrdersTab onEditOrder={editOrder} />}
+      {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
       {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
@@ -945,7 +957,7 @@ function CustomerDesigner() {
     let cancelled = false;
     (async () => {
       try {
-        const rows = await dbGet("customer_rubbers");
+        const rows = await dbGet("rubbers");
         if (!cancelled) setRubbers(Array.isArray(rows) ? rows : []);
       } catch {
         if (!cancelled) setError("Stamp sizes could not be loaded. The default size is still available.");
@@ -980,7 +992,7 @@ export default SharmaJiStamps;
 // "customer_designs" Supabase table (status: new -> accepted -> printed).
 // This tab is how staff accept them, open the design in the normal editor to
 // tweak it, and print it — same editor, just pre-loaded with the customer's config.
-function OrdersTab({ onEditOrder }) {
+function OrdersTab({ onEditOrder, onBillOrder }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1001,12 +1013,20 @@ function OrdersTab({ onEditOrder }) {
   useEffect(() => { load(); }, []);
 
   const setStatus = async (order, status) => {
-    await dbUpdate("customer_designs", order.id, { status });
-    await load();
+    try {
+      await dbUpdate("customer_designs", order.id, { status });
+      await load();
+    } catch (err) {
+      setError(`Could not update this order — ${err.message || "check that the Supabase update policy was run on customer_designs."}`);
+    }
   };
   const remove = async (order) => {
-    await dbDelete("customer_designs", order.id);
-    await load();
+    try {
+      await dbDelete("customer_designs", order.id);
+      await load();
+    } catch (err) {
+      setError(`Could not delete this order — ${err.message || "check the Supabase delete policy on customer_designs."}`);
+    }
   };
 
   const shown = orders.filter((o) => filter === "all" || (o.status || "new") === filter);
@@ -1051,6 +1071,11 @@ function OrdersTab({ onEditOrder }) {
                 )}
                 <button onClick={() => remove(o)} style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 8, color: C.stamp, cursor: "pointer", padding: "6px 10px" }}><Trash2 size={14} /></button>
               </div>
+              {(o.status || "new") !== "new" && (
+                <Btn variant="ghost" onClick={() => onBillOrder(o)} style={{ justifyContent: "center", width: "100%", padding: "6px 8px", fontSize: 11.5 }}>
+                  <Wallet size={13} /> Make Bill
+                </Btn>
+              )}
             </div>
           </Card>
         ))}
@@ -1060,7 +1085,7 @@ function OrdersTab({ onEditOrder }) {
 }
 
 /* ================= STAMP ENTRY ================= */
-function StampEntryTab({ rubbers, entries, refresh, user }) {
+function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillConsumed }) {
   const [date, setDate] = useState(todayISO());
   const [rubberId, setRubberId] = useState(rubbers[0]?.id || "");
   const [mobile, setMobile] = useState("");
@@ -1069,6 +1094,17 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
   const [remarks, setRemarks] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Pre-fill this entry when staff taps "Make Bill" on an accepted/printed
+  // customer order — same customer, same rubber/size they ordered.
+  useEffect(() => {
+    if (!initialFill) return;
+    if (initialFill.rubberId) setRubberId(initialFill.rubberId);
+    if (initialFill.mobile) setMobile(initialFill.mobile);
+    if (initialFill.remarks) setRemarks(initialFill.remarks);
+    if (onFillConsumed) onFillConsumed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFill]);
 
   const rubber = rubbers.find((r) => r.id === rubberId);
   const rate = rubber?.rate || 0;
@@ -1148,7 +1184,7 @@ function StampEntryTab({ rubbers, entries, refresh, user }) {
               ) : (
             "📷 Tap to capture / upload impression"
             )}
-            <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
             </label>
 
             <Label>Stamp Name (text engraved on stamp)</Label>
@@ -1295,6 +1331,11 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const selectedStampPreviewHeight = Math.max(80, Math.round(
     selectedStampPreviewWidth * editorAspect
   ));
+
+  // How tall the mobile preview area itself should be, not just the dashed
+  // stamp boundary inside it — small stamps get a smaller preview panel
+  // instead of a small box floating inside a big empty grid.
+  const mobileCanvasAreaHeight = Math.max(170, Math.min(330, Math.round(selectedStampPreviewHeight) + 90));
 
   const addLayer = (type, opts = {}) => {
     const num = layerCounter + 1;
@@ -2286,9 +2327,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               right: 0,
               zIndex: 70,
               width: "100%",
-              height: "42vh",
-              minHeight: 210,
+              height: mobileCanvasAreaHeight,
+              minHeight: 170,
               maxHeight: 330,
+              transition: "height .18s ease",
               boxShadow: "0 2px 10px rgba(38,50,65,.14)",
             }),
       }}
@@ -2361,7 +2403,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   );
 
   const mobileCanvasSpacer = !isDesktop
-    ? <div aria-hidden="true" style={{ height: "42vh", minHeight: 210, maxHeight: 330, marginBottom: 10 }} />
+    ? <div aria-hidden="true" style={{ height: mobileCanvasAreaHeight, minHeight: 170, maxHeight: 330, marginBottom: 10, transition: "height .18s ease" }} />
     : null;
 
   const downloadCustomerStampPreview = async () => {
@@ -2892,7 +2934,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       </Card>}
 
       {customerMode && (
-        (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : <Card id="mobile-stamp-submit" style={{ marginBottom: 24 }}>
+        (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : <Card id="mobile-stamp-customer-submit" style={{ marginBottom: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Submit & Download Preview</div>
           <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
             Enter your name and mobile number. Download is a protected preview.
@@ -2965,6 +3007,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
   const [editPaymentMode, setEditPaymentMode] = useState("Cash");
   const [editRemarks, setEditRemarks] = useState("");
   const [editBusy, setEditBusy] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
 
   const chronological = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
   let runningTotal = 0;
@@ -2994,7 +3037,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
 
   const saveEdit = async () => {
     if (!editRubberId || editBusy) return;
-    setEditBusy(true);
+    setEditBusy(true); setErrMsg("");
     try {
       await dbUpdate("stamp_entries", editId, {
         date: editDate, rubber_id: editRubberId, mobile: editMobile,
@@ -3002,11 +3045,16 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
       });
       setEditId(null);
       await refresh();
+    } catch (err) {
+      setErrMsg(err.message || "Save failed — check connection.");
     } finally {
       setEditBusy(false);
     }
   };
-  const removeEntry = async (id) => { await dbDelete("stamp_entries", id); await refresh(); };
+  const removeEntry = async (id) => {
+    try { await dbDelete("stamp_entries", id); await refresh(); }
+    catch (err) { setErrMsg(err.message || "Delete failed — check connection."); }
+  };
 
   const exportCSV = () => {
     const rows = display.map((e) => {
@@ -3034,6 +3082,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
         <SectionTitle icon={BookOpen} title="Stamp Sale Register" bare />
         <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
+      {errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
       <div style={{ position: "relative", marginBottom: 10, maxWidth: isDesktop ? 420 : "none" }}>
         <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
         <Field placeholder="Search by rubber name, mobile, or stamp name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
@@ -3177,6 +3226,7 @@ function RubberTab({ rubbers, refresh }) {
   const [editPhotoFile, setEditPhotoFile] = useState(null);
   const [editPhotoUrl, setEditPhotoUrl] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
 
   const startEdit = (r) => {
     setEditId(r.id); setEditName(r.name); setEditCategory(r.category || "rubber");
@@ -3186,7 +3236,7 @@ function RubberTab({ rubbers, refresh }) {
   const handleEditPhotoChange = (e) => { const file=e.target.files[0]; if(!file)return; setEditPhotoFile(file); setEditPhotoPreview(URL.createObjectURL(file)); };
   const saveEdit = async () => {
     if (!editName.trim() || busy) return;
-    setBusy(true);
+    setBusy(true); setErrMsg("");
     try {
       let photo_url = editPhotoUrl;
       if (editPhotoFile) photo_url = await uploadPhoto(editPhotoFile, "rubbers");
@@ -3195,12 +3245,13 @@ function RubberTab({ rubbers, refresh }) {
         opening_stock: Number(editOpening) || 0, rate: Number(editRate) || 0, photo_url
       });
       setEditId(null); await refresh();
-    } finally { setBusy(false); }
+    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
+    finally { setBusy(false); }
   };
   const handlePhotoChange = (e) => { const file=e.target.files[0]; if(!file)return; setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); };
   const add = async () => {
     if (!name.trim() || busy) return;
-    setBusy(true);
+    setBusy(true); setErrMsg("");
     try {
       let photo_url = null;
       if (photoFile) photo_url = await uploadPhoto(photoFile, "rubbers");
@@ -3209,9 +3260,13 @@ function RubberTab({ rubbers, refresh }) {
         opening_stock: Number(opening) || 0, rate: Number(rate) || 0, photo_url
       });
       setName(""); setCategory("rubber"); setSize(""); setOpening(0); setRate(0); setPhotoPreview(null); setPhotoFile(null); await refresh();
-    } finally { setBusy(false); }
+    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
+    finally { setBusy(false); }
   };
-  const remove = async (id) => { await dbDelete("rubbers", id); await refresh(); };
+  const remove = async (id) => {
+    try { await dbDelete("rubbers", id); await refresh(); }
+    catch (err) { setErrMsg(err.message || "Delete failed — check connection."); }
+  };
   const filtered = rubbers.filter((r) => `${r.name} ${r.category || "rubber"} ${r.size || ""}`.toLowerCase().includes(q.toLowerCase()));
   const catLabel = (c) => c === "machine" ? "Machine" : c === "raw" ? "Raw" : "Rubber";
 
@@ -3219,6 +3274,7 @@ function RubberTab({ rubbers, refresh }) {
     <div>
       <SectionTitle icon={Package} title="Item Master" />
       <Card>
+        {errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
         <Label>Item Name</Label>
         <Field value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Round Seal / Cutting Machine / Rubber Sheet" />
         <Label>Category</Label>
@@ -3231,7 +3287,7 @@ function RubberTab({ rubbers, refresh }) {
         <Label>{category === "rubber" ? "Rubber Stamp Photo" : "Item Photo"}</Label>
         <label style={{ display:"block", border:`1px dashed ${C.brass}`, borderRadius:8, padding:16, textAlign:"center", color:C.brass, fontSize:13, marginBottom:12, cursor:"pointer", overflow:"hidden" }}>
           {photoPreview ? <img src={photoPreview} alt="Item" style={{ maxWidth:"100%", maxHeight:160, borderRadius:6 }} /> : "📷 Tap to capture / upload photo"}
-          <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handlePhotoChange}/>
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={handlePhotoChange}/>
         </label>
         <Btn onClick={add} disabled={busy} style={{width:"100%",justifyContent:"center"}}><Plus size={16}/> {busy ? "Saving…" : "Add Item"}</Btn>
       </Card>
@@ -3244,7 +3300,7 @@ function RubberTab({ rubbers, refresh }) {
           <Label>Opening Stock</Label><Field type="number" value={editOpening} onChange={(e)=>setEditOpening(e.target.value)}/>
           <Label>Rate (₹)</Label><Field type="number" min="0" value={editRate} onChange={(e)=>setEditRate(e.target.value)} placeholder="Selling rate"/>
           <Label>Item Photo</Label>
-          <label style={{display:"block",border:`1px dashed ${C.brass}`,borderRadius:8,padding:16,textAlign:"center",color:C.brass,fontSize:13,marginBottom:12,cursor:"pointer",overflow:"hidden"}}>{editPhotoPreview?<img src={editPhotoPreview} alt="Item" style={{maxWidth:"100%",maxHeight:160,borderRadius:6}}/>:"📷 Tap to capture / upload photo"}<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleEditPhotoChange}/></label>
+          <label style={{display:"block",border:`1px dashed ${C.brass}`,borderRadius:8,padding:16,textAlign:"center",color:C.brass,fontSize:13,marginBottom:12,cursor:"pointer",overflow:"hidden"}}>{editPhotoPreview?<img src={editPhotoPreview} alt="Item" style={{maxWidth:"100%",maxHeight:160,borderRadius:6}}/>:"📷 Tap to capture / upload photo"}<input type="file" accept="image/*" style={{display:"none"}} onChange={handleEditPhotoChange}/></label>
           <div style={{display:"flex",gap:8}}><Btn onClick={saveEdit} disabled={busy} style={{flex:1,justifyContent:"center"}}>{busy?"Saving…":"Save"}</Btn><Btn variant="ghost" onClick={()=>setEditId(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn></div>
         </div> : <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div style={{display:"flex",gap:10,alignItems:"center"}}>
@@ -3260,20 +3316,21 @@ function RubberTab({ rubbers, refresh }) {
 /* ================= PURCHASE ================= */
 function PurchaseTab({ rubbers, purchases, refresh }) {
   const [date,setDate]=useState(todayISO()); const [paymentMode,setPaymentMode]=useState("Cash");
-  const [items,setItems]=useState([{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]); const [busy,setBusy]=useState(false);
+  const [items,setItems]=useState([{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]); const [busy,setBusy]=useState(false); const [errMsg,setErrMsg]=useState("");
   const [editId,setEditId]=useState(null); const [editRubberId,setEditRubberId]=useState(""); const [editQty,setEditQty]=useState(0); const [editRate,setEditRate]=useState(0); const [editDate,setEditDate]=useState(todayISO()); const [editPaymentMode,setEditPaymentMode]=useState("Cash"); const [editBusy,setEditBusy]=useState(false);
   const addRow=()=>setItems([...items,{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]); const removeRow=(idx)=>setItems(items.filter((_,i)=>i!==idx)); const updateRow=(idx,patch)=>setItems(items.map((it,i)=>i===idx?{...it,...patch}:it));
   const itemsAmount=items.reduce((s,it)=>s+Number(it.qty||0)*Number(it.purchaseRate||0),0);
-  const save=async()=>{const validItems=items.filter(it=>it.rubberId&&Number(it.qty)>0);if(!validItems.length||busy)return;setBusy(true);try{for(const it of validItems){const amount=Number(it.qty)*Number(it.purchaseRate||0);await dbInsert("purchases",{id:uid(),date,rubber_id:it.rubberId,qty:Number(it.qty),purchase_rate:Number(it.purchaseRate||0),amount,courier:0,total:amount,payment_mode:paymentMode});}setItems([{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]);await refresh();}finally{setBusy(false);}};
+  const save=async()=>{const validItems=items.filter(it=>it.rubberId&&Number(it.qty)>0);if(!validItems.length||busy)return;setBusy(true);setErrMsg("");try{for(const it of validItems){const amount=Number(it.qty)*Number(it.purchaseRate||0);await dbInsert("purchases",{id:uid(),date,rubber_id:it.rubberId,qty:Number(it.qty),purchase_rate:Number(it.purchaseRate||0),amount,courier:0,total:amount,payment_mode:paymentMode});}setItems([{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]);await refresh();}catch(err){setErrMsg(err.message||"Save failed — check connection.");}finally{setBusy(false);}};
   const startEdit=(p)=>{setEditId(p.id);setEditRubberId(p.rubber_id);setEditQty(p.qty);setEditRate(p.purchase_rate);setEditPaymentMode(p.payment_mode||"Cash");setEditDate(p.date);};
-  const saveEdit=async()=>{if(!editRubberId||!editQty||editBusy)return;setEditBusy(true);try{const amount=Number(editQty)*Number(editRate||0);await dbUpdate("purchases",editId,{date:editDate,rubber_id:editRubberId,qty:Number(editQty),purchase_rate:Number(editRate||0),amount,courier:0,total:amount,payment_mode:editPaymentMode});setEditId(null);await refresh();}finally{setEditBusy(false);}};
-  const removePurchase=async(id)=>{await dbDelete("purchases",id);await refresh();};
+  const saveEdit=async()=>{if(!editRubberId||!editQty||editBusy)return;setEditBusy(true);setErrMsg("");try{const amount=Number(editQty)*Number(editRate||0);await dbUpdate("purchases",editId,{date:editDate,rubber_id:editRubberId,qty:Number(editQty),purchase_rate:Number(editRate||0),amount,courier:0,total:amount,payment_mode:editPaymentMode});setEditId(null);await refresh();}catch(err){setErrMsg(err.message||"Save failed — check connection.");}finally{setEditBusy(false);}};
+  const removePurchase=async(id)=>{try{await dbDelete("purchases",id);await refresh();}catch(err){setErrMsg(err.message||"Delete failed — check connection.");}};
   const grouped=useMemo(()=>{const map=new Map();purchases.forEach(p=>{const key=p.date;if(!map.has(key))map.set(key,{date:key,items:[],total:0,modes:new Set()});const g=map.get(key);g.items.push(p);g.total+=Number(p.total??p.amount??0);g.modes.add(p.payment_mode||"Cash");});return [...map.values()].sort((a,b)=>new Date(b.date)-new Date(a.date));},[purchases]);
   const exportCSV=()=>{const rows=[...purchases].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{const r=rubbers.find(r=>r.id===p.rubber_id);return{Date:fmtDate(p.date),"Payment Mode":p.payment_mode||"Cash","Category":r?.category||"rubber","Size":r?.category==="rubber"?(r?.size||""):"","Item Name":r?.name||"",Qty:p.qty,Rate:p.purchase_rate,Total:Number(p.total??p.amount??0)};});exportToCSV(`purchases-${todayISO()}.csv`,rows);};
   const catLabel=(c)=>c==="machine"?"Machine":c==="raw"?"Raw":"Rubber";
   const optionLabel=(r)=>`${r.name} · ${catLabel(r.category)}${r.category==="rubber"&&r.size?` · ${r.size}`:""}`;
   return <div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,paddingBottom:10,borderBottom:`2px solid ${C.headerGreen}`,gap:8}}><SectionTitle icon={ShoppingCart} title="Purchase Entry" bare/><Btn variant="ghost" onClick={exportCSV} style={{padding:"6px 10px",fontSize:11.5,flexShrink:0}}><Download size={13}/> Export</Btn></div>
+    {errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
     <Card><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}><div><Label>Date</Label><Field type="date" value={date} onChange={e=>setDate(e.target.value)} style={{marginBottom:0}}/></div><div><Label>Payment Mode</Label><div style={{display:"flex",gap:7}}><Btn variant={paymentMode==="Cash"?"solid":"ghost"} onClick={()=>setPaymentMode("Cash")} style={{flex:1,justifyContent:"center",padding:"9px 10px"}}>💵 Cash</Btn><Btn variant={paymentMode==="Bank"?"solid":"ghost"} onClick={()=>setPaymentMode("Bank")} style={{flex:1,justifyContent:"center",padding:"9px 10px"}}>🏦 Bank</Btn></div></div></div>
       <div style={{display:"grid",gridTemplateColumns:"38px minmax(180px,1fr) 120px 140px 110px 34px",gap:8,alignItems:"center",padding:"8px 10px",background:C.paperDark,borderRadius:7,fontFamily:font.mono,fontSize:10,color:C.inkSoft,letterSpacing:.5}}><span>#</span><span>ITEM · CATEGORY · SIZE</span><span>QTY</span><span>RATE (₹)</span><span style={{textAlign:"right"}}>AMOUNT</span><span/></div>
       {items.map((it,idx)=>{const rowAmount=Number(it.qty||0)*Number(it.purchaseRate||0);return <div key={idx} style={{display:"grid",gridTemplateColumns:"38px minmax(180px,1fr) 120px 140px 110px 34px",gap:8,alignItems:"center",padding:"9px 10px",borderBottom:`1px solid ${C.line}`}}><div style={{fontFamily:font.mono,fontWeight:700,color:C.inkSoft}}>{idx+1}</div><Select value={it.rubberId} onChange={e=>updateRow(idx,{rubberId:e.target.value})} style={{marginBottom:0}}>{rubbers.map(r=><option key={r.id} value={r.id}>{optionLabel(r)}</option>)}</Select><Field type="number" min="0" value={it.qty} onChange={e=>updateRow(idx,{qty:e.target.value})} placeholder="Qty" style={{marginBottom:0}}/><Field type="number" min="0" value={it.purchaseRate} onChange={e=>updateRow(idx,{purchaseRate:e.target.value})} placeholder="Rate" style={{marginBottom:0}}/><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:700}}>{inr(rowAmount)}</div>{items.length>1?<button onClick={()=>removeRow(idx)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={15}/></button>:<span/>}</div>})}
@@ -3449,6 +3506,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [note, setNote] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState(todayISO());
+  const [errMsg, setErrMsg] = useState("");
 
   const cashSales = entries.filter(e => (e.payment_mode || "Cash") === "Cash");
   const cashPurchases = purchases.filter(p => (p.payment_mode || "Cash") === "Cash");
@@ -3466,7 +3524,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const filteredIn=shown.reduce((s,t)=>s+(t.type==="in"?t.amount:0),0);
   const filteredOut=shown.reduce((s,t)=>s+(t.type==="out"?t.amount:0),0);
 
-  const addManual = async () => { if(!amount) return; await dbInsert("cash_manual",{id:uid(),date:todayISO(),type,category,amount:Number(amount),note}); setAmount(0);setNote("");await refresh(); };
+  const addManual = async () => { if(!amount) return; try { await dbInsert("cash_manual",{id:uid(),date:todayISO(),type,category,amount:Number(amount),note}); setAmount(0);setNote("");setErrMsg("");await refresh(); } catch(err) { setErrMsg(err.message || "Save failed — check connection."); } };
   const exportCSV=()=>exportToCSV(`cash-register-${todayISO()}.csv`,shown.map(t=>({Date:fmtDate(t.date),Description:t.label,Type:t.type==="in"?"Cash In":"Cash Out",Amount:t.amount,Balance:t.balanceAfter})));
 
   return <div>
@@ -3477,7 +3535,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
       <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH IN</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredIn)}</div></Card>
       <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH OUT</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredOut)}</div></Card>
     </div>
-    <Card><Label>Add Cash Entry</Label><div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>setType("in")} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>setType("out")} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>Category</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<option>Other Expense</option>}</Select><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}><Plus size={16}/> Add Entry</Btn></Card>
+    <Card><Label>Add Cash Entry</Label>{errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}<div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>setType("in")} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>setType("out")} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>Category</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<option>Other Expense</option>}</Select><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}><Plus size={16}/> Add Entry</Btn></Card>
     <Label>Transactions</Label>
     {(() => { const groups=[]; shown.slice(0,100).forEach(t=>{const last=groups[groups.length-1];if(last&&last.date===t.date)last.items.push(t);else groups.push({date:t.date,items:[t]});}); return groups.map(g=><div key={g.date}><div style={{fontFamily:font.mono,fontSize:10.5,fontWeight:700,color:C.brass,textTransform:"uppercase",letterSpacing:1,margin:"16px 0 6px"}}>{fmtDate(g.date)}</div>{g.items.map(t=><Card key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0,overflow:"hidden"}}><div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.label}</div></div><div style={{textAlign:"right",flexShrink:0}}><div style={{fontFamily:font.mono,fontWeight:700,color:t.type==="in"?C.sage:C.stamp}}>{t.type==="in"?"+":"−"}{inr(t.amount)}</div><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,marginTop:2}}>Bal: {inr(t.balanceAfter)}</div></div></Card>)}</div>); })()}
     {shown.length===0 && <EmptyNote text="No cash transactions for the selected dates."/>}
@@ -3491,26 +3549,33 @@ function UsersTab({ users, refresh, currentUser }) {
   const [role, setRole] = useState("staff");
   const [resetId, setResetId] = useState(null);
   const [newPin, setNewPin] = useState("");
+  const [errMsg, setErrMsg] = useState("");
 
   const add = async () => {
     if (!name.trim() || pin.length < 4) return;
-    await dbInsert("users", { id: uid(), name: name.trim(), role, pin });
-    setName(""); setPin(""); await refresh();
+    try {
+      await dbInsert("users", { id: uid(), name: name.trim(), role, pin });
+      setName(""); setPin(""); setErrMsg(""); await refresh();
+    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
   };
   const remove = async (id) => {
     if (id === currentUser.id) return;
-    await dbDelete("users", id); await refresh();
+    try { await dbDelete("users", id); await refresh(); }
+    catch (err) { setErrMsg(err.message || "Delete failed — check connection."); }
   };
   const applyReset = async (id) => {
     if (newPin.length < 4) return;
-    await dbUpdate("users", id, { pin: newPin });
-    setResetId(null); setNewPin(""); await refresh();
+    try {
+      await dbUpdate("users", id, { pin: newPin });
+      setResetId(null); setNewPin(""); await refresh();
+    } catch (err) { setErrMsg(err.message || "PIN reset failed — check connection."); }
   };
 
   return (
     <div>
       <SectionTitle icon={Users} title="User Management" />
       <Card>
+        {errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
         <Label>Name</Label>
         <Field value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
         <Label>Role</Label>
