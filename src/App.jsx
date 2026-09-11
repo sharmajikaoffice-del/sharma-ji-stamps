@@ -760,6 +760,10 @@ function SharmaJiStampsAdmin() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [orderToEdit, setOrderToEdit] = useState(null);
   const editOrder = (order) => { setOrderToEdit(order); setTab("create"); };
+  const [editorActive, setEditorActive] = useState(false);
+  // Reset if the user navigates away from Create Stamp by any other route
+  // (bottom nav, back gesture) so a stale "editor open" state can't linger.
+  useEffect(() => { if (tab !== "create" && editorActive) setEditorActive(false); }, [tab]);
   const [entryToFill, setEntryToFill] = useState(null);
   const billOrder = (order) => {
     setEntryToFill({
@@ -844,7 +848,7 @@ function SharmaJiStampsAdmin() {
     <>
       {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
-      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} />}
+      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
@@ -893,38 +897,42 @@ function SharmaJiStampsAdmin() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column", overflowX: "hidden" }}>
-      <div style={{ background: C.headerGreen, color: C.white, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <StampMark size={30} />
-          <div>
-            <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 16, lineHeight: 1 }}>Sharma Ji Stamps</div>
-            <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: "#DCE9FF", marginTop: 2 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
+      {!editorActive && (
+        <div style={{ background: C.headerGreen, color: C.white, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <StampMark size={30} />
+            <div>
+              <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 16, lineHeight: 1 }}>Sharma Ji Stamps</div>
+              <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: "#DCE9FF", marginTop: 2 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
+            </div>
           </div>
+          <button onClick={logout} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
         </div>
-        <button onClick={logout} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
-      </div>
+      )}
 
-      <div style={{ flex: 1, padding: "16px 16px 90px", maxWidth: 760, width: "100%", margin: "0 auto" }}>
+      <div style={{ flex: 1, padding: editorActive ? 0 : "16px 16px 90px", maxWidth: 760, width: "100%", margin: "0 auto" }}>
         {tabContent}
       </div>
 
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.white, borderTop: `1px solid ${C.line}`, display: "flex", overflowX: "auto", zIndex: 20 }}>
-        {primaryTabs.map((t) => {
-          const Icon = t.icon; const active = tab === t.id;
-          return (
-            <button key={t.id} onClick={() => { setTab(t.id); setMoreOpen(false); }} style={{ flex: "1 0 auto", minWidth: 70, background: "none", border: "none", padding: "10px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? C.stamp : C.inkSoft }}>
-              <Icon size={18} />
-              <span style={{ fontSize: 10, fontFamily: font.mono, letterSpacing: 0.5 }}>{t.label}</span>
+      {!editorActive && (
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.white, borderTop: `1px solid ${C.line}`, display: "flex", overflowX: "auto", zIndex: 20 }}>
+          {primaryTabs.map((t) => {
+            const Icon = t.icon; const active = tab === t.id;
+            return (
+              <button key={t.id} onClick={() => { setTab(t.id); setMoreOpen(false); }} style={{ flex: "1 0 auto", minWidth: 70, background: "none", border: "none", padding: "10px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: active ? C.stamp : C.inkSoft }}>
+                <Icon size={18} />
+                <span style={{ fontSize: 10, fontFamily: font.mono, letterSpacing: 0.5 }}>{t.label}</span>
+              </button>
+            );
+          })}
+          {moreTabs.length > 0 && (
+            <button onClick={() => setMoreOpen((v) => !v)} style={{ flex: "1 0 auto", minWidth: 70, background: "none", border: "none", padding: "10px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: moreOpen || moreActive ? C.stamp : C.inkSoft }}>
+              <MoreHorizontal size={18} />
+              <span style={{ fontSize: 10, fontFamily: font.mono, letterSpacing: 0.5 }}>More</span>
             </button>
-          );
-        })}
-        {moreTabs.length > 0 && (
-          <button onClick={() => setMoreOpen((v) => !v)} style={{ flex: "1 0 auto", minWidth: 70, background: "none", border: "none", padding: "10px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: moreOpen || moreActive ? C.stamp : C.inkSoft }}>
-            <MoreHorizontal size={18} />
-            <span style={{ fontSize: 10, fontFamily: font.mono, letterSpacing: 0.5 }}>More</span>
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {moreOpen && (
         <>
@@ -1221,11 +1229,19 @@ function rubberSizeKey(sizeText) {
   return parsed ? `${parsed.widthMm}x${parsed.heightMm}` : String(sizeText ?? "").trim().toLowerCase();
 }
 
-function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed }) {
+function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed, onEditorActiveChange }) {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
   const [view, setView] = useState("templates"); // "templates" | "editor"
+  // Let the app shell know when the full-screen editor (with its own top
+  // toolbar and bottom Layer/Edit/Size/Submit bar) is open, so it can hide
+  // its own header and bottom nav instead of stacking on top of these.
+  useEffect(() => {
+    onEditorActiveChange?.(view === "editor");
+    return () => onEditorActiveChange?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
   const [pickShape, setPickShape] = useState("circle");
   const [mobileEditorPanel, setMobileEditorPanel] = useState("edit");
 
@@ -2484,32 +2500,33 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           boxShadow: "0 1px 2px rgba(36,95,196,.12)",
           ...(isDesktop ? {} : {
             position: "fixed",
-            top: 74,
-            right: 8,
-            width: 66,
-            minHeight: "auto",
-            zIndex: 90,
-            padding: "7px 5px",
-            flexDirection: "column",
-            alignItems: "stretch",
+            top: 0,
+            left: 0,
+            right: 0,
+            width: "auto",
+            minHeight: 54,
+            zIndex: 95,
+            padding: "8px 10px",
+            flexDirection: "row",
+            alignItems: "center",
             justifyContent: "flex-start",
-            gap: 5,
-            borderRadius: 10,
-            transform: mobileHeaderVisible ? "translateX(0)" : "translateX(calc(100% + 16px))",
+            gap: 8,
+            borderRadius: 0,
+            transform: mobileHeaderVisible ? "translateY(0)" : "translateY(-100%)",
             transition: "transform .18s ease",
           }),
         }}
       >
-        <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { width: "100%", padding: "6px 2px", justifyContent: "center", fontSize: 9.5, gap: 2 }) }}>
-          <ChevronLeft size={15} /> Back
+        <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { padding: "8px", flexShrink: 0 }) }}>
+          <ChevronLeft size={16} />{isDesktop && " Back"}
         </button>
 
         <div style={{
-          display: "flex", alignItems: "center", gap: isDesktop ? 22 : 4,
-          flexDirection: isDesktop ? "row" : "column",
+          display: "flex", alignItems: "center", gap: isDesktop ? 22 : 6,
+          flexDirection: "row",
           flexWrap: "nowrap", justifyContent: isDesktop ? "center" : "flex-start",
-          overflowX: isDesktop ? "visible" : "hidden", minWidth: 0,
-          flex: isDesktop ? 1 : "0 0 auto", WebkitOverflowScrolling: "touch",
+          overflowX: isDesktop ? "visible" : "auto", minWidth: 0,
+          flex: 1, WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none", padding: isDesktop ? 0 : 0
         }}>
           <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn}>
@@ -2539,8 +2556,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           <input ref={layerImageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLayerImageUpload} />
         </div>
 
-        <button type="button" onClick={startNew} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { width: "100%", padding: "6px 2px", justifyContent: "center", fontSize: 9.5, gap: 2 }) }}>
-          <Plus size={15} /> New
+        <button type="button" onClick={startNew} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { padding: "8px", flexShrink: 0 }) }}>
+          <Plus size={16} />{isDesktop && " New"}
         </button>
       </div>
 
