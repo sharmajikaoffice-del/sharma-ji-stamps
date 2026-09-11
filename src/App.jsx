@@ -1714,8 +1714,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     });
     // Selected rubber size is maintained 1:1 here — exportWidth/exportHeight are the
     // print-accurate pixel dimensions for the chosen mm size at the given dpi.
-    // Keep anti-aliased edges for a smoother, sharper print/export. The previous
-    // binarization step could make small text and curved edges look jagged.
+    // Keep anti-aliased edges for a smoother, sharper print/export — binarizing
+    // to pure black/transparent pixels made small text and curved edges look
+    // jagged, so that step is intentionally skipped.
     const exportCtx = exportCanvas.getContext("2d");
     if (exportCtx) exportCtx.imageSmoothingQuality = "high";
     return { dataUrl: exportCanvas.toDataURL("image/png"), widthMm, heightMm };
@@ -1829,8 +1830,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // Print uses one A4/3 feeder piece at a time; no 3-up copies are generated.
   // scissors mark between each, so one sheet of butter paper yields 3 stamp
   // impressions instead of wasting a whole sheet on a single print.
+  // Uses the same 600dpi source as Download — 300dpi was soft/blurry once the
+  // browser scaled the image up to the printer's actual resolution.
   const handlePrint = () => {
-    const { dataUrl, widthMm, heightMm } = generateStampDataUrl(300);
+    const { dataUrl, widthMm, heightMm } = generateStampDataUrl(600);
 
     // The user cuts one A4 sheet into 3 equal pieces and feeds one piece at a
     // time. Each piece is 99mm x 210mm (A4/3). Choose orientation from the
