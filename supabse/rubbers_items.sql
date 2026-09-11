@@ -1,12 +1,10 @@
--- Run this once in Supabase SQL Editor.
--- Adds the three item categories and stamp impression size.
+-- Run this once in Supabase SQL Editor for the Item Master categories/sizes.
 ALTER TABLE public.rubbers
   ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'rubber';
 
 ALTER TABLE public.rubbers
   ADD COLUMN IF NOT EXISTS size text;
 
--- Existing items remain Rubber items by default.
 UPDATE public.rubbers
 SET category = 'rubber'
 WHERE category IS NULL OR trim(category) = '';
