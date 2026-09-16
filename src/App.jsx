@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
-  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
+  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, Star, X,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Sun, Moon
 } from "lucide-react";
 
@@ -365,6 +365,64 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       });
       ctx.restore();
     } else if (layer.type === "centerText") {
+      // Auto-generated triangle text follows the corresponding triangle edge.
+      // It is positioned from the frame geometry, so it remains parallel when
+      // the selected stamp size/aspect changes.
+      if (layer.layout === "triangleSide") {
+        const frame = layers.find((x) => x.id === layer.triangleFrameId && x.type === "frame" && (x.shape || "circle") === "triangle");
+        if (frame) {
+          ctx.save();
+          const frx = ((frame.x ?? 50) / 100) * size;
+          const fry = ((frame.y ?? 50) / 100) * canvasHeight;
+          const frot = ((frame.rotation ?? 0) * Math.PI) / 180;
+          const r = Math.max(4, Math.min(Math.min(size, canvasHeight) * 0.48, Number(frame.radius ?? 100)));
+          const points = [-90, 30, 150].map((deg) => {
+            const a = (deg * Math.PI) / 180 + frot;
+            return { x: frx + r * Math.cos(a), y: fry + r * Math.sin(a) };
+          });
+          const sides = [
+            [points[0], points[1]],
+            [points[1], points[2]],
+            [points[2], points[0]],
+          ];
+          const sideIndex = Math.max(0, Math.min(2, Number(layer.triangleSide ?? 0)));
+          const [a, b] = sides[sideIndex];
+          const mx = (a.x + b.x) / 2;
+          const my = (a.y + b.y) / 2;
+
+          // Move the text slightly toward the triangle interior so it sits
+          // neatly beside the line instead of directly over the stroke.
+          const ex = b.x - a.x;
+          const ey = b.y - a.y;
+          const len = Math.max(1, Math.hypot(ex, ey));
+          const nx = -ey / len;
+          const ny = ex / len;
+          const toCenterX = frx - mx;
+          const toCenterY = fry - my;
+          const inward = (nx * toCenterX + ny * toCenterY) >= 0 ? 1 : -1;
+          const offset = 12;
+          const tx = mx + nx * offset * inward;
+          const ty = my + ny * offset * inward;
+
+          // Use the edge angle, normalized to the readable orientation.
+          let angle = Math.atan2(ey, ex) + frot;
+          while (angle > Math.PI / 2) angle -= Math.PI;
+          while (angle < -Math.PI / 2) angle += Math.PI;
+
+          ctx.translate(tx, ty);
+          ctx.rotate(angle);
+          const weight = layer.bold ? 700 : 400;
+          const style = layer.fontStyle === "italic" ? "italic " : "";
+          const family = layer.fontFamily || "Arial";
+          const fsz = layer.fontSize ?? layer.size ?? 13;
+          ctx.font = `${style}${weight} ${fsz}px ${family}`;
+          ctx.fillStyle = inkColor;
+          ctx.fillText(layer.text || "", 0, 0);
+          ctx.restore();
+        }
+        return;
+      }
+
       ctx.save();
       ctx.translate(lx, ly);
       // "Flip text" turns the text upside-down (180°) instead of mirroring each
@@ -417,7 +475,7 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
           // Width/Height are independent percentages of the canvas, so this
           // shape can be a true rectangle, not just a square.
           const w = Math.max(6, ((layer.width ?? 45) / 100) * size - inset * 2);
-          const h = Math.max(6, ((layer.height ?? 45) / 100) * size - inset * 2);
+          const h = Math.max(6, ((layer.height ?? 45) / 100) * canvasHeight - inset * 2);
           ctx.rect(-w / 2, -h / 2, w, h);
         } else if (frameShape === "triangle") {
           // Equilateral triangle inscribed in a circle of radius r.
@@ -1554,25 +1612,91 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     } else if (type === "frame") {
       const shape = opts.shape || "circle";
       const existingCount = layers.filter((l) => l.type === "frame" && (l.shape || "circle") === shape).length;
+
+      // Frame geometry is based on the selected stamp canvas. Rectangle/Square
+      // gets a true stamp-sized box (with a small safe inset), while circle and
+      // triangle stay proportional to the available canvas.
       const radius = Math.max(30, 100 - existingCount * 16);
-      const dim = Math.max(10, 45 - existingCount * 7);
-      layer = { ...layer, radius, width: dim, height: dim, strokeWidth: 4, lineBreak: 0, borderStyle: "single", shape, x: 50, y: 50, rotation: 0 };
+      const dim = shape === "square"
+        ? Math.max(10, 92 - existingCount * 8)
+        : Math.max(10, 45 - existingCount * 7);
+
+      layer = {
+        ...layer,
+        radius,
+        width: dim,
+        height: dim,
+        strokeWidth: 4,
+        lineBreak: 0,
+        // A newly inserted circle is always an outline. Scalloped is still
+        // available as an explicit border-style choice in the editor.
+        borderStyle: "single",
+        shape,
+        x: 50,
+        y: 50,
+        rotation: 0
+      };
+
       if (existingCount === 0) {
-        let top, bottom;
-        if (shape === "triangle") {
-          // Triangle edges are straight, not curved, so the auto text stays
-          // upright and just moves into place near the top/bottom of the
-          // triangle instead of arcing like on a circle.
-          top = { id: uid(), type: "centerText", num: num + 1, text: "YOUR COMPANY NAME", size: 13, fontFamily: "Arial", fontSize: 13, bold: true, flipX: false, x: 50, y: 24, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "triangleTop" };
-          bottom = { id: uid(), type: "centerText", num: num + 2, text: "YOUR ADDRESS", size: 11, fontFamily: "Arial", fontSize: 11, bold: true, flipX: false, x: 50, y: 82, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "bottom" };
-        } else {
-          top = { id: uid(), type: "circleText", num: num + 1, text: "YOUR COMPANY NAME", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
-          bottom = { id: uid(), type: "circleText", num: num + 2, text: "YOUR ADDRESS", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: true, fontStyle: "normal", tall: false, invert: false, layout: "bottomArc" };
+        // Circle: keep the traditional curved text + centre text.
+        if (shape === "circle") {
+          const top = {
+            id: uid(), type: "circleText", num: num + 1,
+            text: "YOUR COMPANY NAME", radius: radius * 0.82, spacing: 4,
+            start: 90, fontFamily: "Arial", fontSize: 13, bold: true,
+            flipX: false, fontStyle: "normal", tall: false, invert: false,
+            layout: "topArc"
+          };
+          const bottom = {
+            id: uid(), type: "circleText", num: num + 2,
+            text: "YOUR ADDRESS", radius: radius * 0.82, spacing: 4,
+            start: 90, fontFamily: "Arial", fontSize: 13, bold: true,
+            flipX: true, fontStyle: "normal", tall: false, invert: false,
+            layout: "bottomArc"
+          };
+          const center = {
+            id: uid(), type: "centerText", num: num + 3,
+            text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16,
+            bold: true, flipX: false, x: 50, y: 50, rotation: 0,
+            fontStyle: "normal", tall: false, invert: false, layout: "center"
+          };
+          setLayerCounter(num + 3);
+          setLayers((ls) => [...ls, layer, top, bottom, center]);
+          setActiveLayerId(center.id);
+          return;
         }
-        const center = { id: uid(), type: "centerText", num: num + 3, text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16, bold: true, flipX: false, x: 50, y: 50, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "center" };
-        setLayerCounter(num + 3);
-        setLayers((ls) => [...ls, layer, top, bottom, center]);
-        setActiveLayerId(center.id);
+
+        // Triangle: three editable text layers, one parallel to each edge,
+        // plus a normal centre text layer.
+        if (shape === "triangle") {
+          const sideTexts = [
+            ["YOUR COMPANY NAME", 13, 0],
+            ["YOUR ADDRESS", 11, 1],
+            ["AUTHORIZED SIGNATORY", 11, 2],
+          ].map(([label, fontSize, side], i) => ({
+            id: uid(), type: "centerText", num: num + 1 + i,
+            text: label, size: fontSize, fontFamily: "Arial", fontSize,
+            bold: true, flipX: false, x: 50, y: 50, rotation: 0,
+            fontStyle: "normal", tall: false, invert: false,
+            layout: "triangleSide", triangleFrameId: id, triangleSide: side
+          }));
+          const center = {
+            id: uid(), type: "centerText", num: num + 4,
+            text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16,
+            bold: true, flipX: false, x: 50, y: 50, rotation: 0,
+            fontStyle: "normal", tall: false, invert: false, layout: "center"
+          };
+          setLayerCounter(num + 4);
+          setLayers((ls) => [...ls, layer, ...sideTexts, center]);
+          setActiveLayerId(center.id);
+          return;
+        }
+
+        // Rectangle/Square: ONLY the box. Do not inject curved or any other
+        // automatic text layers.
+        setLayerCounter(num);
+        setLayers((ls) => [...ls, layer]);
+        setActiveLayerId(id);
         return;
       }
     } else if (type === "line") {
@@ -3210,6 +3334,44 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             Images
           </button>
           <input ref={layerImageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLayerImageUpload} />
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setSymbolPickerOpen((v) => !v)}
+              style={toolbarIconBtn}
+              title="Add Symbol"
+              aria-label="Add Symbol"
+            >
+              <span style={toolbarIconBox}><Star size={18} /></span>
+              Symbols
+            </button>
+            {symbolPickerOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 80,
+                minWidth: 170, padding: 8, background: C.white,
+                border: `1px solid ${C.line}`, borderRadius: 10,
+                boxShadow: "0 8px 24px rgba(0,0,0,.14)"
+              }}>
+                <div style={{ fontSize: 10, fontFamily: font.mono, color: C.inkSoft, marginBottom: 7, letterSpacing: 1 }}>ADD SYMBOL</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                  {PRELOADED_SYMBOLS.map((sym) => (
+                    <button
+                      key={sym.id}
+                      type="button"
+                      title={sym.label}
+                      onClick={() => addPreloadedSymbol(sym.src)}
+                      style={{
+                        border: `1px solid ${C.line}`, background: C.white, borderRadius: 7,
+                        padding: 7, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center"
+                      }}
+                    >
+                      <img src={sym.src} alt={sym.label} style={{ width: 28, height: 28, objectFit: "contain" }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <button type="button" onClick={startNew} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { padding: "8px", flexShrink: 0 }) }}>
