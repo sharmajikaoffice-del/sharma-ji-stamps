@@ -1,16 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Work+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  --text: #687587;
-  --text-h: #263241;
-  --bg: #f3f6fa;
-  --border: #d7dee8;
+  --text: #64748b;
+  --text-h: #172033;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
   --code-bg: #eef2f7;
   --accent: #3f7fe8;
+  --accent-strong: #245fc4;
   --accent-bg: rgba(63, 127, 232, 0.10);
-  --accent-border: rgba(63, 127, 232, 0.45);
-  --social-bg: rgba(255, 255, 255, 0.72);
-  --shadow: rgba(31, 55, 86, 0.14) 0 8px 20px -6px, rgba(31, 55, 86, 0.08) 0 3px 8px -3px;
+  --accent-border: rgba(63, 127, 232, 0.28);
+  --success-bg: #ecfdf3;
+  --success-text: #16704a;
+  --danger-bg: #fff1f2;
+  --danger-text: #be123c;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, .04);
+  --shadow-sm: 0 4px 14px rgba(15, 23, 42, .06);
+  --shadow-md: 0 12px 30px rgba(15, 23, 42, .08);
+  --shadow-lg: 0 20px 50px rgba(15, 23, 42, .12);
 
   --sans: 'Work Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: 'Fraunces', Georgia, serif;
@@ -38,6 +48,7 @@ html, body {
 
 body {
   overflow-x: hidden;
+  min-height: 100svh;
 }
 
 button, input, select, textarea {
@@ -48,6 +59,25 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(63, 127, 232, .18);
+  outline-offset: 1px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+select,
+input,
+textarea {
+  max-width: 100%;
+}
+
 #root {
   width: 100%;
   min-height: 100svh;
@@ -55,14 +85,15 @@ button {
   text-align: left;
 }
 
-h1, h2 {
+h1, h2, h3, h4 {
   font-family: var(--heading);
   font-weight: 600;
   color: var(--text-h);
 }
 
 h1 {
-  font-size: 42px;
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.08;
   letter-spacing: -1px;
   margin: 24px 0;
 }
@@ -74,12 +105,18 @@ h2 {
   margin: 0 0 8px;
 }
 
+h3 {
+  font-size: 17px;
+  line-height: 125%;
+  margin: 0 0 6px;
+}
+
 p { margin: 0; }
 
 code, .counter {
   font-family: var(--mono);
   display: inline-flex;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--text-h);
 }
 
@@ -90,7 +127,50 @@ code {
   background: var(--code-bg);
 }
 
+/* Consistent scrollbar for desktop panels without changing the editor canvas. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Keep common native controls visually consistent when their component does
+   not provide an inline style of its own. */
+input:not([type="range"]),
+select,
+textarea {
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+
+input:not([type="range"]):hover,
+select:hover,
+textarea:hover {
+  border-color: var(--border-strong);
+}
+
+input:not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(63, 127, 232, .10);
+}
+
 @media (max-width: 1024px) {
   :root { font-size: 14px; }
   h1 { font-size: 34px; }
+}
+
+@media (max-width: 700px) {
+  html, body { min-width: 320px; }
+  h1 { font-size: 28px; margin: 16px 0; }
+  h2 { font-size: 20px; }
+  h3 { font-size: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
