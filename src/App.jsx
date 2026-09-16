@@ -490,14 +490,28 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     }
   });
 
-  // Final export pass: convert every non-transparent pixel to pure black.
-  // This also removes colored logos/images and prevents the old blue/speckled PNG issue.
+  // Final export pass: turn the design into stamp-ready ink.
+  // IMPORTANT: this must NOT just flip every opaque pixel to black — an inserted
+  // photo/logo is usually fully opaque (a JPG, or a PNG with a white/solid
+  // background), so a blanket "opaque -> black" fill turned the whole image
+  // into one solid black rectangle on export/print. Instead, threshold by
+  // brightness: light pixels (background of an inserted image) become fully
+  // transparent (no ink), and only genuinely dark pixels (text, borders, and
+  // the dark parts of an inserted logo/photo) become solid black ink.
   if (monochrome) {
-    ctx.save();
-    ctx.globalCompositeOperation = "source-in";
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, size, canvasHeight);
-    ctx.restore();
+    const imgData = ctx.getImageData(0, 0, size, canvasHeight);
+    const d = imgData.data;
+    const brightnessThreshold = 200; // 0-255; raise to keep more of a light logo as ink
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] === 0) continue; // already transparent, nothing to do
+      const luminance = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      if (luminance > brightnessThreshold) {
+        d[i + 3] = 0; // light pixel (e.g. white background of an inserted image) -> no ink
+      } else {
+        d[i] = 0; d[i + 1] = 0; d[i + 2] = 0; // dark pixel -> solid black ink, keep its alpha
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
   }
 }
 
