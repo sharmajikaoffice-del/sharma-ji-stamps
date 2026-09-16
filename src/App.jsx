@@ -3304,13 +3304,22 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               </button>
               {sizeMenuOpen && (
                 <div style={{
-                  position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 50,
-                  background: C.white, border: `1px solid ${C.line}`, borderRadius: 8,
-                  boxShadow: "0 10px 30px rgba(38,50,65,.14)",
-                  maxHeight: isDesktop ? 520 : 430, overflowY: "auto", padding: 8,
+                  position: "absolute",
+                  left: 0,
+                  top: "calc(100% + 4px)",
+                  zIndex: 50,
+                  width: isDesktop ? "min(560px, calc(100vw - 285px))" : "calc(100vw - 20px)",
+                  maxWidth: isDesktop ? "560px" : "calc(100vw - 20px)",
+                  background: C.white,
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 10,
+                  boxShadow: "0 10px 30px rgba(38,50,65,.18)",
+                  maxHeight: isDesktop ? 560 : 430,
+                  overflowY: "auto",
+                  padding: 10,
                   display: "grid",
                   gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
-                  gap: 8,
+                  gap: 10,
                 }}>
                   {rubberSizes.length === 0 ? (
                     <div style={{ padding: 12, color: C.inkSoft, fontSize: 12 }}>No rubber sizes configured. Add a Rubber item with a size and photo in Rubber.</div>
@@ -3328,15 +3337,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                         style={{
                           width: "100%",
                           minWidth: 0,
-                          minHeight: isDesktop ? 118 : 112,
+                          minHeight: isDesktop ? 150 : 126,
                           display: "flex",
                           flexDirection: "column",
                           alignItems: "center",
-                          justifyContent: "center",
+                          justifyContent: "flex-start",
                           gap: 6,
-                          padding: "8px",
+                          padding: "10px 8px 9px",
                           border: `1.5px solid ${active ? STAMP_INK_BLUE : C.line}`,
-                          borderRadius: 8,
+                          borderRadius: 9,
                           background: active ? "#EAF2FF" : C.white,
                           color: active ? STAMP_INK_BLUE : C.ink,
                           cursor: "pointer",
@@ -3344,10 +3353,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                           fontWeight: active ? 700 : 500,
                         }}
                       >
-                        {r.photo_url ? <img src={r.photo_url} alt="" style={{ width: isDesktop ? 64 : 58, height: isDesktop ? 64 : 58, objectFit: "cover", borderRadius: 7, border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <span style={{ width: isDesktop ? 64 : 58, height: isDesktop ? 64 : 58, borderRadius: 7, background: C.paperDark, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={22} color={C.inkSoft} /></span>}
-                        <span style={{ minWidth: 0, width: "100%" }}>
-                          <span style={{ display: "block", fontWeight: active ? 750 : 650, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
-                          <span style={{ display: "block", marginTop: 2, color: active ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.mono, fontSize: 9.5 }}>{r.size} · {r.parsed.widthMm} × {r.parsed.heightMm} mm</span>
+                        {r.photo_url ? <img src={r.photo_url} alt="" style={{ width: isDesktop ? 72 : 62, height: isDesktop ? 72 : 62, objectFit: "cover", borderRadius: 7, border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <span style={{ width: isDesktop ? 72 : 62, height: isDesktop ? 72 : 62, borderRadius: 7, background: C.paperDark, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={24} color={C.inkSoft} /></span>}
+                        <span style={{ minWidth: 0, width: "100%", display: "block" }}>
+                          <span style={{ display: "block", fontWeight: active ? 750 : 650, fontSize: 12, lineHeight: 1.2, whiteSpace: "normal", overflowWrap: "anywhere" }}>{r.name}</span>
+                          <span style={{ display: "block", marginTop: 3, color: active ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.mono, fontSize: 9.5, lineHeight: 1.35 }}>{r.size} · {r.parsed.widthMm} × {r.parsed.heightMm} mm</span>
                         </span>
                         <span style={{ fontFamily: font.mono, fontWeight: 800, fontSize: 12.5, color: active ? STAMP_INK_BLUE : C.ink, flexShrink: 0 }}>{inr(r.rate)}</span>
                         {active && <span style={{ width: 22, height: 22, borderRadius: "50%", background: STAMP_INK_BLUE, color: C.white, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>✓</span>}
