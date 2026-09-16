@@ -2407,7 +2407,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     </>
   );
 
-  const SizeVisual = ({ r, active = false, large = false }) => {
+  function SizeVisual({ r, active = false, large = false }) {
     const w = Number(r?.parsed?.widthMm) || 1;
     const h = Number(r?.parsed?.heightMm) || 1;
     const maxSide = Math.max(w, h);
@@ -2430,7 +2430,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </div>
       </div>
     );
-  };
+  }
 
   const sizeControls = (
     <div>
