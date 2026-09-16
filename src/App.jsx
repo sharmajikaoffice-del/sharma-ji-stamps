@@ -1535,7 +1535,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       const radius = Math.max(30, 100 - existingCount * 16);
       const dim = Math.max(10, 45 - existingCount * 7);
       layer = { ...layer, radius, width: dim, height: dim, strokeWidth: 4, lineBreak: 0, borderStyle: "single", shape, x: 50, y: 50, rotation: 0 };
-      if (shape === "circle") {
+      if (existingCount === 0) {
         const top = { id: uid(), type: "circleText", num: num + 1, text: "YOUR COMPANY NAME", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
         const bottom = { id: uid(), type: "circleText", num: num + 2, text: "YOUR ADDRESS", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: true, fontStyle: "normal", tall: false, invert: false, layout: "bottomArc" };
         const center = { id: uid(), type: "centerText", num: num + 3, text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16, bold: true, flipX: false, x: 50, y: 50, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "center" };
@@ -2917,9 +2917,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               </button>
             ))}
           </div>
-          <Btn variant="ghost" onClick={() => layerImageInputRef.current?.click()} style={{ width: "100%", justifyContent: "center", marginTop: 4 }}>Upload own</Btn>
-          <Btn variant="ghost" onClick={() => layerVectorInputRef.current?.click()} style={{ width: "100%", justifyContent: "center", marginTop: 6 }}>Import Vector (SVG)</Btn>
-          <input ref={layerVectorInputRef} type="file" accept=".svg,image/svg+xml" style={{ display: "none" }} onChange={handleLayerVectorUpload} />
         </>
       )}
     </div>
