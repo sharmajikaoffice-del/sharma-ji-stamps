@@ -708,7 +708,7 @@ function Login({ users, onLogin }) {
             ))}
           </div>
           <div style={{ height: 18, color: C.stamp, fontFamily: font.mono, fontSize: 11, marginBottom: 6 }}>{error}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, width: 220 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: 220 }}>
             {["1","2","3","4","5","6","7","8","9","","0","back"].map((k, i) => (
               k === "" ? <div key={i} /> :
               <button key={i} onClick={() => press(k)} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 0", fontFamily: font.mono, fontSize: 16, color: C.ink, cursor: "pointer" }}>{k === "back" ? "⌫" : k}</button>
@@ -1345,19 +1345,16 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     return layer.type === "frame" || layer.type === "image";
   };
   const rubberSizes = useMemo(() => {
-    const seen = new Set();
+    // Show EVERY rubber stamp item from Item Master.
+    // Do not remove items just because two stamps have the same impression size:
+    // they can have different names, photos, rates, stock, etc.
     return rubbers
-      .filter((r) => String(r.category || "rubber").toLowerCase() === "rubber" && r.size)
+      .filter((r) => String(r.category || "rubber").trim().toLowerCase() === "rubber" && r.size)
       .map((r) => {
         const parsed = parseRubberSize(r.size);
         return { ...r, parsed };
       })
-      .filter((r) => r.parsed && (() => {
-        const key = rubberSizeKey(r.size);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })());
+      .filter((r) => r.parsed);
   }, [rubbers]);
 
   const selectedRubber = rubbers.find((r) => r.id === selectedRubberId) || rubberSizes[0] || null;
@@ -3163,16 +3160,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             </div>
             <span style={{ color: C.inkSoft, whiteSpace: "nowrap" }}>{selectedDimensions.widthMm} × {selectedDimensions.heightMm} mm</span>
           </div>
-          <div style={{ display: "flex", gap: 8, width: isDesktop ? "auto" : "100%" }}>
-            <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: isDesktop ? 184 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
-              <Download size={16} /> {customerMode ? "Download preview" : "Download stamp"}
-            </Btn>
-            {!customerMode && (
-              <Btn onClick={handlePrint} style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: isDesktop ? 130 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
-                <Printer size={16} /> Print
-              </Btn>
-            )}
-          </div>
         </div>
       )}
 
@@ -3209,6 +3196,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </div>
         {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
         {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 12 }}>Couldn't save — check the table exists in Supabase.</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: isDesktop ? 184 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
+            <Download size={16} /> Download stamp
+          </Btn>
+          <Btn onClick={handlePrint} style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: isDesktop ? 130 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
+            <Printer size={16} /> Print
+          </Btn>
+        </div>
       </Card>}
 
       {customerMode && (
