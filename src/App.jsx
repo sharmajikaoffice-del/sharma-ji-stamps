@@ -365,51 +365,34 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       });
       ctx.restore();
     } else if (layer.type === "centerText") {
-      // Auto-generated triangle text follows the corresponding triangle edge.
-      // It is positioned from the frame geometry, so it remains parallel when
-      // the selected stamp size/aspect changes.
-      if (layer.layout === "triangleSide") {
+      // Triangle side text is constrained to the selected triangle edge.
+      if (layer.layout === "triangleSide" || ["bottom", "rightRotated", "leftRotated"].includes(layer.layout)) {
         const frame = layers.find((x) => x.id === layer.triangleFrameId && x.type === "frame" && (x.shape || "circle") === "triangle");
         if (frame) {
           ctx.save();
           const frx = ((frame.x ?? 50) / 100) * size;
           const fry = ((frame.y ?? 50) / 100) * canvasHeight;
           const frot = ((frame.rotation ?? 0) * Math.PI) / 180;
-          const r = Math.max(4, Math.min(Math.min(size, canvasHeight) * 0.48, Number(frame.radius ?? 100)));
+          const r = Math.max(4, Math.min(size * 0.48, canvasHeight * 0.48, Number(frame.radius ?? 100)));
           const points = [-90, 30, 150].map((deg) => {
             const a = (deg * Math.PI) / 180 + frot;
             return { x: frx + r * Math.cos(a), y: fry + r * Math.sin(a) };
           });
-          const sides = [
-            [points[0], points[1]],
-            [points[1], points[2]],
-            [points[2], points[0]],
-          ];
-          const sideIndex = Math.max(0, Math.min(2, Number(layer.triangleSide ?? 0)));
+          const sides = [[points[0], points[1]], [points[1], points[2]], [points[2], points[0]]];
+          const layoutSide = { rightRotated: 0, bottom: 1, leftRotated: 2 };
+          const sideIndex = layoutSide[layer.layout] ?? Math.max(0, Math.min(2, Number(layer.triangleSide ?? 1)));
           const [a, b] = sides[sideIndex];
-          const mx = (a.x + b.x) / 2;
-          const my = (a.y + b.y) / 2;
-
-          // Move the text slightly toward the triangle interior so it sits
-          // neatly beside the line instead of directly over the stroke.
-          const ex = b.x - a.x;
-          const ey = b.y - a.y;
+          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          const ex = b.x - a.x, ey = b.y - a.y;
           const len = Math.max(1, Math.hypot(ex, ey));
-          const nx = -ey / len;
-          const ny = ex / len;
-          const toCenterX = frx - mx;
-          const toCenterY = fry - my;
-          const inward = (nx * toCenterX + ny * toCenterY) >= 0 ? 1 : -1;
-          const offset = 12;
-          const tx = mx + nx * offset * inward;
-          const ty = my + ny * offset * inward;
-
-          // Use the edge angle, normalized to the readable orientation.
-          let angle = Math.atan2(ey, ex) + frot;
+          const txv = ex / len, tyv = ey / len;
+          const nx = -tyv, ny = txv;
+          let angle = Math.atan2(ey, ex);
           while (angle > Math.PI / 2) angle -= Math.PI;
           while (angle < -Math.PI / 2) angle += Math.PI;
-
-          ctx.translate(tx, ty);
+          const horizontalOffset = ((Number(layer.x ?? 50) - 50) / 50) * len * 0.42;
+          const verticalOffset = ((Number(layer.y ?? 50) - 50) / 50) * len * 0.22;
+          ctx.translate(mx + txv * horizontalOffset + nx * verticalOffset, my + tyv * horizontalOffset + ny * verticalOffset);
           ctx.rotate(angle);
           const weight = layer.bold ? 700 : 400;
           const style = layer.fontStyle === "italic" ? "italic " : "";
@@ -417,16 +400,15 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
           const fsz = layer.fontSize ?? layer.size ?? 13;
           ctx.font = `${style}${weight} ${fsz}px ${family}`;
           ctx.fillStyle = inkColor;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
           ctx.fillText(layer.text || "", 0, 0);
           ctx.restore();
         }
         return;
       }
-
       ctx.save();
       ctx.translate(lx, ly);
-      // "Flip text" turns the text upside-down (180°) instead of mirroring each
-      // letter — a mirror flip made the text backwards/unreadable.
       ctx.rotate(rot + (layer.flipX ? Math.PI : 0));
       const weight = layer.bold ? 700 : 400;
       const style = layer.fontStyle === "italic" ? "italic " : "";
@@ -435,26 +417,17 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       ctx.font = `${style}${weight} ${fsz}px ${family}`;
       const text = layer.text || "";
       if (layer.invert) {
-        const m = ctx.measureText(text);
-        const tw = m.width;
+        const m = ctx.measureText(text), tw = m.width;
         const th = fsz * (layer.tall ? 1.55 : 1.15);
         const padX = fsz * 0.32, padY = fsz * 0.16;
-        ctx.save();
-        ctx.fillStyle = inkColor;
+        ctx.save(); ctx.fillStyle = inkColor;
         const rx = -tw / 2 - padX, ry = -th / 2 - padY, rw = tw + padX * 2, rh = th + padY * 2;
         if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(rx, ry, rw, rh, Math.min(4, rh / 2)); ctx.fill(); }
-        else { ctx.fillRect(rx, ry, rw, rh); }
-        ctx.restore();
-        ctx.fillStyle = "#fff";
+        else ctx.fillRect(rx, ry, rw, rh);
+        ctx.restore(); ctx.fillStyle = "#fff";
       }
-      if (layer.tall) {
-        ctx.save();
-        ctx.scale(1, 1.35); // "Height" toggle for straight text
-        ctx.fillText(text, 0, 0);
-        ctx.restore();
-      } else {
-        ctx.fillText(text, 0, 0);
-      }
+      if (layer.tall) { ctx.save(); ctx.scale(1, 1.35); ctx.fillText(text, 0, 0); ctx.restore(); }
+      else ctx.fillText(text, 0, 0);
       ctx.restore();
     } else if (layer.type === "frame") {
       ctx.save();
@@ -1706,7 +1679,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             text: label, size: fontSize, fontFamily: "Arial", fontSize,
             bold: true, flipX: false, x: 50, y: 50, rotation: 0,
             fontStyle: "normal", tall: false, invert: false,
-            layout: "triangleSide", triangleFrameId: id, triangleSide: side
+            layout: ["rightRotated", "bottom", "leftRotated"][side], triangleFrameId: id, triangleSide: side
           }));
           const center = {
             id: uid(), type: "centerText", num: num + 4,
@@ -2845,20 +2818,20 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     { id: "topArc", label: "Top Arc" },
     { id: "bottomArc", label: "Bottom Arc" },
   ];
-  const TEXT_LAYOUTS = [
-    ...ADD_TEXT_LAYOUTS,
-    { id: "topLeft", label: "Top Left" },
-    { id: "topRight", label: "Top Right" },
+  const TRIANGLE_TEXT_LAYOUTS = [
     { id: "bottom", label: "Bottom" },
+    { id: "rightRotated", label: "Right rotated" },
+    { id: "leftRotated", label: "Left rotated" },
   ];
+  const TEXT_LAYOUTS = ADD_TEXT_LAYOUTS;
   const layoutPatch = (layoutId) => {
     switch (layoutId) {
       case "center": return { layout: "center", type: "centerText", x: 50, y: 50, rotation: 0 };
       case "topArc": return { layout: "topArc", type: "circleText", start: 90, flipX: false };
       case "bottomArc": return { layout: "bottomArc", type: "circleText", start: 90, flipX: true };
-      case "topLeft": return { layout: "topLeft", type: "centerText", x: 25, y: 25, rotation: 0 };
-      case "topRight": return { layout: "topRight", type: "centerText", x: 75, y: 25, rotation: 0 };
-      case "bottom": return { layout: "bottom", type: "centerText", x: 50, y: 82, rotation: 0 };
+      case "bottom": return { layout: "bottom", type: "centerText", x: 50, y: 50, rotation: 0, triangleSide: 1 };
+      case "rightRotated": return { layout: "rightRotated", type: "centerText", x: 50, y: 50, rotation: 0, triangleSide: 0 };
+      case "leftRotated": return { layout: "leftRotated", type: "centerText", x: 50, y: 50, rotation: 0, triangleSide: 2 };
       default: return { layout: layoutId };
     }
   };
@@ -2868,9 +2841,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     if (id === "center") return <svg {...common}><rect x="9" y="5" width="8" height="6" rx="1" /></svg>;
     if (id === "topArc") return <svg {...common}><path d="M3 12 A 10 10 0 0 1 23 12" /></svg>;
     if (id === "bottomArc") return <svg {...common}><path d="M3 4 A 10 10 0 0 0 23 4" /></svg>;
-    if (id === "topLeft") return <svg {...common}><path d="M6 13 L6 3 L16 3" /></svg>;
-    if (id === "topRight") return <svg {...common}><path d="M20 13 L20 3 L10 3" /></svg>;
     if (id === "bottom") return <svg {...common}><line x1="4" y1="10" x2="22" y2="10" /></svg>;
+    if (id === "rightRotated") return <svg {...common}><line x1="7" y1="14" x2="19" y2="2" /></svg>;
+    if (id === "leftRotated") return <svg {...common}><line x1="7" y1="2" x2="19" y2="14" /></svg>;
     return null;
   };
 
@@ -2940,7 +2913,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
         <Label>Text layout</Label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 16 }}>
-          {(layer.source === "addText" ? ADD_TEXT_LAYOUTS : TEXT_LAYOUTS).map((opt) => {
+          {(layer.layout === "triangleSide" || ["bottom", "rightRotated", "leftRotated"].includes(layer.layout)
+            ? TRIANGLE_TEXT_LAYOUTS
+            : (layer.source === "addText" ? ADD_TEXT_LAYOUTS : TEXT_LAYOUTS)
+          ).map((opt) => {
             const active = layoutId === opt.id;
             return (
               <button
@@ -2972,7 +2948,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const layerPanel = activeLayer && (
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
-      {(activeLayer.type !== "circleText" || activeLayer.source === "addText") && (
+      {activeLayer.type === "centerText" && activeLayer.layout !== "triangleSide" && !["bottom", "rightRotated", "leftRotated"].includes(activeLayer.layout) && (
         <>
           <Label>Quick align</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
@@ -3003,7 +2979,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <>
           <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
           <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
-          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+          {activeLayer.layout !== "triangleSide" && !["bottom", "rightRotated", "leftRotated"].includes(activeLayer.layout) && (
+            <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+          )}
         </>
       ) : activeLayer.type === "frame" ? (
         <>
