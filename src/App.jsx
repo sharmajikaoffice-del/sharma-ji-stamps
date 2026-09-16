@@ -480,6 +480,18 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       }
       ctx.setLineDash([]);
       ctx.restore();
+    } else if (layer.type === "line") {
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(rot);
+      const lineW = ((layer.width ?? 55) / 100) * size;
+      ctx.lineWidth = layer.strokeWidth ?? 4;
+      ctx.lineCap = "butt";
+      ctx.beginPath();
+      ctx.moveTo(-lineW / 2, 0);
+      ctx.lineTo(lineW / 2, 0);
+      ctx.stroke();
+      ctx.restore();
     } else if (layer.type === "image" && layer.imageObj) {
       ctx.save();
       ctx.translate(lx, ly);
@@ -1294,6 +1306,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const [plateSize, setPlateSize] = useState(38);
   const [selectedRubberId, setSelectedRubberId] = useState("");
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
+  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [customerName, setCustomerName] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
@@ -1317,8 +1330,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     return () => window.removeEventListener("scroll", onScroll);
   }, [isDesktop]);
 
-  // Extra layers added from the toolbar (Text around the circle / Text in the
-  // centre / Circle / Images) — each becomes its own tab, like the reference editor.
+  // Extra layers added from the toolbar (Text / Shapes / Line / Images) — each becomes its own tab.
   const [layers, setLayers] = useState([]);
   const [activeLayerId, setActiveLayerId] = useState(null);
   const [layerCounter, setLayerCounter] = useState(0);
@@ -1396,7 +1408,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       const existingCount = layers.filter((l) => l.type === "frame" && (l.shape || "circle") === shape).length;
       const radius = Math.max(30, 100 - existingCount * 16);
       const dim = Math.max(10, 45 - existingCount * 7);
-      layer = { ...layer, radius, width: dim, height: dim, strokeWidth: 4, lineBreak: 0, borderStyle: "single", shape };
+      layer = { ...layer, radius, width: dim, height: dim, strokeWidth: 4, lineBreak: 0, borderStyle: "single", shape, x: 50, y: 50, rotation: 0 };
+    } else if (type === "line") {
+      layer = { ...layer, width: 55, strokeWidth: 4, x: 50, y: 50, rotation: 0 };
     } else if (type === "image") {
       layer = { ...layer, size: 15, x: 50, y: 68, rotation: 0, imageDataUrl: null, imageObj: null };
     }
@@ -2497,7 +2511,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           ) : (
             <SliderControl label="Radius" value={activeLayer.radius ?? 100} min={30} max={150} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
           )}
-          <SliderControl label="Stroke" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
+          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
           <SliderControl label="Break" value={activeLayer.lineBreak ?? 0} min={0} max={200} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
           <Label>Border Style</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 4 }}>
@@ -2527,6 +2544,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               );
             })}
           </div>
+        </>
+      ) : activeLayer.type === "line" ? (
+        <>
+          <SliderControl label="Line width" value={activeLayer.width ?? 55} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
+          <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
+          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
         </>
       ) : (
         <>
@@ -2791,18 +2816,53 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             <span style={toolbarIconBox}><Type size={18} /></span>
             Add Text
           </button>
-          <button type="button" onClick={() => addLayer("frame", { shape: "circle" })} style={toolbarIconBtn}>
-            <span style={toolbarIconBox}><Circle size={18} /></span>
-            Circle
-          </button>
-          <button type="button" onClick={() => addLayer("frame", { shape: "square" })} style={toolbarIconBtn}>
-            <span style={toolbarIconBox}><Square size={18} /></span>
-            Square box
-          </button>
-          <button type="button" onClick={() => addLayer("frame", { shape: "triangle" })} style={toolbarIconBtn}>
-            <span style={toolbarIconBox}><Triangle size={18} /></span>
-            Triangle
-          </button>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setShapeMenuOpen((v) => !v)}
+              style={toolbarIconBtn}
+              title="Insert Shape"
+            >
+              <span style={toolbarIconBox}><Square size={18} /></span>
+              Insert Shape
+            </button>
+            {shapeMenuOpen && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 120,
+                width: isDesktop ? 260 : 235, padding: 8, background: C.white,
+                border: `1px solid ${C.line}`, borderRadius: 10,
+                boxShadow: "0 10px 28px rgba(38,50,65,.16)",
+                display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7
+              }}>
+                {[
+                  { id: "circle", label: "Circle", icon: <Circle size={20} /> },
+                  { id: "square", label: "Square", icon: <Square size={20} /> },
+                  { id: "triangle", label: "Triangle", icon: <Triangle size={20} /> },
+                  { id: "line", label: "Line", icon: <span style={{ fontSize: 24, lineHeight: 1 }}>―</span> },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.id === "line") addLayer("line");
+                      else addLayer("frame", { shape: item.id });
+                      setShapeMenuOpen(false);
+                    }}
+                    style={{
+                      border: `1px solid ${C.line}`, borderRadius: 8, background: C.white,
+                      color: C.ink, minHeight: 62, padding: "7px 4px",
+                      display: "flex", flexDirection: "column", alignItems: "center",
+                      justifyContent: "center", gap: 4, cursor: "pointer",
+                      fontFamily: font.body, fontSize: 10.5
+                    }}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => { addLayer("image"); setTimeout(() => layerImageInputRef.current?.click(), 0); }}
@@ -3115,7 +3175,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 <ChevronRight size={15} style={{ transform: sizeMenuOpen ? "rotate(90deg)" : "none", flexShrink: 0 }} />
               </button>
               {sizeMenuOpen && (
-                <div style={{ position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 50, background: C.white, border: `1px solid ${C.line}`, borderRadius: 8, boxShadow: "0 10px 30px rgba(38,50,65,.14)", maxHeight: 280, overflowY: "auto" }}>
+                <div style={{
+                  position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)", zIndex: 50,
+                  background: C.white, border: `1px solid ${C.line}`, borderRadius: 8,
+                  boxShadow: "0 10px 30px rgba(38,50,65,.14)",
+                  maxHeight: isDesktop ? 520 : 430, overflowY: "auto", padding: 8,
+                  display: "grid",
+                  gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
+                  gap: 8,
+                }}>
                   {rubberSizes.length === 0 ? (
                     <div style={{ padding: 12, color: C.inkSoft, fontSize: 12 }}>No rubber sizes configured. Add a Rubber item with a size and photo in Rubber.</div>
                   ) : rubberSizes.map((r) => {
@@ -3131,24 +3199,27 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                         }}
                         style={{
                           width: "100%",
+                          minWidth: 0,
+                          minHeight: isDesktop ? 118 : 112,
                           display: "flex",
+                          flexDirection: "column",
                           alignItems: "center",
-                          gap: 10,
-                          padding: active ? "8px 10px 8px 8px" : "8px 10px",
-                          border: "none",
-                          borderBottom: `1px solid ${C.paperDark}`,
-                          borderLeft: active ? `3px solid ${STAMP_INK_BLUE}` : "3px solid transparent",
+                          justifyContent: "center",
+                          gap: 6,
+                          padding: "8px",
+                          border: `1.5px solid ${active ? STAMP_INK_BLUE : C.line}`,
+                          borderRadius: 8,
                           background: active ? "#EAF2FF" : C.white,
                           color: active ? STAMP_INK_BLUE : C.ink,
                           cursor: "pointer",
-                          textAlign: "left",
+                          textAlign: "center",
                           fontWeight: active ? 700 : 500,
                         }}
                       >
-                        {r.photo_url ? <img src={r.photo_url} alt="" style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <span style={{ width: 44, height: 44, borderRadius: 6, background: C.paperDark, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={18} color={C.inkSoft} /></span>}
-                        <span style={{ minWidth: 0, flex: 1 }}>
-                          <span style={{ display: "block", fontWeight: active ? 750 : 650, fontSize: 12.5 }}>{r.name}</span>
-                          <span style={{ display: "block", marginTop: 2, color: active ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.mono, fontSize: 10.5 }}>{r.size} · {r.parsed.widthMm} × {r.parsed.heightMm} mm</span>
+                        {r.photo_url ? <img src={r.photo_url} alt="" style={{ width: isDesktop ? 64 : 58, height: isDesktop ? 64 : 58, objectFit: "cover", borderRadius: 7, border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <span style={{ width: isDesktop ? 64 : 58, height: isDesktop ? 64 : 58, borderRadius: 7, background: C.paperDark, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={22} color={C.inkSoft} /></span>}
+                        <span style={{ minWidth: 0, width: "100%" }}>
+                          <span style={{ display: "block", fontWeight: active ? 750 : 650, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                          <span style={{ display: "block", marginTop: 2, color: active ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.mono, fontSize: 9.5 }}>{r.size} · {r.parsed.widthMm} × {r.parsed.heightMm} mm</span>
                         </span>
                         <span style={{ fontFamily: font.mono, fontWeight: 800, fontSize: 12.5, color: active ? STAMP_INK_BLUE : C.ink, flexShrink: 0 }}>{inr(r.rate)}</span>
                         {active && <span style={{ width: 22, height: 22, borderRadius: "50%", background: STAMP_INK_BLUE, color: C.white, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>✓</span>}
