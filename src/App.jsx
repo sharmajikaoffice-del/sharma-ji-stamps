@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
-  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown
+  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal
 } from "lucide-react";
@@ -1272,6 +1272,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
   const [view, setView] = useState("templates"); // "templates" | "editor"
+  const [designStartTab, setDesignStartTab] = useState("templates"); // "templates" | "recent"
   // Let the app shell know when the full-screen editor (with its own top
   // toolbar and bottom Layer/Edit/Size/Submit bar) is open, so it can hide
   // its own header and bottom nav instead of stacking on top of these.
@@ -2200,8 +2201,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
           {rubberSizes.map((r) => {
             const w = r.parsed.widthMm, h = r.parsed.heightMm;
-            const longSide = Math.max(w, h);
-            const boxMax = 44;
             return (
               <button
                 key={r.id}
@@ -2213,27 +2212,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                   background: C.white, cursor: "pointer", textAlign: "center", fontFamily: font.body,
                 }}
               >
-                {r.photo_url ? (
-                  <img
-                    src={r.photo_url}
-                    alt=""
-                    style={{ width: 46, height: 46, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }}
-                  />
-                ) : (
-                  // No photo on file — a simple box scaled to the size's own
-                  // width:height ratio, so the shape/orientation is still a
-                  // useful visual hint even without a real product photo.
-                  <span
-                    style={{
-                      display: "block",
-                      width: Math.max(18, Math.round((w / longSide) * boxMax)),
-                      height: Math.max(18, Math.round((h / longSide) * boxMax)),
-                      border: `2px solid ${STAMP_INK_BLUE}`,
-                      borderRadius: 5,
-                      background: "#EAF2FF",
-                    }}
-                  />
-                )}
+                <SizeVisual r={r} active={false} large />
                 <div style={{ fontWeight: 650, fontSize: 12.5, color: C.ink }}>{r.name}</div>
                 <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>
                   {w} × {h} mm
@@ -2265,13 +2244,19 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           )}
         </Card>
 
-        <Label>{customerMode ? "Choose a Template" : "My Templates"}</Label>
-        {templatesLoading && <EmptyNote text="Loading…" />}
-        {templatesError && <EmptyNote text={templatesError} />}
-        {!templatesLoading && !templatesError && templates.length === 0 && (
+        {!customerMode && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, padding: 4, background: C.paperDark, border: `1px solid ${C.line}`, borderRadius: 10, marginBottom: 12 }}>
+            <button type="button" onClick={() => setDesignStartTab("templates")} style={{ border: "none", borderRadius: 7, padding: "9px 8px", cursor: "pointer", background: designStartTab === "templates" ? C.white : "transparent", color: designStartTab === "templates" ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.body, fontWeight: 700, fontSize: 12.5 }}>Templates</button>
+            <button type="button" onClick={() => setDesignStartTab("recent")} style={{ border: "none", borderRadius: 7, padding: "9px 8px", cursor: "pointer", background: designStartTab === "recent" ? C.white : "transparent", color: designStartTab === "recent" ? STAMP_INK_BLUE : C.inkSoft, fontFamily: font.body, fontWeight: 700, fontSize: 12.5 }}>Recent Designs{downloadHistory.length ? ` (${downloadHistory.length})` : ""}</button>
+          </div>
+        )}
+        {(customerMode || designStartTab === "templates") && <Label>{customerMode ? "Choose a Template" : "My Templates"}</Label>}
+        {designStartTab === "templates" && templatesLoading && <EmptyNote text="Loading…" />}
+        {designStartTab === "templates" && templatesError && <EmptyNote text={templatesError} />}
+        {designStartTab === "templates" && !templatesLoading && !templatesError && templates.length === 0 && (
           <EmptyNote text="No templates available yet." />
         )}
-        {templates.length > 0 && (
+        {designStartTab === "templates" && templates.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(150px, 1fr))" : "repeat(2, 1fr)", gap: 10 }}>
             {templates.map((t) => (
               <div
@@ -2297,9 +2282,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </div>
         )}
 
-        {!customerMode && (
+        {!customerMode && designStartTab === "recent" && (
           <>
-            <Label style={{ marginTop: 18 }}>Download History</Label>
+            <Label style={{ marginTop: 4 }}>Recent Designs</Label>
             {downloadHistory.length === 0 ? (
               <EmptyNote text="Downloaded designs will appear here and stay editable." />
             ) : (
@@ -2422,6 +2407,31 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     </>
   );
 
+  const SizeVisual = ({ r, active = false, large = false }) => {
+    const w = Number(r?.parsed?.widthMm) || 1;
+    const h = Number(r?.parsed?.heightMm) || 1;
+    const maxSide = Math.max(w, h);
+    const maxBox = large ? 74 : 54;
+    const vw = Math.max(24, Math.round((w / maxSide) * maxBox));
+    const vh = Math.max(24, Math.round((h / maxSide) * maxBox));
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: large ? 82 : 62 }}>
+        <div style={{
+          width: vw, height: vh, borderRadius: large ? 8 : 6,
+          border: `2px solid ${active ? STAMP_INK_BLUE : C.inkSoft}`,
+          background: active ? "#EAF2FF" : "#F7FAFD",
+          boxShadow: active ? `0 0 0 3px rgba(39,91,156,.10)` : "inset 0 0 0 1px rgba(255,255,255,.8)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative", overflow: "hidden",
+        }}>
+          <span style={{ fontFamily: font.mono, fontSize: large ? 9 : 8, color: active ? STAMP_INK_BLUE : C.inkSoft, fontWeight: 700, whiteSpace: "nowrap" }}>
+            {w}×{h}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   const sizeControls = (
     <div>
       <Label>Choose stamp size</Label>
@@ -2430,7 +2440,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           No rubber sizes configured.
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))", gap: 10 }}>
           {rubberSizes.map((r) => {
             const active = r.id === selectedRubberId;
             return (
@@ -2443,20 +2453,18 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                   setSizeMenuOpen(false);
                 }}
                 style={{
-                  border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
-                  background: active ? "#EAF2FF" : C.white,
+                  border: `1.5px solid ${active ? STAMP_INK_BLUE : C.line}`,
+                  background: active ? "#F3F8FF" : C.white,
                   color: active ? STAMP_INK_BLUE : C.ink,
-                  borderRadius: 8,
-                  padding: "9px 7px",
-                  cursor: "pointer",
-                  textAlign: "center",
-                  fontFamily: font.body,
+                  borderRadius: 11, padding: "10px 7px 9px", cursor: "pointer",
+                  textAlign: "center", fontFamily: font.body, minHeight: 126,
+                  boxShadow: active ? "0 4px 14px rgba(39,91,156,.10)" : "none",
                 }}
               >
-                <div style={{ fontWeight: active ? 750 : 600, fontSize: 12 }}>{r.name}</div>
-                <div style={{ marginTop: 3, fontFamily: font.mono, fontSize: 10.5 }}>
-                  {r.parsed.widthMm} × {r.parsed.heightMm} mm
-                </div>
+                <SizeVisual r={r} active={active} />
+                <div style={{ fontWeight: active ? 750 : 650, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                <div style={{ marginTop: 3, fontFamily: font.mono, fontSize: 10.5 }}>{r.parsed.widthMm} × {r.parsed.heightMm} mm</div>
+                {r.rate != null && <div style={{ marginTop: 4, fontFamily: font.mono, fontWeight: 800, fontSize: 11.5, color: STAMP_INK_BLUE }}>{inr(r.rate)}</div>}
               </button>
             );
           })}
@@ -3106,6 +3114,20 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                         </button>
                         <button
                           type="button"
+                          title="Duplicate layer"
+                          aria-label="Duplicate layer"
+                          onClick={(e) => { e.stopPropagation(); duplicateLayer(l.id); }}
+                          style={{
+                            width: 28, height: 28, padding: 0, flexShrink: 0,
+                            display: "grid", placeItems: "center",
+                            border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, borderRadius: 6,
+                            background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer",
+                          }}
+                        >
+                          <Copy size={14} />
+                        </button>
+                        <button
+                          type="button"
                           title="Delete layer"
                           aria-label="Delete layer"
                           onClick={(e) => {
@@ -3214,6 +3236,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                             style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: C.inkSoft, flexShrink: 0 }}
                           >
                             {l.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            title="Duplicate layer"
+                            onClick={(e) => { e.stopPropagation(); duplicateLayer(l.id); }}
+                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: selected ? STAMP_INK_BLUE : C.inkSoft, flexShrink: 0 }}
+                          >
+                            <Copy size={16} />
                           </button>
                           <button
                             type="button"
