@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
-  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2,
+  Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal
 } from "lucide-react";
@@ -1306,7 +1306,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const [plateSize, setPlateSize] = useState(38);
   const [selectedRubberId, setSelectedRubberId] = useState("");
   const [sizeMenuOpen, setSizeMenuOpen] = useState(false);
-  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [customerName, setCustomerName] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
@@ -1335,10 +1334,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const [activeLayerId, setActiveLayerId] = useState(null);
   const [layerCounter, setLayerCounter] = useState(0);
   const [layerFilter, setLayerFilter] = useState("All");
+  // Editor history: keep layer edits reversible without storing live Image objects.
+  const historyRef = useRef([]);
+  const redoRef = useRef([]);
+  const historyLockRef = useRef(false);
+  const dragRef = useRef(null);
   const layerImageInputRef = useRef(null);
   const layerVectorInputRef = useRef(null);
 
-  const LAYER_TYPE_NAMES = { circleText: "Text around the circle", centerText: "Text in the centre", frame: "Frame", image: "Image" };
+  const LAYER_TYPE_NAMES = { circleText: "Text around the circle", centerText: "Text in the centre", frame: "Frame", line: "Line", image: "Image" };
   const FRAME_SHAPE_NAMES = { circle: "Circle", square: "Square", triangle: "Triangle" };
   // Text layers show their own typed content as the name (renaming the text
   // field renames the layer everywhere it's listed); other layer types keep
@@ -1354,7 +1358,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const layerTypeMatchesFilter = (layer, filter) => {
     if (filter === "All") return true;
     if (filter === "Text") return layer.type === "circleText" || layer.type === "centerText";
-    return layer.type === "frame" || layer.type === "image";
+    if (filter === "Shape") return layer.type === "frame" || layer.type === "line";
+    return layer.type === "frame" || layer.type === "line" || layer.type === "image";
   };
   const rubberSizes = useMemo(() => {
     // Show EVERY rubber stamp item from Item Master.
@@ -1393,7 +1398,41 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // instead of a small box floating inside a big empty grid.
   const mobileCanvasAreaHeight = Math.max(170, Math.min(330, Math.round(selectedStampPreviewHeight) + 90));
 
+  const cleanLayersForHistory = (ls) => ls.map((l) => ({ ...l, imageObj: null }));
+  const pushHistory = (snapshot = layers) => {
+    if (historyLockRef.current) return;
+    historyRef.current = [...historyRef.current.slice(-49), cleanLayersForHistory(snapshot)];
+    redoRef.current = [];
+  };
+  const restoreLayerSnapshot = (snapshot) => {
+    historyLockRef.current = true;
+    const restored = snapshot.map((l) => ({ ...l, imageObj: null }));
+    restored.forEach((l) => {
+      if (l.imageDataUrl) {
+        const img = new Image();
+        img.onload = () => setLayers((ls) => ls.map((x) => x.id === l.id ? { ...x, imageObj: img } : x));
+        img.src = l.imageDataUrl;
+      }
+    });
+    setLayers(restored);
+    setActiveLayerId(restored.length ? restored[restored.length - 1].id : null);
+    requestAnimationFrame(() => { historyLockRef.current = false; });
+  };
+  const undoLayers = () => {
+    const prev = historyRef.current.pop();
+    if (!prev) return;
+    redoRef.current.push(cleanLayersForHistory(layers));
+    restoreLayerSnapshot(prev);
+  };
+  const redoLayers = () => {
+    const next = redoRef.current.pop();
+    if (!next) return;
+    historyRef.current.push(cleanLayersForHistory(layers));
+    restoreLayerSnapshot(next);
+  };
+
   const addLayer = (type, opts = {}) => {
+    pushHistory();
     const num = layerCounter + 1;
     setLayerCounter(num);
     const id = uid();
@@ -1403,7 +1442,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     } else if (type === "centerText") {
       layer = { ...layer, text: "New text", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "center" };
     } else if (type === "frame") {
-      // Each newly added shape sits slightly inside the previous one of the same kind.
       const shape = opts.shape || "circle";
       const existingCount = layers.filter((l) => l.type === "frame" && (l.shape || "circle") === shape).length;
       const radius = Math.max(30, 100 - existingCount * 16);
@@ -1418,14 +1456,46 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     setActiveLayerId(id);
   };
 
-  const updateLayer = (id, patch) => setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  const updateLayer = (id, patch) => {
+    if (!historyLockRef.current) pushHistory();
+    setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  };
 
   const removeLayer = (id) => {
+    pushHistory();
     setLayers((ls) => {
       const next = ls.filter((l) => l.id !== id);
       if (activeLayerId === id) setActiveLayerId(next.length ? next[next.length - 1].id : null);
       return next;
     });
+  };
+
+  const duplicateLayer = (id) => {
+    const source = layers.find((l) => l.id === id);
+    if (!source) return;
+    pushHistory();
+    const copy = { ...source, id: uid(), num: layerCounter + 1, imageObj: source.imageObj || null, x: Math.min(100, (source.x ?? 50) + 3), y: Math.min(100, (source.y ?? 50) + 3) };
+    setLayerCounter((n) => n + 1);
+    setLayers((ls) => [...ls, copy]);
+    setActiveLayerId(copy.id);
+  };
+
+  const moveLayerOrder = (id, direction) => {
+    const index = layers.findIndex((l) => l.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= layers.length) return;
+    pushHistory();
+    setLayers((ls) => {
+      const next = [...ls];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const alignLayer = (id, axis, value) => {
+    if (!layers.some((l) => l.id === id)) return;
+    pushHistory();
+    setLayers((ls) => ls.map((l) => l.id === id ? { ...l, [axis]: value } : l));
   };
 
   const activeLayer = layers.find((l) => l.id === activeLayerId) || null;
@@ -1748,6 +1818,48 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       width: editorWidth, height: editorHeight, pixelRatio: window.devicePixelRatio || 1,
     });
   }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, logo, radius, strokeWidth, letterSpacing, layers]);
+
+  // Direct canvas dragging for movable layers. Position is stored as a percentage,
+  // so the interaction remains correct at every stamp size and on mobile.
+  const handleCanvasPointerDown = (e) => {
+    if (!canvasRef.current || !layers.length) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) / rect.width) * STAMP_CANVAS_SIZE;
+    const py = ((e.clientY - rect.top) / rect.height) * STAMP_CANVAS_SIZE;
+    const cx = STAMP_CANVAS_SIZE / 2, cy = STAMP_CANVAS_SIZE / 2;
+    const hits = layers.map((l, i) => {
+      if (l.hidden || l.type === "circleText") return null;
+      const x = ((l.x ?? 50) / 100) * STAMP_CANVAS_SIZE;
+      const y = ((l.y ?? 50) / 100) * editorHeight;
+      const d = Math.hypot(px - x, py - y);
+      let hit = false;
+      if (l.type === "frame") {
+        const r = (l.radius ?? 100);
+        hit = Math.abs(Math.hypot(px - x, py - y) - r) < Math.max(28, (l.strokeWidth ?? 4) * 3 + 12);
+      } else if (l.type === "line") {
+        hit = d < Math.max(24, (l.strokeWidth ?? 4) * 2 + 12);
+      } else {
+        const sz = ((l.size ?? 15) / 100) * STAMP_CANVAS_SIZE;
+        hit = d < Math.max(30, sz * .75);
+      }
+      return hit ? { l, i, d } : null;
+    }).filter(Boolean).sort((a,b) => a.i - b.i);
+    const hit = hits[hits.length - 1];
+    if (!hit) return;
+    setActiveLayerId(hit.l.id);
+    pushHistory();
+    dragRef.current = { id: hit.l.id, startX: e.clientX, startY: e.clientY, x: hit.l.x ?? 50, y: hit.l.y ?? 50, rect };
+    canvas.setPointerCapture?.(e.pointerId);
+  };
+  const handleCanvasPointerMove = (e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = ((e.clientX - d.startX) / d.rect.width) * 100;
+    const dy = ((e.clientY - d.startY) / d.rect.height) * 100;
+    setLayers((ls) => ls.map((l) => l.id === d.id ? { ...l, x: Math.max(0, Math.min(100, d.x + dx)), y: Math.max(0, Math.min(100, d.y + dy)) } : l));
+  };
+  const handleCanvasPointerUp = () => { dragRef.current = null; };
 
   // Click any item directly on the stamp to make it the active/editable item.
   // Preloaded template layers use the same hit-testing as newly added layers.
@@ -2485,6 +2597,19 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const layerPanel = activeLayer && (
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
+      {activeLayer.type !== "circleText" && (
+        <>
+          <Label>Quick align</Label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
+            <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Left</button>
+            <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Center</button>
+            <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Right</button>
+            <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Top</button>
+            <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Middle</button>
+            <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Bottom</button>
+          </div>
+        </>
+      )}
       {(activeLayer.type === "circleText" || activeLayer.type === "centerText") && (
         textPropertyPanel(activeLayer)
       )}
@@ -2670,6 +2795,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         >
           <canvas
             ref={canvasRef}
+            onPointerDown={handleCanvasPointerDown}
+            onPointerMove={handleCanvasPointerMove}
+            onPointerUp={handleCanvasPointerUp}
+            onPointerCancel={handleCanvasPointerUp}
             onClick={handleCanvasClick}
             title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
             style={{ width: "100%", height: "100%", display: "block", cursor: layers.length ? "pointer" : "default" }}
@@ -2803,6 +2932,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { padding: "8px", flexShrink: 0 }) }}>
           <ChevronLeft size={16} />{isDesktop && " Back"}
         </button>
+        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          <button type="button" onClick={undoLayers} title="Undo" aria-label="Undo" style={toolbarIconBtn}><Undo2 size={18} /></button>
+          <button type="button" onClick={redoLayers} title="Redo" aria-label="Redo" style={toolbarIconBtn}><Redo2 size={18} /></button>
+        </div>
 
         <div style={{
           display: "flex", alignItems: "center", gap: isDesktop ? 22 : 6,
@@ -2816,53 +2949,18 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             <span style={toolbarIconBox}><Type size={18} /></span>
             Add Text
           </button>
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => setShapeMenuOpen((v) => !v)}
-              style={toolbarIconBtn}
-              title="Insert Shape"
-            >
-              <span style={toolbarIconBox}><Square size={18} /></span>
-              Insert Shape
-            </button>
-            {shapeMenuOpen && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 120,
-                width: isDesktop ? 260 : 235, padding: 8, background: C.white,
-                border: `1px solid ${C.line}`, borderRadius: 10,
-                boxShadow: "0 10px 28px rgba(38,50,65,.16)",
-                display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7
-              }}>
-                {[
-                  { id: "circle", label: "Circle", icon: <Circle size={20} /> },
-                  { id: "square", label: "Square", icon: <Square size={20} /> },
-                  { id: "triangle", label: "Triangle", icon: <Triangle size={20} /> },
-                  { id: "line", label: "Line", icon: <span style={{ fontSize: 24, lineHeight: 1 }}>―</span> },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      if (item.id === "line") addLayer("line");
-                      else addLayer("frame", { shape: item.id });
-                      setShapeMenuOpen(false);
-                    }}
-                    style={{
-                      border: `1px solid ${C.line}`, borderRadius: 8, background: C.white,
-                      color: C.ink, minHeight: 62, padding: "7px 4px",
-                      display: "flex", flexDirection: "column", alignItems: "center",
-                      justifyContent: "center", gap: 4, cursor: "pointer",
-                      fontFamily: font.body, fontSize: 10.5
-                    }}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <button type="button" onClick={() => addLayer("frame", { shape: "circle" })} style={toolbarIconBtn} title="Insert Circle">
+            <span style={toolbarIconBox}><Circle size={18} /></span> Circle
+          </button>
+          <button type="button" onClick={() => addLayer("frame", { shape: "square" })} style={toolbarIconBtn} title="Insert Square">
+            <span style={toolbarIconBox}><Square size={18} /></span> Square
+          </button>
+          <button type="button" onClick={() => addLayer("frame", { shape: "triangle" })} style={toolbarIconBtn} title="Insert Triangle">
+            <span style={toolbarIconBox}><Triangle size={18} /></span> Triangle
+          </button>
+          <button type="button" onClick={() => addLayer("line")} style={toolbarIconBtn} title="Insert Line">
+            <span style={toolbarIconBox}><span style={{ fontSize: 21, lineHeight: 1 }}>―</span></span> Line
+          </button>
           <button
             type="button"
             onClick={() => { addLayer("image"); setTimeout(() => layerImageInputRef.current?.click(), 0); }}
