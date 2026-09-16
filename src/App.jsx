@@ -469,11 +469,33 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
         }
       };
 
-      if (style === "double" || style === "triple") {
+      if (style === "scalloped" && frameShape === "circle") {
+        // A filled scalloped/wavy ring, like a "PAID" rubber stamp border:
+        // alternating outer/inner points around the circle, filled solid,
+        // with a thin ring just inside it. "Wave amount" controls how deep
+        // the teeth cut in, replacing Stroke width for this style.
+        const outerR = Math.max(4, Math.min(size * 0.48, layer.radius ?? 100));
+        const teeth = 24;
+        const amp = Math.max(2, ((layer.waveAmount ?? 14) / 100) * outerR * 0.9);
+        const innerR = Math.max(2, outerR - amp);
+        const points = teeth * 2;
+        ctx.beginPath();
+        for (let i = 0; i <= points; i++) {
+          const ang = (Math.PI * 2 * i) / points - Math.PI / 2;
+          const r = i % 2 === 0 ? outerR : innerR;
+          const px = r * Math.cos(ang);
+          const py = r * Math.sin(ang);
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(2, innerR - Math.max(2, sw)), 0, Math.PI * 2);
+        ctx.lineWidth = Math.max(1, sw * 0.4);
+        ctx.stroke();
+      } else if (style === "double") {
         const ringGap = Math.max(6, sw * 2.2);
-        const rings = style === "triple" ? 3 : 2;
-        for (let i = 0; i < rings; i++) {
-          ctx.lineWidth = i === 0 ? sw : sw * 0.6;
+        for (let i = 0; i < 2; i++) {
           // Keep the outer edge fixed. Every ring is shifted inward by half
           // its own stroke width so increasing Stroke only makes it bolder inward.
           const ringStroke = i === 0 ? sw : sw * 0.6;
@@ -1536,8 +1558,17 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       const dim = Math.max(10, 45 - existingCount * 7);
       layer = { ...layer, radius, width: dim, height: dim, strokeWidth: 4, lineBreak: 0, borderStyle: "single", shape, x: 50, y: 50, rotation: 0 };
       if (existingCount === 0) {
-        const top = { id: uid(), type: "circleText", num: num + 1, text: "YOUR COMPANY NAME", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
-        const bottom = { id: uid(), type: "circleText", num: num + 2, text: "YOUR ADDRESS", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: true, fontStyle: "normal", tall: false, invert: false, layout: "bottomArc" };
+        let top, bottom;
+        if (shape === "triangle") {
+          // Triangle edges are straight, not curved, so the auto text stays
+          // upright and just moves into place near the top/bottom of the
+          // triangle instead of arcing like on a circle.
+          top = { id: uid(), type: "centerText", num: num + 1, text: "YOUR COMPANY NAME", size: 13, fontFamily: "Arial", fontSize: 13, bold: true, flipX: false, x: 50, y: 24, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "triangleTop" };
+          bottom = { id: uid(), type: "centerText", num: num + 2, text: "YOUR ADDRESS", size: 11, fontFamily: "Arial", fontSize: 11, bold: true, flipX: false, x: 50, y: 82, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "bottom" };
+        } else {
+          top = { id: uid(), type: "circleText", num: num + 1, text: "YOUR COMPANY NAME", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
+          bottom = { id: uid(), type: "circleText", num: num + 2, text: "YOUR ADDRESS", radius: radius * 0.82, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: true, flipX: true, fontStyle: "normal", tall: false, invert: false, layout: "bottomArc" };
+        }
         const center = { id: uid(), type: "centerText", num: num + 3, text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16, bold: true, flipX: false, x: 50, y: 50, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "center" };
         setLayerCounter(num + 3);
         setLayers((ls) => [...ls, layer, top, bottom, center]);
@@ -2694,7 +2725,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const FRAME_BORDER_STYLES = [
     { id: "single", label: "Single" },
     { id: "double", label: "Double" },
-    { id: "triple", label: "Triple" },
+    { id: "scalloped", label: "Scalloped" },
     { id: "dashed", label: "Dashed" },
   ];
   const BorderStyleIcon = ({ id, active }) => {
@@ -2702,7 +2733,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     const common = { width: 22, height: 22, viewBox: "0 0 22 22", fill: "none", stroke, strokeWidth: 1.4 };
     if (id === "single") return <svg {...common}><circle cx="11" cy="11" r="8" /></svg>;
     if (id === "double") return <svg {...common}><circle cx="11" cy="11" r="9" /><circle cx="11" cy="11" r="5.5" /></svg>;
-    if (id === "triple") return <svg {...common}><circle cx="11" cy="11" r="9.5" /><circle cx="11" cy="11" r="6.5" /><circle cx="11" cy="11" r="3.5" /></svg>;
+    if (id === "scalloped") return <svg {...common}><path d="M11 1.5 L12.6 4 L15.3 2.8 L15.6 5.7 L18.5 5.4 L17.3 8.1 L20 9.7 L17.5 11.3 L20 12.9 L17.3 14.5 L18.5 17.2 L15.6 16.9 L15.3 19.8 L12.6 18.6 L11 21.1 L9.4 18.6 L6.7 19.8 L6.4 16.9 L3.5 17.2 L4.7 14.5 L2 12.9 L4.5 11.3 L2 9.7 L4.7 8.1 L3.5 5.4 L6.4 5.7 L6.7 2.8 L9.4 4 Z" strokeLinejoin="round" /></svg>;
     if (id === "dashed") return <svg {...common}><circle cx="11" cy="11" r="8" strokeDasharray="2.5 2.5" /></svg>;
     return null;
   };
@@ -2824,7 +2855,11 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           ) : (
             <SliderControl label="Radius" value={activeLayer.radius ?? 100} min={30} max={150} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
           )}
-          <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          {(activeLayer.borderStyle || "single") === "scalloped" ? (
+            <SliderControl label="Wave amount" value={activeLayer.waveAmount ?? 14} min={2} max={40} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { waveAmount: v })} />
+          ) : (
+            <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          )}
           <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
           <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
