@@ -1270,6 +1270,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   }, [view]);
   const [pickShape, setPickShape] = useState("circle");
   const [mobileEditorPanel, setMobileEditorPanel] = useState("edit");
+  // "New Stamp" first asks for a size (with a price shown per size) instead of
+  // dropping straight into the 4-tab editor blind. This just controls whether
+  // that size-picker overlay is showing.
+  const [sizePickerOpen, setSizePickerOpen] = useState(false);
 
   const [shape, setShape] = useState("circle");
   const [topText, setTopText] = useState("");
@@ -1589,15 +1593,34 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     setActiveLayerId(null);
   };
 
-  const startNew = () => {
-    // New Stamp must always start completely blank: no frames, no stars,
-    // no hidden/default drawing and no preselected layer.
+  // Actually starts the blank design once a size has been chosen (or there
+  // was nothing to choose from). New Stamp must always start completely
+  // blank: no frames, no stars, no hidden/default drawing and no preselected layer.
+  const beginNewDesign = (rubberId) => {
+    if (rubberId) {
+      setSelectedRubberId(rubberId);
+      const r = rubbers.find((x) => x.id === rubberId);
+      const dims = parseRubberSize(r?.size);
+      if (dims) setPlateSize(dims.widthMm);
+    }
     resetDesign(pickShape);
     setLayers([]);
     setActiveLayerId(null);
     setLayerCounter(0);
     setMobileEditorPanel("edit");
+    setSizePickerOpen(false);
     setView("editor");
+  };
+
+  const startNew = () => {
+    // Ask for the stamp size first (each option shown with its price) instead
+    // of opening the full 4-tab editor blind. If there's nothing to choose
+    // from, skip straight to the editor as before.
+    if (rubberSizes.length > 0) {
+      setSizePickerOpen(true);
+    } else {
+      beginNewDesign(null);
+    }
   };
 
   const openTemplate = (t) => {
@@ -2018,6 +2041,91 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     printWindow.document.close();
   };
 
+  // Size + price picker shown right after tapping "New Stamp". Rendered on
+  // top of whichever screen is active (templates list or the editor's own
+  // "start new" toolbar button), so it's defined once and inserted in both.
+  const sizePickerModal = sizePickerOpen && (
+    <>
+      <div
+        onClick={() => setSizePickerOpen(false)}
+        style={{ position: "fixed", inset: 0, background: "rgba(38,50,65,0.45)", zIndex: 200 }}
+      />
+      <div
+        style={{
+          position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          width: "min(92vw, 440px)", maxHeight: "82vh", overflowY: "auto",
+          background: C.white, borderRadius: 14, boxShadow: "0 20px 60px rgba(38,50,65,.28)",
+          zIndex: 201, padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ fontWeight: 750, fontSize: 15.5, color: C.ink, fontFamily: font.body }}>
+            Stamp size chunein
+          </div>
+          <button
+            type="button"
+            onClick={() => setSizePickerOpen(false)}
+            style={{ background: "none", border: "none", cursor: "pointer", color: C.inkSoft, padding: 4, lineHeight: 0 }}
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: C.inkSoft, fontFamily: font.body, marginBottom: 14 }}>
+          Size ke hisaab se design ka layout aur price niche dikh raha hai.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+          {rubberSizes.map((r) => {
+            const w = r.parsed.widthMm, h = r.parsed.heightMm;
+            const longSide = Math.max(w, h);
+            const boxMax = 44;
+            return (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => beginNewDesign(r.id)}
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                  border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 8px 12px",
+                  background: C.white, cursor: "pointer", textAlign: "center", fontFamily: font.body,
+                }}
+              >
+                {r.photo_url ? (
+                  <img
+                    src={r.photo_url}
+                    alt=""
+                    style={{ width: 46, height: 46, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.line}` }}
+                  />
+                ) : (
+                  // No photo on file — a simple box scaled to the size's own
+                  // width:height ratio, so the shape/orientation is still a
+                  // useful visual hint even without a real product photo.
+                  <span
+                    style={{
+                      display: "block",
+                      width: Math.max(18, Math.round((w / longSide) * boxMax)),
+                      height: Math.max(18, Math.round((h / longSide) * boxMax)),
+                      border: `2px solid ${STAMP_INK_BLUE}`,
+                      borderRadius: 5,
+                      background: "#EAF2FF",
+                    }}
+                  />
+                )}
+                <div style={{ fontWeight: 650, fontSize: 12.5, color: C.ink }}>{r.name}</div>
+                <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>
+                  {w} × {h} mm
+                </div>
+                <div style={{ fontFamily: font.mono, fontWeight: 800, fontSize: 13, color: STAMP_INK_BLUE }}>
+                  {inr(r.rate)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+
   /* ---------------- STEP 1: pick a shape / pick a saved template ---------------- */
   if (view === "templates") {
     return (
@@ -2100,6 +2208,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             )}
           </>
         )}
+        {sizePickerModal}
       </div>
     );
   }
@@ -3161,6 +3270,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           })}
         </div>
       )}
+      {sizePickerModal}
     </div>
   );
 }
