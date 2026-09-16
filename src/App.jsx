@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
-  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal
+  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock
 } from "lucide-react";
 
 /* Preloaded symbol PNGs — ready-made icons users can drop onto a stamp
@@ -485,19 +485,32 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       ctx.translate(lx, ly);
       ctx.rotate(rot);
       const lineW = ((layer.width ?? 55) / 100) * size;
+      const curve = Number(layer.curve ?? 0);
+      const curveAmount = Math.max(0, Number(layer.curveAmount ?? 24));
       ctx.lineWidth = layer.strokeWidth ?? 4;
       ctx.lineCap = "butt";
       ctx.beginPath();
       ctx.moveTo(-lineW / 2, 0);
-      ctx.lineTo(lineW / 2, 0);
+      if (curve === 0) {
+        ctx.lineTo(lineW / 2, 0);
+      } else {
+        // Canvas Y grows downward: negative control-point Y makes an upward arc,
+        // positive control-point Y makes a downward arc.
+        const controlY = curve * curveAmount;
+        ctx.quadraticCurveTo(0, controlY, lineW / 2, 0);
+      }
       ctx.stroke();
       ctx.restore();
     } else if (layer.type === "image" && layer.imageObj) {
       ctx.save();
       ctx.translate(lx, ly);
       ctx.rotate(rot);
-      const isz = ((layer.size ?? 15) / 100) * Math.min(size, canvasHeight);
-      ctx.drawImage(layer.imageObj, -isz / 2, -isz / 2, isz, isz);
+      const iw = ((layer.width ?? layer.size ?? 15) / 100) * Math.min(size, canvasHeight);
+      const naturalRatio = layer.imageObj.naturalHeight && layer.imageObj.naturalWidth
+        ? layer.imageObj.naturalHeight / layer.imageObj.naturalWidth
+        : 1;
+      const ih = iw * naturalRatio;
+      ctx.drawImage(layer.imageObj, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
     }
   });
@@ -749,6 +762,7 @@ const TABS_ADMIN = [
   { id: "dashboard", label: "Dashboard", icon: CircleDot },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
+  { id: "create-pro", label: "New Stamp Pro", icon: Wand2 },
   { id: "orders", label: "Orders", icon: Inbox },
   { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
@@ -771,7 +785,7 @@ const TABS_STAFF = [
 
 // On the mobile bottom bar these tabs collapse into a single "More" button
 // so the bar doesn't get crowded — the desktop sidebar still shows all tabs.
-const MORE_TAB_IDS = ["stock", "rubber", "purchase", "ledger", "users"];
+const MORE_TAB_IDS = ["stock", "rubber", "purchase", "ledger", "users", "create-pro"];
 
 function SharmaJiStampsAdmin() {
   useFonts();
@@ -887,6 +901,7 @@ function SharmaJiStampsAdmin() {
       {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
       {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} />}
+      {tab === "create-pro" && user.role === "admin" && <CreateStampProTab rubbers={rubbers} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
@@ -1334,6 +1349,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const [layers, setLayers] = useState([]);
   const [activeLayerId, setActiveLayerId] = useState(null);
   const [layerCounter, setLayerCounter] = useState(0);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [autoSaveStatus, setAutoSaveStatus] = useState("");
+  const AUTOSAVE_KEY = "sjs_stamp_draft_v2";
   const [layerFilter, setLayerFilter] = useState("All");
   // Editor history: keep layer edits reversible without storing live Image objects.
   const historyRef = useRef([]);
@@ -1351,10 +1369,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const layerLabel = (l) => {
     if (l.type === "circleText" || l.type === "centerText") {
       const t = (l.text || "").trim();
-      return t || LAYER_TYPE_NAMES[l.type];
+      return `${t || LAYER_TYPE_NAMES[l.type]}${l.locked ? " 🔒" : ""}`;
     }
     const base = l.type === "frame" ? FRAME_SHAPE_NAMES[l.shape || "circle"] : LAYER_TYPE_NAMES[l.type];
-    return `${base} #${l.num}`;
+    return `${base} #${l.num}${l.locked ? " 🔒" : ""}`;
   };
   const layerTypeMatchesFilter = (layer, filter) => {
     if (filter === "All") return true;
@@ -1449,20 +1467,23 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       const dim = Math.max(10, 45 - existingCount * 7);
       layer = { ...layer, radius, width: dim, height: dim, strokeWidth: 4, lineBreak: 0, borderStyle: "single", shape, x: 50, y: 50, rotation: 0 };
     } else if (type === "line") {
-      layer = { ...layer, width: 55, strokeWidth: 4, x: 50, y: 50, rotation: 0 };
+      layer = { ...layer, width: 55, strokeWidth: 4, curve: 0, curveAmount: 24, x: 50, y: 50, rotation: 0 };
     } else if (type === "image") {
-      layer = { ...layer, size: 15, x: 50, y: 68, rotation: 0, imageDataUrl: null, imageObj: null };
+      layer = { ...layer, width: 15, x: 50, y: 68, rotation: 0, imageDataUrl: null, imageObj: null };
     }
     setLayers((ls) => [...ls, layer]);
     setActiveLayerId(id);
   };
 
   const updateLayer = (id, patch) => {
+    const target = layers.find((l) => l.id === id);
+    if (!target || target.locked) return;
     if (!historyLockRef.current) pushHistory();
     setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   };
 
   const removeLayer = (id) => {
+    if (layers.find((l) => l.id === id)?.locked) return;
     pushHistory();
     setLayers((ls) => {
       const next = ls.filter((l) => l.id !== id);
@@ -1473,7 +1494,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const duplicateLayer = (id) => {
     const source = layers.find((l) => l.id === id);
-    if (!source) return;
+    if (!source || source.locked) return;
     pushHistory();
     const copy = { ...source, id: uid(), num: layerCounter + 1, imageObj: source.imageObj || null, x: Math.min(100, (source.x ?? 50) + 3), y: Math.min(100, (source.y ?? 50) + 3) };
     setLayerCounter((n) => n + 1);
@@ -1482,6 +1503,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   };
 
   const moveLayerOrder = (id, direction) => {
+    if (layers.find((l) => l.id === id)?.locked) return;
     const index = layers.findIndex((l) => l.id === id);
     const target = index + direction;
     if (index < 0 || target < 0 || target >= layers.length) return;
@@ -1499,6 +1521,18 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     setLayers((ls) => ls.map((l) => l.id === id ? { ...l, [axis]: value } : l));
   };
 
+  const toggleLayerLock = (id) => {
+    const target = layers.find((l) => l.id === id);
+    if (!target) return;
+    pushHistory();
+    setLayers((ls) => ls.map((l) => l.id === id ? { ...l, locked: !l.locked } : l));
+  };
+  const snapValue = (value) => {
+    if (!snapToGrid) return value;
+    const step = 5;
+    const snapped = Math.round(value / step) * step;
+    return Math.max(0, Math.min(100, snapped));
+  };
   const activeLayer = layers.find((l) => l.id === activeLayerId) || null;
   const filteredLayers = layers.filter((l) => layerTypeMatchesFilter(l, layerFilter));
 
@@ -1691,6 +1725,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     setLayerCounter(0);
     setMobileEditorPanel("edit");
     setSizePickerOpen(false);
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
+    setAutoSaveStatus("");
     setView("editor");
   };
 
@@ -1811,6 +1847,50 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     await loadTemplates();
   };
 
+  // Auto-save the current editable design locally while the user works. Images are
+  // stored as data URLs, so the draft can survive a page refresh without a server table.
+  useEffect(() => {
+    if (view !== "editor") return;
+    const timer = setTimeout(() => {
+      try {
+        const draft = {
+          shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3,
+          borderStyle, texture, radius, strokeWidth, letterSpacing, logoDataUrl,
+          rubberId: selectedRubberId, rubberSize: selectedRubber?.size || null,
+          layers: cleanLayersForHistory(layers), templateName,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(draft));
+        setAutoSaveStatus("Auto-saved");
+      } catch {
+        setAutoSaveStatus("Auto-save unavailable");
+      }
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [view, shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, radius, strokeWidth, letterSpacing, logoDataUrl, selectedRubberId, selectedRubber?.size, layers, templateName]);
+
+  useEffect(() => {
+    if (!isDesktop && view !== "editor") return;
+    const onKeyDown = (ev) => {
+      const tag = ev.target?.tagName?.toLowerCase();
+      const typing = tag === "input" || tag === "textarea" || tag === "select" || ev.target?.isContentEditable;
+      const mod = ev.ctrlKey || ev.metaKey;
+      if (mod && ev.key.toLowerCase() === "z" && !ev.shiftKey) { ev.preventDefault(); undoLayers(); return; }
+      if (mod && (ev.key.toLowerCase() === "y" || (ev.key.toLowerCase() === "z" && ev.shiftKey))) { ev.preventDefault(); redoLayers(); return; }
+      if (typing) return;
+      if (mod && ev.key.toLowerCase() === "d" && activeLayerId) { ev.preventDefault(); duplicateLayer(activeLayerId); return; }
+      if ((ev.key === "Delete" || ev.key === "Backspace") && activeLayerId) { ev.preventDefault(); removeLayer(activeLayerId); return; }
+      if (!activeLayer || activeLayer.locked) return;
+      const amount = ev.shiftKey ? 5 : 1;
+      if (ev.key === "ArrowLeft") { ev.preventDefault(); updateLayer(activeLayer.id, { x: snapValue((activeLayer.x ?? 50) - amount) }); }
+      if (ev.key === "ArrowRight") { ev.preventDefault(); updateLayer(activeLayer.id, { x: snapValue((activeLayer.x ?? 50) + amount) }); }
+      if (ev.key === "ArrowUp") { ev.preventDefault(); updateLayer(activeLayer.id, { y: snapValue((activeLayer.y ?? 50) - amount) }); }
+      if (ev.key === "ArrowDown") { ev.preventDefault(); updateLayer(activeLayer.id, { y: snapValue((activeLayer.y ?? 50) + amount) }); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [view, isDesktop, activeLayer, activeLayerId, snapToGrid, layers]);
+
   useEffect(() => {
     drawStampOnCanvas(canvasRef.current, {
       shape, topText, bottomText, centerLine1, centerLine2,
@@ -1849,6 +1929,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     const hit = hits[hits.length - 1];
     if (!hit) return;
     setActiveLayerId(hit.l.id);
+    if (hit.l.locked) return;
     pushHistory();
     dragRef.current = { id: hit.l.id, startX: e.clientX, startY: e.clientY, x: hit.l.x ?? 50, y: hit.l.y ?? 50, rect };
     canvas.setPointerCapture?.(e.pointerId);
@@ -1858,7 +1939,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     if (!d) return;
     const dx = ((e.clientX - d.startX) / d.rect.width) * 100;
     const dy = ((e.clientY - d.startY) / d.rect.height) * 100;
-    setLayers((ls) => ls.map((l) => l.id === d.id ? { ...l, x: Math.max(0, Math.min(100, d.x + dx)), y: Math.max(0, Math.min(100, d.y + dy)) } : l));
+    setLayers((ls) => ls.map((l) => l.id === d.id ? { ...l, x: snapValue(d.x + dx), y: snapValue(d.y + dy) } : l));
   };
   const handleCanvasPointerUp = () => { dragRef.current = null; };
 
@@ -2400,6 +2481,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
       </label>
 
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: 8 }}>
+        <input type="checkbox" checked={snapToGrid} onChange={(e) => setSnapToGrid(e.target.checked)} />
+        Snap to grid (5%)
+      </label>
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer" }}>
         <input type="checkbox" checked={texture} onChange={(e) => setTexture(e.target.checked)} />
         Worn ink texture
@@ -2682,13 +2767,36 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <>
           <SliderControl label="Line width" value={activeLayer.width ?? 55} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <Label>Curve</Label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, marginBottom: 10 }}>
+            {[{ id: 0, label: "Straight" }, { id: -1, label: "Up Curve" }, { id: 1, label: "Down Curve" }].map((opt) => {
+              const active = Number(activeLayer.curve ?? 0) === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateLayer(activeLayer.id, { curve: opt.id })}
+                  style={{
+                    border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
+                    background: active ? "#EAF2FF" : C.white,
+                    color: active ? STAMP_INK_BLUE : C.ink,
+                    borderRadius: 8, padding: "9px 4px", cursor: "pointer",
+                    fontSize: 10.5, fontWeight: active ? 700 : 500,
+                  }}
+                >{opt.label}</button>
+              );
+            })}
+          </div>
+          {Number(activeLayer.curve ?? 0) !== 0 && (
+            <SliderControl label="Curve amount" value={activeLayer.curveAmount ?? 24} min={4} max={80} step={1} onChange={(v) => updateLayer(activeLayer.id, { curveAmount: v })} />
+          )}
           <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
           <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
         </>
       ) : (
         <>
-          <SliderControl label="Size" value={activeLayer.size ?? 15} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { size: v })} />
+          <SliderControl label="Width" value={activeLayer.width ?? activeLayer.size ?? 15} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
           <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
@@ -3114,6 +3222,20 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                         </button>
                         <button
                           type="button"
+                          title={l.locked ? "Unlock layer" : "Lock layer"}
+                          aria-label={l.locked ? "Unlock layer" : "Lock layer"}
+                          onClick={(e) => { e.stopPropagation(); toggleLayerLock(l.id); setActiveLayerId(l.id); }}
+                          style={{
+                            width: 28, height: 28, padding: 0, flexShrink: 0,
+                            display: "grid", placeItems: "center",
+                            border: `1px solid ${l.locked ? STAMP_INK_BLUE : C.line}`, borderRadius: 6,
+                            background: l.locked ? "#EAF2FF" : C.white, color: l.locked ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer",
+                          }}
+                        >
+                          {l.locked ? <Lock size={14} /> : <Unlock size={14} />}
+                        </button>
+                        <button
+                          type="button"
                           title="Duplicate layer"
                           aria-label="Duplicate layer"
                           onClick={(e) => { e.stopPropagation(); duplicateLayer(l.id); }}
@@ -3236,6 +3358,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                             style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: C.inkSoft, flexShrink: 0 }}
                           >
                             {l.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            title={l.locked ? "Unlock layer" : "Lock layer"}
+                            onClick={(e) => { e.stopPropagation(); toggleLayerLock(l.id); setActiveLayerId(l.id); }}
+                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: l.locked ? STAMP_INK_BLUE : C.inkSoft, flexShrink: 0 }}
+                          >
+                            {l.locked ? <Lock size={16} /> : <Unlock size={16} />}
                           </button>
                           <button
                             type="button"
@@ -3367,6 +3497,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               )}
             </div>
             <span style={{ color: C.inkSoft, whiteSpace: "nowrap" }}>{selectedDimensions.widthMm} × {selectedDimensions.heightMm} mm</span>
+            {autoSaveStatus && <span style={{ color: C.sage, fontFamily: font.mono, fontSize: 10, whiteSpace: "nowrap" }}>{autoSaveStatus}</span>}
           </div>
         </div>
       )}
@@ -4093,6 +4224,50 @@ function UsersTab({ users, refresh, currentUser }) {
 }
 
 /* ---------- helpers ---------- */
+/* ================= NEW STAMP PRO (ADMIN ONLY) =================
+   Separate beta workspace. The old Create Stamp remains untouched so the
+   admin can compare both editors until the Pro version is finalized. */
+function CreateStampProTab({ rubbers = [] }) {
+  const [sessionKey, setSessionKey] = useState(0);
+  return (
+    <div>
+      <div style={{
+        background: C.headerGreen, color: C.white, borderRadius: 14, padding: "14px 16px",
+        marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 12, boxShadow: "0 6px 18px rgba(36,95,196,.12)"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,.14)", display: "flex", alignItems: "center", justifyContent: "center", flex: "0 0 auto" }}>
+            <Wand2 size={20} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: font.display, fontWeight: 800, fontSize: 17 }}>New Stamp Pro</div>
+            <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, opacity: .82, marginTop: 2 }}>ADMIN ONLY · BETA WORKSPACE</div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSessionKey((k) => k + 1)}
+          style={{ background: C.white, color: C.headerGreen, border: "none", borderRadius: 8, padding: "8px 10px", fontFamily: font.body, fontWeight: 750, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}
+        >
+          New Workspace
+        </button>
+      </div>
+
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", marginBottom: 10,
+        background: "#EEF5FF", border: `1px solid ${C.line}`, borderRadius: 10,
+        color: C.inkSoft, fontSize: 11.5, lineHeight: 1.4
+      }}>
+        <Wand2 size={15} color={STAMP_INK_BLUE} />
+        <span><b style={{ color: C.ink }}>Testing area:</b> Purana <b>Create Stamp</b> abhi bhi safe hai. Final hone ke baad hi uski jagah Pro version use karenge.</span>
+      </div>
+
+      <CreateStampTab key={sessionKey} rubbers={rubbers} />
+    </div>
+  );
+}
+
 function SectionTitle({ icon: Icon, title, bare = false }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, ...(bare ? {} : { marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}` }) }}>
