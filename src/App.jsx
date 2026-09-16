@@ -3,7 +3,7 @@ import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, X,
-  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock
+  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Sun, Moon
 } from "lucide-react";
 
 /* Preloaded symbol PNGs — ready-made icons users can drop onto a stamp
@@ -80,12 +80,20 @@ async function uploadPhoto(file, folder) {
 }
 
 /* ---------- design tokens ---------- */
-const C = {
+const LIGHT_C = {
   // Desktop theme tuned to the blue editor shown in the reference UI.
   paper: "#F3F6FA", paperDark: "#E8EDF4", ink: "#263241", inkSoft: "#687587",
   stamp: "#3F7FE8", stampDark: "#245FC4", brass: "#3F7FE8", sage: "#3F7FE8",
   white: "#FFFFFF", line: "#D7DEE8", headerGreen: "#3F7FE8",
 };
+const DARK_C = {
+  ...LIGHT_C,
+  paper: "#111827", paperDark: "#1F2937", ink: "#F3F4F6", inkSoft: "#AAB4C2",
+  white: "#182231", line: "#334155",
+};
+// Mutable palette: the admin shell switches this before rendering its children.
+// Stamp ink/header colors intentionally stay blue in both themes.
+let C = LIGHT_C;
 const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -200,7 +208,7 @@ const STAMP_SHAPES = [
    small template-picker thumbnails, so the drawing logic lives in one place. */
 function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
   if (!canvas) return;
-  const { shape, topText = "", bottomText = "", centerLine1 = "", centerLine2 = "", rectLine1 = "", rectLine2 = "", rectLine3 = "", inkColor = STAMP_INK_BLUE, borderStyle = "double", texture = true, logo = null, radius = 138, strokeWidth = 3, letterSpacing = 2.5, layers = [], width = STAMP_CANVAS_SIZE, height = STAMP_CANVAS_SIZE, pixelRatio = window.devicePixelRatio || 1, monochrome = false } = cfg;
+  const { shape, topText = "", bottomText = "", centerLine1 = "", centerLine2 = "", rectLine1 = "", rectLine2 = "", rectLine3 = "", topTextSize = 12, bottomTextSize = 12, centerTextSize = 16, centerText2Size = 11, inkColor = STAMP_INK_BLUE, borderStyle = "double", texture = true, logo = null, radius = 138, strokeWidth = 3, letterSpacing = 2.5, layers = [], width = STAMP_CANVAS_SIZE, height = STAMP_CANVAS_SIZE, pixelRatio = window.devicePixelRatio || 1, monochrome = false } = cfg;
   const dpr = pixelRatio;
   const size = STAMP_CANVAS_SIZE;
   const canvasHeight = Math.max(40, STAMP_CANVAS_SIZE * (height / Math.max(1, width)));
@@ -266,8 +274,9 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       }
     }
 
-    ctx.font = "600 12px Georgia, 'Times New Roman', serif";
+    ctx.font = `600 ${Number(topTextSize) || 12}px Georgia, 'Times New Roman', serif`;
     drawArcText(ctx, topText.toUpperCase(), cx, cy, textR, 0, 1, letterSpacing);
+    ctx.font = `600 ${Number(bottomTextSize) || 12}px Georgia, 'Times New Roman', serif`;
     drawArcText(ctx, bottomText.toUpperCase(), cx, cy, textR, 0, -1, letterSpacing);
 
     if (logo) {
@@ -278,10 +287,10 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       ctx.restore();
     }
 
-    ctx.font = "700 16px Georgia, 'Times New Roman', serif";
+    ctx.font = `700 ${Number(centerTextSize) || 16}px Georgia, 'Times New Roman', serif`;
     ctx.fillText(centerLine1.toUpperCase(), cx, logo ? cy + 4 : cy - 4);
     if (centerLine2) {
-      ctx.font = "400 11px Georgia, 'Times New Roman', serif";
+      ctx.font = `400 ${Number(centerText2Size) || 11}px Georgia, 'Times New Roman', serif`;
       ctx.fillText(centerLine2.toUpperCase(), cx, cy + (logo ? 24 : 16));
     }
 
@@ -617,15 +626,51 @@ function ShapeIcon({ shape }) {
 function TemplateThumb({ config, size = 140 }) {
   const ref = useRef(null);
   const [logoImg, setLogoImg] = useState(null);
+  const [layerImages, setLayerImages] = useState({});
+
+  // Templates store image layers as imageDataUrl (not live Image objects).
+  // Re-hydrate every saved image before drawing the thumbnail so image layers
+  // are visible in Templates / Recent Designs as well as inside the editor.
   useEffect(() => {
-    if (!config.logoDataUrl) { setLogoImg(null); return; }
+    let cancelled = false;
+    const load = async () => {
+      const next = {};
+      const urls = (Array.isArray(config?.layers) ? config.layers : []).filter((l) => l?.type === "image" && l?.imageDataUrl);
+      await Promise.all(urls.map((layer) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => { next[layer.id] = img; resolve(); };
+        img.onerror = () => resolve();
+        img.src = layer.imageDataUrl;
+      })));
+      if (!cancelled) setLayerImages(next);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [config]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!config?.logoDataUrl) { setLogoImg(null); return undefined; }
     const img = new Image();
-    img.onload = () => setLogoImg(img);
+    img.onload = () => { if (!cancelled) setLogoImg(img); };
+    img.onerror = () => { if (!cancelled) setLogoImg(null); };
     img.src = config.logoDataUrl;
-  }, [config.logoDataUrl]);
+    return () => { cancelled = true; };
+  }, [config?.logoDataUrl]);
+
   useEffect(() => {
-    drawStampOnCanvas(ref.current, { ...config, inkColor: config.inkColor || STAMP_INK_BLUE, logo: logoImg }, size);
-  }, [config, logoImg, size]);
+    const hydratedLayers = (Array.isArray(config?.layers) ? config.layers : []).map((layer) => ({
+      ...layer,
+      imageObj: layerImages[layer.id] || null,
+    }));
+    drawStampOnCanvas(ref.current, {
+      ...config,
+      layers: hydratedLayers,
+      inkColor: config.inkColor || STAMP_INK_BLUE,
+      logo: logoImg,
+    }, size);
+  }, [config, logoImg, layerImages, size]);
+
   return <canvas ref={ref} style={{ width: size, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1", display: "block" }} />;
 }
 
@@ -809,13 +854,21 @@ function SharmaJiStampsAdmin() {
     try { localStorage.removeItem("sjs_user"); } catch {}
   };
   const [tab, setTab] = useState("dashboard");
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem("sjs_theme") === "dark" ? "dark" : "light"; } catch { return "light"; }
+  });
+  C = theme === "dark" ? DARK_C : LIGHT_C;
+  useEffect(() => {
+    try { localStorage.setItem("sjs_theme", theme); } catch {}
+  }, [theme]);
+  const toggleTheme = () => setTheme((v) => v === "dark" ? "light" : "dark");
   const [moreOpen, setMoreOpen] = useState(false);
   const [orderToEdit, setOrderToEdit] = useState(null);
   const editOrder = (order) => { setOrderToEdit(order); setTab("create"); };
   const [editorActive, setEditorActive] = useState(false);
   // Reset if the user navigates away from Create Stamp by any other route
   // (bottom nav, back gesture) so a stale "editor open" state can't linger.
-  useEffect(() => { if (tab !== "create" && editorActive) setEditorActive(false); }, [tab]);
+  useEffect(() => { if (tab !== "create" && tab !== "create-pro" && editorActive) setEditorActive(false); }, [tab]);
   const [entryToFill, setEntryToFill] = useState(null);
   const billOrder = (order) => {
     setEntryToFill({
@@ -901,7 +954,7 @@ function SharmaJiStampsAdmin() {
       {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
       {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} />}
-      {tab === "create-pro" && user.role === "admin" && <CreateStampProTab rubbers={rubbers} />}
+      {tab === "create-pro" && user.role === "admin" && <CreateStampProTab rubbers={rubbers} onEditorActiveChange={setEditorActive} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
@@ -935,6 +988,9 @@ function SharmaJiStampsAdmin() {
               );
             })}
           </div>
+          <button onClick={toggleTheme} style={{ margin: "0 14px 8px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: font.body, fontSize: 12.5, padding: "9px 0" }}>
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </button>
           <button onClick={logout} style={{ margin: 14, background: "none", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: font.body, fontSize: 12.5, padding: "9px 0" }}><LogOut size={15} /> Logout</button>
         </div>
 
@@ -959,7 +1015,12 @@ function SharmaJiStampsAdmin() {
               <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: "#DCE9FF", marginTop: 2 }}>{user.name.toUpperCase()} · {user.role.toUpperCase()}</div>
             </div>
           </div>
-          <button onClick={logout} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={toggleTheme} title={theme === "dark" ? "Light Mode" : "Dark Mode"} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34 }}>
+              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+            <button onClick={logout} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
+          </div>
         </div>
       )}
 
@@ -1308,6 +1369,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const [bottomText, setBottomText] = useState("");
   const [centerLine1, setCenterLine1] = useState("");
   const [centerLine2, setCenterLine2] = useState("");
+  const [topTextSize, setTopTextSize] = useState(12);
+  const [bottomTextSize, setBottomTextSize] = useState(12);
+  const [centerTextSize, setCenterTextSize] = useState(16);
+  const [centerText2Size, setCenterText2Size] = useState(11);
   const [rectLine1, setRectLine1] = useState("");
   const [rectLine2, setRectLine2] = useState("");
   const [rectLine3, setRectLine3] = useState("");
@@ -1680,7 +1745,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const buildConfig = () => ({
     shape, topText, bottomText, centerLine1, centerLine2,
-    rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logoDataUrl,
+    rectLine1, rectLine2, rectLine3, topTextSize, bottomTextSize, centerTextSize, centerText2Size, inkColor: STAMP_INK_BLUE, borderStyle, texture, logoDataUrl,
     radius, strokeWidth, letterSpacing,
     rubberId: selectedRubberId, rubberSize: selectedRubber?.size || null,
     layers: layers.map(({ imageObj, ...l }) => l),
@@ -1692,6 +1757,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     setBottomText("");
     setCenterLine1("");
     setCenterLine2("");
+    setTopTextSize(12);
+    setBottomTextSize(12);
+    setCenterTextSize(16);
+    setCenterText2Size(11);
     setRectLine1("");
     setRectLine2("");
     setRectLine3("");
@@ -1751,6 +1820,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     setBottomText(config.bottomText ?? "");
     setCenterLine1(config.centerLine1 ?? "");
     setCenterLine2(config.centerLine2 ?? "");
+    setTopTextSize(Number(config.topTextSize ?? 12));
+    setBottomTextSize(Number(config.bottomTextSize ?? 12));
+    setCenterTextSize(Number(config.centerTextSize ?? 16));
+    setCenterText2Size(Number(config.centerText2Size ?? 11));
     setRectLine1(config.rectLine1 ?? "");
     setRectLine2(config.rectLine2 ?? "");
     setRectLine3(config.rectLine3 ?? "");
@@ -1855,7 +1928,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       try {
         const draft = {
           shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3,
-          borderStyle, texture, radius, strokeWidth, letterSpacing, logoDataUrl,
+          topTextSize, bottomTextSize, centerTextSize, centerText2Size, borderStyle, texture, radius, strokeWidth, letterSpacing, logoDataUrl,
           rubberId: selectedRubberId, rubberSize: selectedRubber?.size || null,
           layers: cleanLayersForHistory(layers), templateName,
           savedAt: new Date().toISOString(),
@@ -1867,7 +1940,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       }
     }, 700);
     return () => clearTimeout(timer);
-  }, [view, shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, radius, strokeWidth, letterSpacing, logoDataUrl, selectedRubberId, selectedRubber?.size, layers, templateName]);
+  }, [view, shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, topTextSize, bottomTextSize, centerTextSize, centerText2Size, borderStyle, texture, radius, strokeWidth, letterSpacing, logoDataUrl, selectedRubberId, selectedRubber?.size, layers, templateName]);
 
   useEffect(() => {
     if (!isDesktop && view !== "editor") return;
@@ -1894,11 +1967,11 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   useEffect(() => {
     drawStampOnCanvas(canvasRef.current, {
       shape, topText, bottomText, centerLine1, centerLine2,
-      rectLine1, rectLine2, rectLine3, inkColor: STAMP_INK_BLUE, borderStyle, texture, logo,
+      rectLine1, rectLine2, rectLine3, topTextSize, bottomTextSize, centerTextSize, centerText2Size, inkColor: STAMP_INK_BLUE, borderStyle, texture, logo,
       radius, strokeWidth, letterSpacing, layers,
       width: editorWidth, height: editorHeight, pixelRatio: window.devicePixelRatio || 1,
     });
-  }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, borderStyle, texture, logo, radius, strokeWidth, letterSpacing, layers]);
+  }, [shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3, topTextSize, bottomTextSize, centerTextSize, centerText2Size, borderStyle, texture, logo, radius, strokeWidth, letterSpacing, layers]);
 
   // Direct canvas dragging for movable layers. Position is stored as a percentage,
   // so the interaction remains correct at every stamp size and on mobile.
@@ -2031,6 +2104,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     const exportCanvas = document.createElement("canvas");
     drawStampOnCanvas(exportCanvas, {
       shape, topText, bottomText, centerLine1, centerLine2, rectLine1, rectLine2, rectLine3,
+      topTextSize, bottomTextSize, centerTextSize, centerText2Size,
       // texture:false keeps the worn-ink speckle effect (used only in the on-screen
       // preview) out of the download — that speckle is a separate thing from the
       // stray-pixel "spots" bug and must never appear in the exported PNG.
@@ -2441,12 +2515,16 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <>
           <Label>Top curved text</Label>
           <Field placeholder="YOUR COMPANY NAME" value={topText} onChange={(e) => setTopText(e.target.value)} maxLength={40} />
+          <SliderControl label="Top curved text size" value={topTextSize} min={6} max={30} step={1} onChange={setTopTextSize} />
           <Label>Bottom curved text</Label>
           <Field placeholder="AUTHORIZED SIGNATORY" value={bottomText} onChange={(e) => setBottomText(e.target.value)} maxLength={40} />
+          <SliderControl label="Bottom curved text size" value={bottomTextSize} min={6} max={30} step={1} onChange={setBottomTextSize} />
           <Label>Center line</Label>
           <Field placeholder="APPROVED" value={centerLine1} onChange={(e) => setCenterLine1(e.target.value)} maxLength={20} />
+          <SliderControl label="Center text size" value={centerTextSize} min={6} max={40} step={1} onChange={setCenterTextSize} />
           <Label>Center line (small, optional)</Label>
           <Field value={centerLine2} onChange={(e) => setCenterLine2(e.target.value)} maxLength={24} />
+          <SliderControl label="Center small text size" value={centerText2Size} min={5} max={30} step={1} onChange={setCenterText2Size} />
         </>
       ) : (
         <>
@@ -2790,9 +2868,13 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           {Number(activeLayer.curve ?? 0) !== 0 && (
             <SliderControl label="Curve amount" value={activeLayer.curveAmount ?? 24} min={4} max={80} step={1} onChange={(v) => updateLayer(activeLayer.id, { curveAmount: v })} />
           )}
-          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
-          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
-          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+          {!(Number(activeLayer.curve ?? 0) !== 0 && (shape === "circle" || shape === "square")) && (
+            <>
+              <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
+              <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+              <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+            </>
+          )}
         </>
       ) : (
         <>
@@ -4124,9 +4206,27 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const cashSales = entries.filter(e => (e.payment_mode || "Cash") === "Cash");
   const cashPurchases = purchases.filter(p => (p.payment_mode || "Cash") === "Cash");
   const inRange = (d) => (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
+  const purchaseSingleEntries = useMemo(() => {
+    const map = new Map();
+    cashPurchases.forEach((p) => {
+      const key = p.date;
+      if (!map.has(key)) map.set(key, { date: key, amount: 0, count: 0 });
+      const g = map.get(key);
+      g.amount += Number(p.total ?? p.amount ?? 0);
+      g.count += 1;
+    });
+    return [...map.values()].map((g) => ({
+      id: `purchase-${g.date}`,
+      date: g.date,
+      label: `Purchase${g.count > 1 ? ` (${g.count} items)` : ""}`,
+      type: "out",
+      amount: g.amount,
+      payment_mode: "Cash",
+    }));
+  }, [cashPurchases]);
   const allTxns = [
     ...cashSales.map(e => { const r=rubbers.find(r=>r.id===e.rubber_id); return {id:`sale-${e.id}`,date:e.date,label:`${r?.name||"Unknown Item"} - Sale`,type:"in",amount:Number(e.amount||0),payment_mode:"Cash"}; }),
-    ...cashPurchases.map(p => { const r=rubbers.find(r=>r.id===p.rubber_id); return {id:`purchase-${p.id}`,date:p.date,label:`${r?.name||"Unknown Item"} - Purchase`,type:"out",amount:Number(p.total ?? p.amount ?? 0),payment_mode:"Cash"}; }),
+    ...purchaseSingleEntries,
     ...cashManual.map(c => ({id:`manual-${c.id}`,date:c.date,label:c.category,type:c.type,amount:Number(c.amount||0),payment_mode:"Cash"}))
   ].sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
 
@@ -4227,7 +4327,7 @@ function UsersTab({ users, refresh, currentUser }) {
 /* ================= NEW STAMP PRO (ADMIN ONLY) =================
    Separate beta workspace. The old Create Stamp remains untouched so the
    admin can compare both editors until the Pro version is finalized. */
-function CreateStampProTab({ rubbers = [] }) {
+function CreateStampProTab({ rubbers = [], onEditorActiveChange }) {
   const [sessionKey, setSessionKey] = useState(0);
   return (
     <div>
@@ -4263,7 +4363,7 @@ function CreateStampProTab({ rubbers = [] }) {
         <span><b style={{ color: C.ink }}>Testing area:</b> Purana <b>Create Stamp</b> abhi bhi safe hai. Final hone ke baad hi uski jagah Pro version use karenge.</span>
       </div>
 
-      <CreateStampTab key={sessionKey} rubbers={rubbers} />
+      <CreateStampTab key={sessionKey} rubbers={rubbers} onEditorActiveChange={onEditorActiveChange} />
     </div>
   );
 }
