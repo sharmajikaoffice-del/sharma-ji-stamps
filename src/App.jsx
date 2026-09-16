@@ -1608,7 +1608,35 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     if (type === "circleText") {
       layer = { ...layer, text: "YOUR COMPANY NAME", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: false, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
     } else if (type === "centerText") {
-      layer = { ...layer, text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "center" };
+      const isFirstAddText = layers.length === 0;
+      const isLandscapeStamp = Number(selectedDimensions.widthMm) > Number(selectedDimensions.heightMm);
+
+      // For a landscape/rectangular stamp, the very first Add Text inserts
+      // the two-line starting layout requested by the user. Once any layer
+      // exists (shape, image, symbol, etc.), Add Text inserts only one line.
+      if (isFirstAddText && isLandscapeStamp) {
+        const firstId = id;
+        const secondId = uid();
+        const first = {
+          ...layer,
+          id: firstId, num, source: "addText",
+          text: "For your company name pvt ltd", size: 13, fontFamily: "Arial", fontSize: 13,
+          bold: false, flipX: false, x: 50, y: 36, rotation: 0, fontStyle: "normal",
+          tall: false, invert: false, layout: "center"
+        };
+        const second = {
+          id: secondId, type: "centerText", num: num + 1, source: "addText",
+          text: "Auth. Sign.", size: 13, fontFamily: "Arial", fontSize: 13,
+          bold: false, flipX: false, x: 50, y: 64, rotation: 0, fontStyle: "normal",
+          tall: false, invert: false, layout: "center"
+        };
+        setLayerCounter(num + 1);
+        setLayers((ls) => [...ls, first, second]);
+        setActiveLayerId(firstId);
+        return;
+      }
+
+      layer = { ...layer, text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16, bold: false, flipX: false, x: 50, y: 50, rotation: 0, fontStyle: "normal", tall: false, invert: false, layout: "center", source: "addText" };
     } else if (type === "frame") {
       const shape = opts.shape || "circle";
       const existingCount = layers.filter((l) => l.type === "frame" && (l.shape || "circle") === shape).length;
@@ -2810,13 +2838,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const fontOptions = ["Arial", "Georgia", "Times New Roman", "Verdana", "Courier New", "Trebuchet MS"];
 
-  // Six text-layout presets, matching the reference editor: Center / Top Arc / Bottom Arc /
-  // Top Left / Top Right / Bottom. Each preset just picks the layer type + arc angle/direction
-  // (or straight position) — all reuse the existing circleText / centerText rendering.
-  const TEXT_LAYOUTS = [
+  // Add Text exposes only the three requested layouts. Other shape-specific
+  // text behavior continues to use its existing rendering/layouts.
+  const ADD_TEXT_LAYOUTS = [
     { id: "center", label: "Center" },
     { id: "topArc", label: "Top Arc" },
     { id: "bottomArc", label: "Bottom Arc" },
+  ];
+  const TEXT_LAYOUTS = [
+    ...ADD_TEXT_LAYOUTS,
     { id: "topLeft", label: "Top Left" },
     { id: "topRight", label: "Top Right" },
     { id: "bottom", label: "Bottom" },
@@ -2901,14 +2931,16 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </button>
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: 16 }}>
-          <input type="checkbox" checked={!!layer.invert} onChange={(e) => updateLayer(layer.id, { invert: e.target.checked })} />
-          Invert
-        </label>
+        {layer.source !== "addText" && (
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: 16 }}>
+            <input type="checkbox" checked={!!layer.invert} onChange={(e) => updateLayer(layer.id, { invert: e.target.checked })} />
+            Invert
+          </label>
+        )}
 
         <Label>Text layout</Label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 16 }}>
-          {TEXT_LAYOUTS.map((opt) => {
+          {(layer.source === "addText" ? ADD_TEXT_LAYOUTS : TEXT_LAYOUTS).map((opt) => {
             const active = layoutId === opt.id;
             return (
               <button
@@ -2940,17 +2972,21 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const layerPanel = activeLayer && (
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
-      {activeLayer.type !== "circleText" && (
+      {(activeLayer.type !== "circleText" || activeLayer.source === "addText") && (
         <>
           <Label>Quick align</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
             <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Left</button>
             <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Center</button>
             <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Right</button>
-            <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Top</button>
-            <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Middle</button>
-            <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Bottom</button>
           </div>
+          {activeLayer.source !== "addText" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
+              <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Top</button>
+              <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Middle</button>
+              <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Bottom</button>
+            </div>
+          )}
         </>
       )}
       {(activeLayer.type === "circleText" || activeLayer.type === "centerText") && (
@@ -3265,6 +3301,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         style={{
           background: STAMP_INK_BLUE,
           borderRadius: 4,
+          position: "relative",
           padding: isDesktop ? "8px 14px" : "10px",
           minHeight: 54,
           display: "flex",
@@ -3309,7 +3346,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           flex: 1, WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none", padding: isDesktop ? 0 : 0
         }}>
-          <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn}>
+          <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn} title="Add Text">
             <span style={toolbarIconBox}><Type size={18} /></span>
             Add Text
           </button>
