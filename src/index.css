@@ -65,24 +65,13 @@ tbody tr { transition:background .14s ease; }
 tbody tr:hover { background:rgba(63,127,232,.035); }
 
 /* Card-like inline surfaces used throughout Dashboard, Entry, Purchase, Stock, Ledger and Orders. */
-#root div[style*="background: rgb(255, 255, 255)"][style*="border"] {
-  box-shadow:var(--shadow-xs);
-}
-#root div[style*="background: rgb(255, 255, 255)"][style*="border-radius"] {
-  transition:box-shadow .18s ease,border-color .18s ease,transform .18s ease;
-}
-#root div[style*="background: rgb(255, 255, 255)"][style*="border-radius"]:hover {
-  box-shadow:var(--shadow-sm);
-}
+#root div[style*="background: rgb(255, 255, 255)"][style*="border"] { box-shadow:var(--shadow-xs); }
+#root div[style*="background: rgb(255, 255, 255)"][style*="border-radius"] { transition:box-shadow .18s ease,border-color .18s ease,transform .18s ease; }
+#root div[style*="background: rgb(255, 255, 255)"][style*="border-radius"]:hover { box-shadow:var(--shadow-sm); }
 
 /* Desktop shell */
 @media (min-width:901px) {
-  #root > div > div[style*="position: fixed"][style*="width: 210px"] {
-    width:224px!important;
-    background:linear-gradient(180deg,#3f7fe8 0%,#326fd6 100%)!important;
-    box-shadow:6px 0 24px rgba(36,95,196,.12)!important;
-    border-right:1px solid rgba(255,255,255,.10);
-  }
+  #root > div > div[style*="position: fixed"][style*="width: 210px"] { width:224px!important; background:linear-gradient(180deg,#3f7fe8 0%,#326fd6 100%)!important; box-shadow:6px 0 24px rgba(36,95,196,.12)!important; border-right:1px solid rgba(255,255,255,.10); }
   #root > div > div[style*="position: fixed"][style*="width: 210px"] > div:first-child { padding:20px 16px 18px!important; min-height:76px; background:rgba(255,255,255,.045); }
   #root > div > div[style*="position: fixed"][style*="width: 210px"] > div:nth-child(2) { padding:12px 10px!important; gap:4px!important; }
   #root > div > div[style*="position: fixed"][style*="width: 210px"] > div:nth-child(2) button { min-height:42px; border:1px solid transparent!important; }
@@ -99,7 +88,6 @@ tbody tr:hover { background:rgba(63,127,232,.035); }
   #root > div > div[style*="position: fixed"][style*="bottom: 0"][style*="border-top"] { padding-bottom:max(6px,env(safe-area-inset-bottom))!important; min-height:68px; background:rgba(255,255,255,.97)!important; box-shadow:0 -6px 20px rgba(15,23,42,.08); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); z-index:40!important; }
   #root > div > div[style*="position: fixed"][style*="bottom: 0"][style*="border-top"] button { min-height:62px; border-radius:12px!important; margin:3px 2px; }
   #root > div > div[style*="position: fixed"][style*="bottom: 0"][style*="border-top"] button:active { transform:scale(.97); }
-  /* Prevent common data tables/forms from forcing horizontal overflow. */
   #root table { min-width:0; }
   #root input,#root select,#root textarea { min-height:40px; }
 }
@@ -109,8 +97,111 @@ tbody tr:hover { background:rgba(63,127,232,.035); }
   h1 { font-size:28px; margin:16px 0; }
   h2 { font-size:20px; }
   h3 { font-size:16px; }
-  /* Make dense desktop-style grids stack more comfortably on phones. */
   #root [style*="grid-template-columns"] { min-width:0; }
+}
+
+/* ================================================================
+   Cash Register / Stock / Rubber management surfaces
+   ================================================================ */
+.cash-register-panel,
+.stock-panel,
+.rubber-panel { min-width:0; }
+
+/* Dense finance tables stay readable without forcing the whole page wider. */
+.cash-register-panel table,
+.stock-panel table,
+.rubber-panel table { width:100%; table-layout:auto; }
+.cash-register-panel thead th,
+.stock-panel thead th,
+.rubber-panel thead th { position:sticky; top:0; z-index:2; padding:10px 12px; white-space:nowrap; }
+.cash-register-panel tbody td,
+.stock-panel tbody td,
+.rubber-panel tbody td { padding:10px 12px; vertical-align:middle; border-bottom:1px solid var(--border); }
+.cash-register-panel tbody tr:last-child td,
+.stock-panel tbody tr:last-child td,
+.rubber-panel tbody tr:last-child td { border-bottom:0; }
+
+/* Useful visual states for cash in/out and low stock rows. */
+.cash-in { color:#16704a!important; }
+.cash-out { color:#be123c!important; }
+.low-stock,
+.stock-low { background:rgba(190,18,60,.055)!important; }
+.low-stock td:first-child,
+.stock-low td:first-child { box-shadow:inset 3px 0 0 #be123c; }
+.stock-ok { color:#16704a!important; }
+
+/* Make scrollable table wrappers behave correctly on desktop and mobile. */
+#root .table-scroll,
+#root [style*="overflow-x: auto"] { scrollbar-width:thin; }
+#root .table-scroll { overflow-x:auto; overscroll-behavior-x:contain; border-radius:12px; }
+
+/* ================================================================
+   Form + dropdown polish
+   ================================================================ */
+#root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+#root select,
+#root textarea {
+  min-width:0;
+  border-radius:9px;
+  background:var(--surface);
+  color:var(--text-h);
+}
+#root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+#root select { min-height:40px; }
+#root textarea { min-height:84px; resize:vertical; }
+#root select { cursor:pointer; }
+#root input:disabled,
+#root select:disabled,
+#root textarea:disabled { cursor:not-allowed; opacity:.62; background:#f1f5f9; }
+
+/* Native select menus inherit browser keyboard navigation (typing + Up/Down + Enter). */
+#root select { padding:0 34px 0 11px; }
+
+/* React custom dropdowns: keep the menu inside the nearest panel and above tables. */
+#root [role="combobox"] { position:relative; min-width:0; }
+#root [role="listbox"] {
+  z-index:1000!important;
+  max-width:min(420px,calc(100vw - 24px));
+  max-height:min(320px,45vh);
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  border:1px solid var(--border)!important;
+  border-radius:10px!important;
+  box-shadow:var(--shadow-lg)!important;
+  background:var(--surface)!important;
+}
+#root [role="option"] { min-height:38px; padding:9px 11px; cursor:pointer; }
+#root [role="option"][aria-selected="true"] { background:var(--accent-bg); color:var(--accent-strong); }
+#root [role="option"]:hover { background:#f1f5f9; }
+
+/* Common absolutely-positioned dropdown menus, including older custom controls. */
+#root [style*="position: absolute"][style*="z-index"] {
+  max-width:calc(100vw - 20px);
+}
+
+/* Prevent a dropdown from being visually clipped by a rounded card. */
+#root .dropdown-portal,
+#root .dropdown-menu,
+#root .autocomplete-menu { z-index:1000; max-width:calc(100vw - 20px); max-height:min(320px,45vh); overflow:auto; overscroll-behavior:contain; }
+
+/* Mobile: give dropdowns enough touch area and avoid right-edge clipping. */
+@media (max-width:900px) {
+  #root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  #root select { min-height:42px; }
+  #root [role="listbox"],
+  #root .dropdown-menu,
+  #root .autocomplete-menu { max-width:calc(100vw - 28px); }
+}
+
+@media (max-width:700px) {
+  .cash-register-panel tbody td,
+  .stock-panel tbody td,
+  .rubber-panel tbody td { padding:9px 8px; }
+  .cash-register-panel thead th,
+  .stock-panel thead th,
+  .rubber-panel thead th { padding:9px 8px; }
 }
 
 @media (prefers-reduced-motion:reduce) {
