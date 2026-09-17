@@ -4660,8 +4660,8 @@ function CashFlowSVG({ data, height = 132 }) {
         const ho = (h - padT - padB) * (d.out / max);
         return (
           <g key={i}>
-            <rect x={cx - barW - 3} y={h - padB - hi} width={barW} height={Math.max(hi, d.in > 0 ? 2 : 0)} rx={2.5} fill={C.sage} />
-            <rect x={cx + 3} y={h - padB - ho} width={barW} height={Math.max(ho, d.out > 0 ? 2 : 0)} rx={2.5} fill={C.stamp} />
+            <rect x={cx - barW - 3} y={h - padB - hi} width={barW} height={Math.max(hi, d.in > 0 ? 2 : 0)} rx={2.5} fill="#159A83" />
+            <rect x={cx + 3} y={h - padB - ho} width={barW} height={Math.max(ho, d.out > 0 ? 2 : 0)} rx={2.5} fill="#E58B45" />
             <text x={cx} y={h - 6} textAnchor="middle" fontSize="9.5" fontFamily={font.mono} fill={C.inkSoft}>{d.label}</text>
           </g>
         );
@@ -4681,8 +4681,6 @@ function KpiCard({ label, value, sub, accent }) {
 }
 
 function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, user }) {
-  // Customer orders live in their own table and aren't part of refreshAll(),
-  // so the dashboard fetches them the same way OrdersTab does.
   const [orders, setOrders] = useState([]);
   useEffect(() => {
     let cancelled = false;
@@ -4690,140 +4688,178 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
     return () => { cancelled = true; };
   }, []);
 
-  const daysAgoISO = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
-  const todayStr = todayISO();
+  // Use local calendar dates consistently for dashboard buckets.
+  const localISO = (date) => {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const todayStr = localISO(new Date());
   const monthPrefix = todayStr.slice(0, 7);
-
-  const todaySales = useMemo(() => entries.filter((e) => e.date === todayStr).reduce((s, e) => s + Number(e.amount || 0), 0), [entries, todayStr]);
+  const today = new Date();
+  const monthBuckets = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - (5 - i), 1);
+    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: d.toLocaleDateString("en-IN", { month: "short" }) };
+  });
+  const todaySales = entries.filter((e) => e.date === todayStr).reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const todayCount = entries.filter((e) => e.date === todayStr).length;
-  const monthSales = useMemo(() => entries.filter((e) => (e.date || "").startsWith(monthPrefix)).reduce((s, e) => s + Number(e.amount || 0), 0), [entries, monthPrefix]);
+  const monthSales = entries.filter((e) => (e.date || "").startsWith(monthPrefix)).reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthCount = entries.filter((e) => (e.date || "").startsWith(monthPrefix)).length;
-
   const cashBalance = useMemo(() => {
-    const cashIn = entries.filter((e) => (e.payment_mode || "Cash") === "Cash").reduce((s, e) => s + Number(e.amount || 0), 0)
-      + cashManual.filter((c) => c.type === "in").reduce((s, c) => s + Number(c.amount || 0), 0);
-    const cashOut = purchases.filter((p) => (p.payment_mode || "Cash") === "Cash").reduce((s, p) => s + Number(p.total ?? p.amount ?? 0), 0)
-      + cashManual.filter((c) => c.type === "out").reduce((s, c) => s + Number(c.amount || 0), 0);
+    const cashIn = entries.filter((e) => (e.payment_mode || "Cash") === "Cash").reduce((sum, e) => sum + Number(e.amount || 0), 0)
+      + cashManual.filter((c) => c.type === "in").reduce((sum, c) => sum + Number(c.amount || 0), 0);
+    const cashOut = purchases.filter((p) => (p.payment_mode || "Cash") === "Cash").reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0)
+      + cashManual.filter((c) => c.type === "out").reduce((sum, c) => sum + Number(c.amount || 0), 0);
     return cashIn - cashOut;
   }, [entries, purchases, cashManual]);
 
   const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
   const lowStock = rubberOnly.filter((r) => (stockByRubber[r.id]?.balance ?? 0) <= 15);
   const pendingOrders = orders.filter((o) => (o.status || "new") !== "printed");
-
   const salesTrend = useMemo(() => {
-    const days = Array.from({ length: 14 }, (_, i) => daysAgoISO(13 - i));
-    const map = new Map(days.map((d) => [d, 0]));
-    entries.forEach((e) => { if (map.has(e.date)) map.set(e.date, map.get(e.date) + Number(e.amount || 0)); });
-    return days.map((d) => ({ date: d, value: map.get(d) || 0 }));
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (13 - i)); return localISO(d);
+    });
+    const totals = new Map(days.map((d) => [d, 0]));
+    entries.forEach((e) => { if (totals.has(e.date)) totals.set(e.date, totals.get(e.date) + Number(e.amount || 0)); });
+    return days.map((date) => ({ date, value: totals.get(date) || 0 }));
   }, [entries]);
-
+  const monthlyComparison = monthBuckets.map((m) => ({
+    ...m,
+    sales: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.amount || 0), 0),
+    purchases: purchases.filter((p) => (p.date || "").startsWith(m.key)).reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0),
+  }));
   const cashFlow7d = useMemo(() => {
-    const days = Array.from({ length: 7 }, (_, i) => daysAgoISO(6 - i));
-    return days.map((d) => {
-      const cin = entries.filter((e) => e.date === d && (e.payment_mode || "Cash") === "Cash").reduce((s, e) => s + Number(e.amount || 0), 0)
-        + cashManual.filter((c) => c.date === d && c.type === "in").reduce((s, c) => s + Number(c.amount || 0), 0);
-      const cout = purchases.filter((p) => p.date === d && (p.payment_mode || "Cash") === "Cash").reduce((s, p) => s + Number(p.total ?? p.amount ?? 0), 0)
-        + cashManual.filter((c) => c.date === d && c.type === "out").reduce((s, c) => s + Number(c.amount || 0), 0);
-      return { label: new Date(d).toLocaleDateString("en-IN", { weekday: "short" }).slice(0, 2), in: cin, out: cout };
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (6 - i)); const key = localISO(d);
+      const cashIn = entries.filter((e) => e.date === key && (e.payment_mode || "Cash") === "Cash").reduce((sum, e) => sum + Number(e.amount || 0), 0)
+        + cashManual.filter((c) => c.date === key && c.type === "in").reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      const cashOut = purchases.filter((p) => p.date === key && (p.payment_mode || "Cash") === "Cash").reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0)
+        + cashManual.filter((c) => c.date === key && c.type === "out").reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      return { label: new Date(`${key}T12:00:00`).toLocaleDateString("en-IN", { weekday: "short" }), in: cashIn, out: cashOut };
     });
   }, [entries, purchases, cashManual]);
-
   const topRubbers = useMemo(() => {
-    const map = new Map();
-    entries.forEach((e) => { map.set(e.rubber_id, (map.get(e.rubber_id) || 0) + 1); });
-    return [...map.entries()]
-      .map(([id, count]) => ({ rubber: rubbers.find((r) => r.id === id), count }))
-      .filter((x) => x.rubber)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    const counts = new Map();
+    entries.forEach((e) => { if (e.rubber_id) counts.set(e.rubber_id, (counts.get(e.rubber_id) || 0) + 1); });
+    return [...counts.entries()].map(([id, count]) => ({ rubber: rubbers.find((r) => r.id === id), count }))
+      .filter((x) => x.rubber).sort((a, b) => b.count - a.count).slice(0, 5);
   }, [entries, rubbers]);
   const maxTopCount = Math.max(1, ...topRubbers.map((t) => t.count));
+  const recentSales = entries.slice(0, 5);
+  const maxMonthly = Math.max(1, ...monthlyComparison.flatMap((m) => [m.sales, m.purchases]));
+  const paymentTotals = ["Cash", "UPI", "Card", "Bank"].map((mode) => ({
+    mode, amount: entries.filter((e) => (e.payment_mode || "Cash").toLowerCase() === mode.toLowerCase()).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  })).filter((x) => x.amount > 0);
+  const paymentTotal = paymentTotals.reduce((sum, x) => sum + x.amount, 0);
 
-  const recentSales = entries.slice(0, 6);
-
+  const panel = { background: C.white, border: `1px solid ${C.line}`, borderRadius: 16, padding: 16, minWidth: 0 };
+  const sectionLabel = { fontFamily: font.mono, fontSize: 10, letterSpacing: 1.15, textTransform: "uppercase", color: C.inkSoft, marginBottom: 12 };
+  const miniStat = { fontFamily: font.mono, fontSize: 10, color: C.inkSoft };
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
-        <SectionTitle icon={LayoutDashboard} title={`Welcome, ${user.name.split(" ")[0]}`} bare />
-        <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft }}>{fmtDate(todayStr)}</div>
+    <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "4px 2px 12px", borderBottom: `1px solid ${C.line}` }}>
+        <div>
+          <div style={{ fontFamily: font.display, fontSize: 25, fontWeight: 700, color: C.ink, lineHeight: 1.2 }}>Good day, {user.name.split(" ")[0]}</div>
+          <div style={{ color: C.inkSoft, fontSize: 12, marginTop: 5 }}>Your business at a glance</div>
+        </div>
+        <div style={{ border: `1px solid ${C.line}`, background: C.white, borderRadius: 10, padding: "8px 12px", fontFamily: font.mono, fontSize: 11, color: C.inkSoft }}>{fmtDate(todayStr)}</div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10, marginBottom: 12 }}>
-        <KpiCard label="Today's Sales" value={inr(todaySales)} sub={`${todayCount} stamp${todayCount === 1 ? "" : "s"} today`} accent={C.sage} />
-        <KpiCard label="This Month" value={inr(monthSales)} sub={`${monthCount} stamps sold`} accent={C.stamp} />
-        <KpiCard label="Cash Balance" value={inr(cashBalance)} sub="Across all cash entries" />
-        <KpiCard label="Low Stock" value={lowStock.length} sub="Items ≤ 15 pcs" accent={lowStock.length ? C.stamp : C.sage} />
-        {user.role === "admin" && <KpiCard label="Pending Orders" value={pendingOrders.length} sub="Not yet printed" />}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 10 }}>
+        {[
+          ["Today's sales", inr(todaySales), `${todayCount} stamp${todayCount === 1 ? "" : "s"} today`, "#3F7FE8"],
+          ["This month", inr(monthSales), `${monthCount} stamps sold`, "#159A83"],
+          ["Cash balance", inr(cashBalance), "Net cash position", "#8B6BD6"],
+          ["Low stock", String(lowStock.length), "Items at 15 pcs or below", lowStock.length ? "#D97706" : "#159A83"],
+          ...(user.role === "admin" ? [["Pending orders", String(pendingOrders.length), "Waiting to be printed", "#D97706"]] : []),
+        ].map(([label, value, sub, accent]) => (
+          <div key={label} style={{ ...panel, padding: 14, borderTop: `3px solid ${accent}` }}>
+            <div style={{ ...sectionLabel, marginBottom: 8 }}>{label}</div>
+            <div style={{ fontFamily: font.display, fontSize: 24, fontWeight: 700, color: C.ink, overflowWrap: "anywhere" }}>{value}</div>
+            <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 5 }}>{sub}</div>
+          </div>
+        ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 12, marginBottom: 12 }}>
-        <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <Label style={{ marginBottom: 0 }}>Sales Trend (14 Days)</Label>
-            <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>{inr(salesTrend.reduce((s, d) => s + d.value, 0))} total</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))", gap: 12 }}>
+        <section style={panel}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
+            <div><div style={sectionLabel}>Sales trend · last 14 days</div><div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 700, color: C.ink }}>{inr(salesTrend.reduce((sum, d) => sum + d.value, 0))}</div></div>
+            <span style={{ ...miniStat, background: C.paper, borderRadius: 8, padding: "5px 7px" }}>14 DAYS</span>
           </div>
-          <TrendSVG data={salesTrend} color={C.stamp} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft, marginTop: 2 }}>
-            <span>{fmtDate(salesTrend[0].date)}</span><span>{fmtDate(salesTrend[salesTrend.length - 1].date)}</span>
+          <div style={{ padding: "12px 0 0" }}>
+            <TrendSVG data={salesTrend} color="#3F7FE8" height={145} />
           </div>
-        </Card>
-        <Card>
-          <Label>Cash Flow (7 Days)</Label>
-          <CashFlowSVG data={cashFlow7d} />
-          <div style={{ display: "flex", gap: 14, marginTop: 4, fontFamily: font.mono, fontSize: 10.5 }}>
-            <span style={{ color: C.sage }}>● Cash In</span><span style={{ color: C.stamp }}>● Cash Out</span>
-          </div>
-        </Card>
-      </div>
+          <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginTop: 8 }}><span>{fmtDate(salesTrend[0].date)}</span><span>{fmtDate(salesTrend[13].date)}</span></div>
+        </section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 12, marginBottom: 12 }}>
-        <Card>
-          <Label>Top Selling Rubbers</Label>
-          {topRubbers.length === 0 && <EmptyNote text="No sales yet." />}
-          {topRubbers.map(({ rubber, count }) => (
-            <div key={rubber.id} style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
-                <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rubber.name}</span>
-                <span style={{ fontFamily: font.mono, color: C.inkSoft, flexShrink: 0 }}>{count} sold</span>
+        <section style={panel}>
+          <div style={{ ...sectionLabel, marginBottom: 5 }}>Monthly sales vs purchases</div>
+          <div style={{ fontSize: 12, color: C.inkSoft, marginBottom: 10 }}>Six-month comparison · amounts in ₹</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {monthlyComparison.map((m) => <div key={m.key}>
+              <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginBottom: 4 }}><span>{m.label}</span><span>Sales {inr(m.sales)} · Purchases {inr(m.purchases)}</span></div>
+              <div style={{ display: "grid", gap: 3 }}>
+                <div style={{ height: 7, background: C.paperDark, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${m.sales / maxMonthly * 100}%`, height: "100%", background: "#3F7FE8", borderRadius: 6 }} /></div>
+                <div style={{ height: 7, background: C.paperDark, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${m.purchases / maxMonthly * 100}%`, height: "100%", background: "#F0A44B", borderRadius: 6 }} /></div>
               </div>
-              <div style={{ height: 7, background: C.paperDark, borderRadius: 4, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${(count / maxTopCount) * 100}%`, background: C.stamp, borderRadius: 4 }} />
-              </div>
+            </div>)}
+          </div>
+          <div style={{ display: "flex", gap: 14, ...miniStat, marginTop: 12 }}><span><b style={{ color: "#3F7FE8" }}>●</b> Sales</span><span><b style={{ color: "#F0A44B" }}>●</b> Purchases</span></div>
+        </section>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: 12 }}>
+        <section style={panel}>
+          <div style={sectionLabel}>Cash flow · last 7 days</div>
+          <div style={{ paddingTop: 8 }}>
+            <CashFlowSVG data={cashFlow7d} height={135} />
+          </div>
+          <div style={{ display: "flex", gap: 14, ...miniStat, marginTop: 8 }}><span><b style={{ color: "#159A83" }}>●</b> Cash in</span><span><b style={{ color: "#E58B45" }}>●</b> Cash out</span></div>
+        </section>
+
+        <section style={panel}>
+          <div style={sectionLabel}>Payment mode mix · all sales</div>
+          {paymentTotals.length === 0 ? <EmptyNote text="No sales recorded yet." /> : <>
+            <div style={{ display: "flex", height: 14, borderRadius: 10, overflow: "hidden", background: C.paperDark, margin: "14px 0" }}>
+              {paymentTotals.map((p, i) => <div key={p.mode} title={`${p.mode}: ${inr(p.amount)}`} style={{ width: `${p.amount / paymentTotal * 100}%`, background: ["#3F7FE8", "#159A83", "#8B6BD6", "#E58B45"][i % 4] }} />)}
             </div>
-          ))}
-        </Card>
-        <Card>
-          <Label>Low Stock Alerts</Label>
-          {lowStock.length === 0 && <EmptyNote text="All items are well stocked." />}
-          {lowStock.slice(0, 6).map((r) => {
-            const s = stockByRubber[r.id] || { balance: 0 };
-            return (
-              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${C.paperDark}` }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
-                <Tag tone="out">{s.balance} left</Tag>
-              </div>
-            );
-          })}
-        </Card>
+            {paymentTotals.map((p, i) => <div key={p.mode} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${C.paperDark}`, fontSize: 12 }}>
+              <span><b style={{ color: ["#3F7FE8", "#159A83", "#8B6BD6", "#E58B45"][i % 4] }}>●</b> {p.mode}</span><span style={{ fontFamily: font.mono, color: C.inkSoft }}>{inr(p.amount)} · {Math.round(p.amount / paymentTotal * 100)}%</span>
+            </div>)}
+          </>}
+        </section>
       </div>
 
-      <Card>
-        <Label>Recent Sales</Label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: 12 }}>
+        <section style={panel}>
+          <div style={sectionLabel}>Top selling rubbers</div>
+          {topRubbers.length === 0 && <EmptyNote text="No sales yet." />}
+          {topRubbers.map(({ rubber, count }) => <div key={rubber.id} style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 5 }}><span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rubber.name}</span><span style={miniStat}>{count} sold</span></div>
+            <div style={{ height: 8, background: C.paperDark, borderRadius: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${count / maxTopCount * 100}%`, background: "#3F7FE8", borderRadius: 8 }} /></div>
+          </div>)}
+        </section>
+        <section style={panel}>
+          <div style={sectionLabel}>Low stock alerts</div>
+          {lowStock.length === 0 && <EmptyNote text="All items are well stocked." />}
+          {lowStock.slice(0, 6).map((r) => <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "9px 0", borderBottom: `1px solid ${C.paperDark}` }}>
+            <span style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span><Tag tone="out">{stockByRubber[r.id]?.balance ?? 0} left</Tag>
+          </div>)}
+        </section>
+      </div>
+
+      <section style={panel}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 4 }}><div style={sectionLabel}>Recent sales</div><span style={miniStat}>LATEST 5</span></div>
         {recentSales.length === 0 && <EmptyNote text="No stamp entries yet." />}
         {recentSales.map((e) => {
-          const r = rubbers.find((r) => r.id === e.rubber_id);
-          return (
-            <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${C.paperDark}` }}>
-              <div style={{ minWidth: 0, overflow: "hidden" }}>
-                <div style={{ fontWeight: 600, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r?.name || "Unknown"}</div>
-                <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>{fmtDate(e.date)}</div>
-              </div>
-              <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage, flexShrink: 0 }}>+{inr(e.amount)}</div>
-            </div>
-          );
+          const rubber = rubbers.find((r) => r.id === e.rubber_id);
+          return <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.paperDark}` }}>
+            <div style={{ minWidth: 0 }}><div style={{ fontWeight: 600, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rubber?.name || "Unknown"}</div><div style={{ ...miniStat, marginTop: 3 }}>{fmtDate(e.date)} · {e.payment_mode || "Cash"}</div></div>
+            <div style={{ fontFamily: font.mono, fontWeight: 700, color: "#159A83", flexShrink: 0 }}>+{inr(e.amount)}</div>
+          </div>;
         })}
-      </Card>
+      </section>
     </div>
   );
 }
