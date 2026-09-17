@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
-  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, CircleDot, Star, X,
+  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, Star, X,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Sun, Moon
 } from "lucide-react";
 
@@ -920,7 +920,6 @@ const SIDEBAR_W = 210;
 
 /* ================= APP SHELL ================= */
 const TABS_ADMIN = [
-  { id: "dashboard", label: "Dashboard", icon: CircleDot },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "orders", label: "Orders", icon: Inbox },
@@ -933,7 +932,6 @@ const TABS_ADMIN = [
   
 ];
 const TABS_STAFF = [
-  { id: "dashboard", label: "Dashboard", icon: CircleDot },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "orders", label: "Orders", icon: Inbox },
@@ -968,7 +966,7 @@ function SharmaJiStampsAdmin() {
     setUser(null);
     try { localStorage.removeItem("sjs_user"); } catch {}
   };
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState("orders");
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem("sjs_theme") === "dark" ? "dark" : "light"; } catch { return "light"; }
   });
@@ -1000,7 +998,7 @@ function SharmaJiStampsAdmin() {
   // dashboard, instead of exiting the app straight away.
   const wasHomeRef = useRef(true);
   useEffect(() => {
-    const isHome = tab === "dashboard" && !moreOpen;
+    const isHome = tab === "orders" && !moreOpen;
     if (wasHomeRef.current && !isHome) {
       window.history.pushState({ sjsAway: true }, "");
     }
@@ -1009,7 +1007,7 @@ function SharmaJiStampsAdmin() {
   useEffect(() => {
     const onPopState = () => {
       setMoreOpen(false);
-      setTab("dashboard");
+      setTab("orders");
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -1075,7 +1073,6 @@ function SharmaJiStampsAdmin() {
 
   const tabContent = (
     <>
-      {tab === "dashboard" && <DashboardTab entries={entries} purchases={purchases} cashManual={cashManual} rubbers={rubbers} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
       {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
@@ -4538,252 +4535,6 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
     <Label>Purchase List</Label>
     {grouped.slice(0,30).map(g=>{const mode=g.modes.size===1?[...g.modes][0]:"Mixed";return <Card key={g.date}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}><div><div style={{fontWeight:800,fontSize:14}}>{fmtDate(g.date)}</div><div style={{display:"inline-flex",marginTop:5,padding:"2px 8px",borderRadius:999,background:mode==="Bank"?"#EAF2FF":"#EEF8F1",color:mode==="Bank"?C.stampDark:"#2D7A4A",fontFamily:font.mono,fontSize:10,fontWeight:700}}>{mode==="Bank"?"🏦 BANK":mode==="Cash"?"💵 CASH":"CASH + BANK"}</div></div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:800,fontSize:15}}>{inr(g.total)}</div></div><div style={{borderTop:`1px solid ${C.line}`}}>{g.items.map((p,i)=>{const r=rubbers.find(r=>r.id===p.rubber_id);return editId===p.id?<div key={p.id} style={{padding:"10px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Date</Label><Field type="date" value={editDate} onChange={e=>setEditDate(e.target.value)}/></div><div><Label>Payment Mode</Label><div style={{display:"flex",gap:6}}><Btn variant={editPaymentMode==="Cash"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Cash")} style={{flex:1,justifyContent:"center"}}>Cash</Btn><Btn variant={editPaymentMode==="Bank"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Bank")} style={{flex:1,justifyContent:"center"}}>Bank</Btn></div></div></div><Label>Item / Category / Size</Label><Select value={editRubberId} onChange={e=>setEditRubberId(e.target.value)}>{rubbers.map(rb=><option key={rb.id} value={rb.id}>{optionLabel(rb)}</option>)}</Select><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Qty</Label><Field type="number" value={editQty} onChange={e=>setEditQty(e.target.value)}/></div><div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={e=>setEditRate(e.target.value)}/></div></div><div style={{display:"flex",gap:8}}><Btn onClick={saveEdit} disabled={editBusy} style={{flex:1,justifyContent:"center"}}>{editBusy?"Saving…":"Save"}</Btn><Btn variant="ghost" onClick={()=>setEditId(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn></div></div>:<div key={p.id} style={{display:"grid",gridTemplateColumns:"32px minmax(160px,1fr) 80px 100px 110px 50px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{fontFamily:font.mono,color:C.inkSoft}}>{i+1}</div><div><div style={{fontWeight:600}}>{r?.name||"Unknown Item"}</div><div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:2}}><span style={{fontFamily:font.mono,fontSize:9,padding:"1px 6px",borderRadius:999,background:C.paperDark}}>{catLabel(r?.category)}</span>{r?.category==="rubber"&&r?.size&&<span style={{fontFamily:font.mono,fontSize:9,color:C.inkSoft}}>Size: {r.size}</span>}</div></div><div style={{fontFamily:font.mono}}>Qty {p.qty}</div><div style={{fontFamily:font.mono}}>₹{Number(p.purchase_rate||0).toFixed(2)}</div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:700}}>{inr(p.total??p.amount??0)}</div><div style={{display:"flex",gap:2,justifyContent:"flex-end"}}><button onClick={()=>startEdit(p)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer"}}><PenSquare size={15}/></button><button onClick={()=>removePurchase(p.id)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={15}/></button></div></div>})}</div><div style={{display:"flex",justifyContent:"flex-end",paddingTop:10,fontFamily:font.mono,fontWeight:800}}>TOTAL&nbsp;&nbsp; {inr(g.total)}</div></Card>})}
     {purchases.length===0&&<EmptyNote text="No purchases recorded yet."/>}
-  </div>;
-}
-
-/* ================= CASH LEDGER ================= */
-function DashboardTab({ entries, purchases, cashManual, rubbers }) {
-  const [fromDate, setFromDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 29); return d.toISOString().slice(0, 10);
-  });
-  const [toDate, setToDate] = useState(todayISO());
-
-  const inRange = (d) => (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
-  const sales = entries.filter(e => inRange(e.date));
-  const buys = purchases.filter(p => inRange(p.date));
-  const manual = cashManual.filter(c => inRange(c.date));
-  const salesTotal = sales.reduce((s,e) => s + Number(e.amount || 0), 0);
-  const purchaseTotal = buys.reduce((s,p) => s + Number(p.total ?? p.amount ?? 0), 0);
-  const cashSales = sales.filter(e => (e.payment_mode || "Cash") === "Cash").reduce((s,e) => s + Number(e.amount || 0), 0);
-  const bankSales = sales.filter(e => (e.payment_mode || "Cash") === "Bank").reduce((s,e) => s + Number(e.amount || 0), 0);
-  const cashPurchases = buys.filter(p => (p.payment_mode || "Cash") === "Cash").reduce((s,p) => s + Number(p.total ?? p.amount ?? 0), 0);
-  const bankPurchases = buys.filter(p => (p.payment_mode || "Cash") === "Bank").reduce((s,p) => s + Number(p.total ?? p.amount ?? 0), 0);
-  const manualIn = manual.filter(c => c.type === "in").reduce((s,c) => s + Number(c.amount || 0), 0);
-  const manualOut = manual.filter(c => c.type === "out").reduce((s,c) => s + Number(c.amount || 0), 0);
-  const cashIn = cashSales + manualIn;
-  const cashOut = cashPurchases + manualOut;
-  const netCash = cashIn - cashOut;
-  const bankNet = bankSales - bankPurchases;
-
-  const daily = useMemo(() => {
-    const map = new Map();
-    [...sales.map(e => ({date:e.date, in:Number(e.amount||0), out:0})),
-      ...buys.map(p => ({date:p.date, in:0, out:Number(p.total ?? p.amount ?? 0)})),
-      ...manual.map(c => ({date:c.date, in:c.type === "in" ? Number(c.amount||0) : 0, out:c.type === "out" ? Number(c.amount||0) : 0}))]
-      .forEach(x => { if (!map.has(x.date)) map.set(x.date,{date:x.date,in:0,out:0}); const r=map.get(x.date); r.in+=x.in; r.out+=x.out; });
-    return [...map.values()].sort((a,b)=>a.date.localeCompare(b.date));
-  }, [sales, buys, manual]);
-
-  // Month-wise qty sold & average rate, last 12 months (independent of the from/to filter above,
-  // so it always shows a full trend even when a short date range is selected).
-  const monthly = useMemo(() => {
-    const map = new Map();
-    entries.forEach(e => {
-      const m = (e.date || "").slice(0, 7); // "YYYY-MM"
-      if (!m) return;
-      if (!map.has(m)) map.set(m, { month: m, qty: 0, rateSum: 0, count: 0 });
-      const r = map.get(m);
-      r.qty += Number(e.qty || 1);
-      r.rateSum += Number(e.rate || 0);
-      r.count += 1;
-    });
-    return [...map.values()]
-      .sort((a, b) => a.month.localeCompare(b.month))
-      .slice(-12)
-      .map(r => ({ month: r.month, qty: r.qty, rate: r.count ? r.rateSum / r.count : 0 }));
-  }, [entries]);
-
-  return <div>
-    <SectionTitle icon={CircleDot} title="Dashboard" />
-    <Card style={{ marginBottom: 12 }}>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:10, alignItems:"end" }}>
-        <div><Label>From Date</Label><Field type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={{marginBottom:0}} /></div>
-        <div><Label>To Date</Label><Field type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={{marginBottom:0}} /></div>
-        <Btn variant="ghost" onClick={()=>{setFromDate("");setToDate("")}}>All Dates</Btn>
-      </div>
-    </Card>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:12}}>
-      {[
-        ["STAMP SALES", salesTotal, C.stamp], ["PURCHASE", purchaseTotal, C.ink],
-        ["CASH NET", netCash, C.sage], ["BANK NET", bankNet, C.stampDark]
-      ].map(([label,value,bg])=><Card key={label} style={{background:bg,color:C.white}}><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.2,color:"#DCE9FF"}}>{label}</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:5}}>{inr(value)}</div></Card>)}
-    </div>
-    <Card style={{marginBottom:12}}>
-      <div style={{fontWeight:800,fontSize:15,marginBottom:2}}>Cash Flow Trend</div>
-      <div style={{fontSize:11,color:C.inkSoft,marginBottom:10}}>Daily money in vs money out for the selected period.</div>
-      <LineChart data={daily} />
-    </Card>
-    <Card style={{marginBottom:12}}>
-      <div style={{fontWeight:800,fontSize:15,marginBottom:2}}>Monthly Sales Trend</div>
-      <div style={{fontSize:11,color:C.inkSoft,marginBottom:10}}>Qty sold aur average rate, month-wise (last 12 months).</div>
-      <MonthlyQtyRateChart data={monthly} />
-    </Card>
-    <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)",gap:12}}>
-      <Card>
-        <div style={{fontWeight:800,fontSize:15}}>Payment Mix</div>
-        <div style={{fontSize:11,color:C.inkSoft,marginBottom:8}}>Stamp sales received through Cash and Bank.</div>
-        <DonutChart cash={cashSales} bank={bankSales} />
-      </Card>
-      <Card>
-        <div style={{fontWeight:800,fontSize:15,marginBottom:8}}>Period Summary</div>
-        <div style={{display:"grid",gap:9,fontFamily:font.mono,fontSize:11.5}}>
-          <div style={{display:"flex",justifyContent:"space-between"}}><span>Cash In</span><b>{inr(cashIn)}</b></div>
-          <div style={{display:"flex",justifyContent:"space-between"}}><span>Cash Out</span><b>{inr(cashOut)}</b></div>
-          <div style={{display:"flex",justifyContent:"space-between"}}><span>Bank In</span><b>{inr(bankSales)}</b></div>
-          <div style={{display:"flex",justifyContent:"space-between"}}><span>Bank Out</span><b>{inr(bankPurchases)}</b></div>
-          <div style={{borderTop:`1px solid ${C.line}`,paddingTop:9,display:"flex",justifyContent:"space-between",fontWeight:800}}><span>Net Movement</span><span>{inr(cashIn + bankSales - cashOut - bankPurchases)}</span></div>
-        </div>
-      </Card>
-    </div>
-  </div>;
-}
-
-function LineChart({ data }) {
-  const [hover, setHover] = useState(null);
-  if (!data.length) return <EmptyNote text="No data for the selected dates." />;
-  const W = 900, H = 300, P = 46, PB = 32;
-  const max = Math.max(1, ...data.map(d => Math.max(d.in, d.out)));
-  const step = data.length === 1 ? 0 : (W - P * 2) / (data.length - 1);
-  const xFor = (i) => P + i * step;
-  const yFor = (v) => H - PB - (v / max) * (H - P - PB);
-  const inPts = data.map((d, i) => [xFor(i), yFor(d.in)]);
-  const outPts = data.map((d, i) => [xFor(i), yFor(d.out)]);
-  const inPath = smoothPath(inPts);
-  const outPath = smoothPath(outPts);
-  const areaPath = `${inPath} L ${xFor(data.length - 1)},${H - PB} L ${xFor(0)},${H - PB} Z`;
-  const labelEvery = Math.max(1, Math.ceil(data.length / 9));
-  const hitW = step || (W - P * 2);
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="300" role="img" aria-label="Cash flow line chart" onMouseLeave={() => setHover(null)}>
-        <defs>
-          <linearGradient id="cfInGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3F7FE8" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#3F7FE8" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0, .25, .5, .75, 1].map(v => {
-          const y = H - PB - v * (H - P - PB);
-          return <g key={v}>
-            <line x1={P} x2={W - P} y1={y} y2={y} stroke="#E3E8F0" strokeWidth="1" />
-            <text x={P - 8} y={y + 3} textAnchor="end" fontSize="9.5" fill="#8A97A8">{fmtAxis(v * max)}</text>
-          </g>;
-        })}
-        <path d={areaPath} fill="url(#cfInGrad)" stroke="none" />
-        <path d={outPath} fill="none" stroke="#263241" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5 4" />
-        <path d={inPath} fill="none" stroke="#3F7FE8" strokeWidth="2.75" strokeLinecap="round" />
-        {data.map((d, i) => (
-          <g key={d.date}>
-            <circle cx={xFor(i)} cy={yFor(d.in)} r={hover === i ? 5 : 3.5} fill="#3F7FE8" />
-            <circle cx={xFor(i)} cy={yFor(d.out)} r={hover === i ? 5 : 3.5} fill="#263241" />
-            {i % labelEvery === 0 && <text x={xFor(i)} y={H - 10} textAnchor="middle" fontSize="9" fill="#687587">{new Date(d.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</text>}
-            <rect x={xFor(i) - hitW / 2} y={P} width={hitW} height={H - P - PB} fill="transparent" onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }} />
-          </g>
-        ))}
-        <circle cx={P + 2} cy={16} r="4" fill="#3F7FE8" /><text x={P + 11} y={19} fontSize="10" fill="#3F7FE8" fontWeight="600">IN</text>
-        <circle cx={P + 46} cy={16} r="4" fill="#263241" /><text x={P + 55} y={19} fontSize="10" fill="#263241" fontWeight="600">OUT</text>
-        {hover != null && (() => {
-          const d = data[hover]; const x = xFor(hover);
-          const boxW = 128, boxH = 56;
-          const bx = Math.min(Math.max(x - boxW / 2, P), W - P - boxW);
-          const by = 26;
-          return <g pointerEvents="none">
-            <line x1={x} x2={x} y1={P} y2={H - PB} stroke="#B9C3D1" strokeWidth="1" strokeDasharray="3 3" />
-            <rect x={bx} y={by} width={boxW} height={boxH} rx="8" fill="#1F2937" opacity="0.94" />
-            <text x={bx + 10} y={by + 18} fontSize="10" fill="#DCE9FF">{new Date(d.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</text>
-            <text x={bx + 10} y={by + 35} fontSize="10.5" fill="#8FC1FF" fontWeight="700">IN {inr(d.in)}</text>
-            <text x={bx + 10} y={by + 50} fontSize="10.5" fill="#CBD5E1" fontWeight="700">OUT {inr(d.out)}</text>
-          </g>;
-        })()}
-      </svg>
-    </div>
-  );
-}
-
-function MonthlyQtyRateChart({ data }) {
-  const [hover, setHover] = useState(null);
-  if (!data.length) return <EmptyNote text="No sales data yet." />;
-  const W = 900, H = 300, P = 46, PB = 32;
-  const maxQty = Math.max(1, ...data.map(d => d.qty));
-  const maxRate = Math.max(1, ...data.map(d => d.rate));
-  const step = data.length === 1 ? 0 : (W - P * 2) / (data.length - 1);
-  const xFor = (i) => P + i * step;
-  const yQty = (v) => H - PB - (v / maxQty) * (H - P - PB);
-  const yRate = (v) => H - PB - (v / maxRate) * (H - P - PB);
-  const barW = Math.min(36, (step || W - P * 2) * 0.4);
-  const ratePath = smoothPath(data.map((d, i) => [xFor(i), yRate(d.rate)]));
-  const labelEvery = Math.max(1, Math.ceil(data.length / 9));
-  const hitW = step || (W - P * 2);
-  const monthLabel = (m) => {
-    const [y, mo] = m.split("-");
-    return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
-  };
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="300" role="img" aria-label="Monthly qty and rate chart" onMouseLeave={() => setHover(null)}>
-        {[0, .25, .5, .75, 1].map(v => {
-          const y = H - PB - v * (H - P - PB);
-          return <g key={v}>
-            <line x1={P} x2={W - P} y1={y} y2={y} stroke="#E3E8F0" strokeWidth="1" />
-            <text x={P - 8} y={y + 3} textAnchor="end" fontSize="9.5" fill="#8A97A8">{Math.round(v * maxQty)}</text>
-          </g>;
-        })}
-        {/* Qty as bars (own scale, left axis) so it reads clearly against the
-           very different scale of the average-rate line drawn over it. */}
-        {data.map((d, i) => (
-          <rect key={`bar-${d.month}`} x={xFor(i) - barW / 2} y={yQty(d.qty)} width={barW}
-            height={Math.max(0, (H - PB) - yQty(d.qty))} rx="4"
-            fill={hover === i ? C.stamp : "#B9D2F5"} style={{ transition: "fill .12s" }} />
-        ))}
-        <path d={ratePath} fill="none" stroke={C.ink} strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" />
-        {data.map((d, i) => (
-          <g key={d.month}>
-            <circle cx={xFor(i)} cy={yRate(d.rate)} r={hover === i ? 5 : 3.5} fill={C.ink} />
-            {i % labelEvery === 0 && <text x={xFor(i)} y={H - 10} textAnchor="middle" fontSize="9" fill="#687587">{monthLabel(d.month)}</text>}
-            <rect x={xFor(i) - hitW / 2} y={P} width={hitW} height={H - P - PB} fill="transparent" onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }} />
-          </g>
-        ))}
-        <rect x={P} y={7} width="10" height="10" rx="2" fill="#B9D2F5" /><text x={P + 15} y={16} fontSize="10" fill={C.stamp} fontWeight="600">QTY</text>
-        <line x1={P + 60} x2={P + 78} y1={12} y2={12} stroke={C.ink} strokeWidth="2.5" strokeDasharray="5 4" /><text x={P + 84} y={16} fontSize="10" fill={C.ink} fontWeight="600">RATE (avg)</text>
-        {hover != null && (() => {
-          const d = data[hover]; const x = xFor(hover);
-          const boxW = 132, boxH = 56;
-          const bx = Math.min(Math.max(x - boxW / 2, P), W - P - boxW);
-          const by = 26;
-          return <g pointerEvents="none">
-            <line x1={x} x2={x} y1={P} y2={H - PB} stroke="#B9C3D1" strokeWidth="1" strokeDasharray="3 3" />
-            <rect x={bx} y={by} width={boxW} height={boxH} rx="8" fill="#1F2937" opacity="0.94" />
-            <text x={bx + 10} y={by + 18} fontSize="10" fill="#DCE9FF">{monthLabel(d.month)}</text>
-            <text x={bx + 10} y={by + 35} fontSize="10.5" fill="#8FC1FF" fontWeight="700">Qty {d.qty}</text>
-            <text x={bx + 10} y={by + 50} fontSize="10.5" fill="#CBD5E1" fontWeight="700">Avg Rate {inr(d.rate)}</text>
-          </g>;
-        })()}
-      </svg>
-    </div>
-  );
-}
-
-function DonutChart({ cash, bank }) {
-  const total = cash + bank; if (!total) return <EmptyNote text="No sales for the selected dates." />;
-  const r = 58, circ = 2 * Math.PI * r, cashLen = (cash / total) * circ;
-  const cashPct = Math.round((cash / total) * 100), bankPct = 100 - cashPct;
-  const rounded = cashLen > 0 && cashLen < circ;
-  return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 28, minHeight: 190, flexWrap: "wrap" }}>
-    <div style={{ position: "relative", width: 150, height: 150 }}>
-      <svg width="150" height="150" viewBox="0 0 150 150">
-        <circle cx="75" cy="75" r={r} fill="none" stroke="#E8EDF4" strokeWidth="20" />
-        <circle cx="75" cy="75" r={r} fill="none" stroke="#3F7FE8" strokeWidth="20" strokeDasharray={`${cashLen} ${circ - cashLen}`} strokeLinecap={rounded ? "round" : "butt"} transform="rotate(-90 75 75)" />
-        <circle cx="75" cy="75" r="40" fill={C.white} />
-      </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-        <b style={{ fontFamily: font.display, fontSize: 17 }}>{inr(total)}</b>
-        <span style={{ fontSize: 9, color: C.inkSoft, letterSpacing: 0.5 }}>SALES</span>
-      </div>
-    </div>
-    <div style={{ fontFamily: font.mono, fontSize: 11.5, display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: C.stamp }} />Cash <b>{inr(cash)}</b><span style={{ color: C.inkSoft }}>({cashPct}%)</span></div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: C.paperDark, border: `1px solid ${C.line}` }} />Bank <b>{inr(bank)}</b><span style={{ color: C.inkSoft }}>({bankPct}%)</span></div>
-    </div>
   </div>;
 }
 
