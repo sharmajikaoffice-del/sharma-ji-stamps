@@ -1021,17 +1021,26 @@ function SharmaJiStampsAdmin() {
   const [entries, setEntries] = useState([]);
   const [cashManual, setCashManual] = useState([]);
 
+  // Guards against a race condition: if refreshAll() gets called again
+  // before an earlier call's network requests finish (e.g. adding an entry
+  // right after opening the app), the earlier, slower call could resolve
+  // LAST and overwrite the screen with stale data — showing the fresh
+  // numbers for a moment, then reverting to the old ones. Only the result
+  // of the most recently started refresh is ever applied.
+  const refreshSeqRef = useRef(0);
   const refreshAll = async () => {
+    const mySeq = ++refreshSeqRef.current;
     try {
       const [u, r, p, e, c] = await Promise.all([
         dbGet("users"), dbGet("rubbers"), dbGet("purchases"), dbGet("stamp_entries"), dbGet("cash_manual"),
       ]);
+      if (mySeq !== refreshSeqRef.current) return; // a newer refresh has since started — ignore this stale result
       setUsers(u); setRubbers(r); setPurchases(p); setEntries(e); setCashManual(c);
       setDbError("");
     } catch (e) {
-      setDbError("Could not connect to the database. Check SUPABASE_URL / SUPABASE_KEY at the top of the file, and that the SQL schema has been run.");
+      if (mySeq === refreshSeqRef.current) setDbError("Could not connect to the database. Check SUPABASE_URL / SUPABASE_KEY at the top of the file, and that the SQL schema has been run.");
     } finally {
-      setLoading(false);
+      if (mySeq === refreshSeqRef.current) setLoading(false);
     }
   };
 
