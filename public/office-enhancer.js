@@ -4,6 +4,13 @@
     [role="option"]{scroll-margin:6px}
     .sjs-dropdown-focus{outline:2px solid #3F7FE8!important;outline-offset:-2px;background:#EAF2FF!important}
     .sjs-responsive-table{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+    /* Create Stamp: the mm-size badge sits on top of the preview boundary and
+       can cover/hide stamp text on small previews. The actual stamp size is
+       already controlled by the selected rubber and the Size panel, so keep
+       the preview clean and let all text use the full canvas area. */
+    #root canvas + div{display:none!important}
+
     @media(max-width:899px){
       #root table{min-width:0!important}
       #root .sjs-responsive-table{margin-right:-2px}
