@@ -10,16 +10,19 @@
       #root .sjs-responsive-table table{min-width:0!important}
 
       /* Stock report: the JSX table has an explicit 720px desktop width.
-         On phones turn each row into a readable two-column card. */
+         On phones remove the desktop colgroup widths and turn each row into
+         a full-width readable card. */
       #root table[style*="min-width: 720px"]{
+        display:block!important;
         width:100%!important;min-width:0!important;max-width:100%!important;
         table-layout:auto!important;border-collapse:separate!important;border-spacing:0!important;
       }
+      #root table[style*="min-width: 720px"] colgroup{display:none!important}
       #root table[style*="min-width: 720px"] thead{display:none!important}
       #root table[style*="min-width: 720px"] tbody{display:block!important;width:100%!important}
       #root table[style*="min-width: 720px"] tbody tr{
         display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px;
-        width:100%!important;margin:0 0 10px!important;padding:10px!important;
+        width:100%!important;max-width:100%!important;margin:0 0 10px!important;padding:10px!important;
         border:1px solid #e2e8f0!important;border-radius:12px!important;
         background:#fff!important;box-shadow:0 1px 2px rgba(15,23,42,.04);
       }
@@ -29,7 +32,10 @@
         min-width:0!important;width:100%!important;padding:8px 2px!important;
         border:0!important;white-space:normal!important;overflow:visible!important;
       }
-      #root table[style*="min-width: 720px"] tbody td:first-child{grid-column:1/-1;padding-bottom:10px!important;border-bottom:1px solid #eef2f7!important;margin-bottom:3px}
+      #root table[style*="min-width: 720px"] tbody td:first-child{
+        grid-column:1/-1!important;padding-bottom:10px!important;
+        border-bottom:1px solid #eef2f7!important;margin-bottom:3px;
+      }
       #root table[style*="min-width: 720px"] tbody td:nth-child(2)::before{content:"Rate";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace;margin-right:8px}
       #root table[style*="min-width: 720px"] tbody td:nth-child(3)::before{content:"In";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace;margin-right:8px}
       #root table[style*="min-width: 720px"] tbody td:nth-child(4)::before{content:"Out";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace;margin-right:8px}
