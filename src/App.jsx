@@ -396,7 +396,11 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
           const frx = ((frame.x ?? 50) / 100) * size;
           const fry = ((frame.y ?? 50) / 100) * canvasHeight;
           const frot = ((frame.rotation ?? 0) * Math.PI) / 180;
-          const r = Math.max(4, Math.min(size * 0.48, canvasHeight * 0.48, Number(frame.radius ?? 100)));
+          // Use the side text's original triangle radius, not the current
+          // frame radius. This keeps all three texts the same size and place
+          // while the triangle itself is resized independently.
+          const textRadius = Number(layer.triangleTextRadius ?? frame.radius ?? 100);
+          const r = Math.max(4, Math.min(size * 0.48, canvasHeight * 0.48, textRadius));
           const points = [-90, 30, 150].map((deg) => {
             const a = (deg * Math.PI) / 180 + frot;
             return { x: frx + r * Math.cos(a), y: fry + r * Math.sin(a) };
@@ -1882,7 +1886,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             text: label, size: fontSize, fontFamily: "Arial", fontSize,
             bold: true, flipX: false, x: 50, y: 50, rotation: 0,
             fontStyle: "normal", tall: false, invert: false,
-            layout: ["rightRotated", "bottom", "leftRotated"][side], triangleFrameId: id, triangleSide: side
+            layout: ["rightRotated", "bottom", "leftRotated"][side], triangleFrameId: id, triangleSide: side,
+            // Triangle side text keeps its own fixed geometry. Resizing the
+            // triangle frame must resize only the triangle, never the text.
+            triangleTextRadius: radius
           }));
           const center = {
             id: uid(), type: "centerText", num: num + 4,
@@ -2056,9 +2063,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const addPreloadedSymbol = (src, { forceNew = false } = {}) => {
     const img = new Image();
     img.onload = () => {
-      if (!forceNew && activeLayer && activeLayer.type === "image") {
-        updateLayer(activeLayer.id, { imageObj: img, imageDataUrl: src });
-      } else {
+      // Toolbar Symbols always create a fresh image layer. They must not depend
+      // on an Image layer already being selected.
+      pushHistory();
+      {
         const num = layerCounter + 1;
         setLayerCounter(num);
         const id = uid();
@@ -3433,25 +3441,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
             style={{ width: "100%", height: "100%", display: "block", cursor: layers.length ? "pointer" : "default" }}
           />
-          <div
-            style={{
-              position: "absolute",
-              top: -10,
-              left: 10,
-              padding: "2px 7px",
-              borderRadius: 10,
-              background: STAMP_INK_BLUE,
-              color: C.white,
-              fontFamily: font.mono,
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: .2,
-              pointerEvents: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {selectedDimensions.widthMm} × {selectedDimensions.heightMm} mm
-          </div>
         </div>
         {layers.length > 0 && (
           <div style={{ marginTop: 5, fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft, textAlign: "center", background: "rgba(255,255,255,.8)", padding: "2px 7px", borderRadius: 10 }}>Click any item on the stamp to edit</div>
@@ -3614,7 +3603,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             </button>
             {symbolPickerOpen && (
               <div style={{
-                position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 80,
+                position: "fixed", top: isDesktop ? 64 : 58, right: isDesktop ? 18 : 8, zIndex: 180,
                 minWidth: 170, padding: 8, background: C.white,
                 border: `1px solid ${C.line}`, borderRadius: 10,
                 boxShadow: "0 8px 24px rgba(0,0,0,.14)"
