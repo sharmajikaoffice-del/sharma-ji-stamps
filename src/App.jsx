@@ -1758,7 +1758,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     // to visually separate the copy from the original) pulled the curve off
     // that center and made the duplicate look shifted. Skip the nudge for
     // exactly that case; everything else keeps the usual offset.
-    const positionLocked = source.type === "line" && (shape === "circle" || shape === "square");
+    const positionLocked =
+      (source.type === "line" && Number(source.curve ?? 0) !== 0) ||
+      (source.type === "frame" && (source.shape === "circle" || source.shape === "triangle"));
     const copy = {
       ...source,
       id: uid(),
@@ -2889,9 +2891,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     { id: "scalloped", label: "Scalloped" },
     { id: "dashed", label: "Dashed" },
   ];
-  const BorderStyleIcon = ({ id, active }) => {
+  const BorderStyleIcon = ({ id, active, shape }) => {
     const stroke = active ? STAMP_INK_BLUE : C.inkSoft;
     const common = { width: 22, height: 22, viewBox: "0 0 22 22", fill: "none", stroke, strokeWidth: 1.4 };
+    if (shape === "triangle") {
+      if (id === "single") return <svg {...common}><path d="M11 2.5 L19.5 18.5 L2.5 18.5 Z" strokeLinejoin="round" /></svg>;
+      if (id === "double") return <svg {...common}><path d="M11 1.5 L20.3 19 L1.7 19 Z" strokeLinejoin="round" /><path d="M11 6 L16.8 16.7 L5.2 16.7 Z" strokeLinejoin="round" /></svg>;
+      return null;
+    }
     if (id === "single") return <svg {...common}><circle cx="11" cy="11" r="8" /></svg>;
     if (id === "double") return <svg {...common}><circle cx="11" cy="11" r="9" /><circle cx="11" cy="11" r="5.5" /></svg>;
     if (id === "scalloped") return <svg {...common}><path d="M11 1.5 L12.6 4 L15.3 2.8 L15.6 5.7 L18.5 5.4 L17.3 8.1 L20 9.7 L17.5 11.3 L20 12.9 L17.3 14.5 L18.5 17.2 L15.6 16.9 L15.3 19.8 L12.6 18.6 L11 21.1 L9.4 18.6 L6.7 19.8 L6.4 16.9 L3.5 17.2 L4.7 14.5 L2 12.9 L4.5 11.3 L2 9.7 L4.7 8.1 L3.5 5.4 L6.4 5.7 L6.7 2.8 L9.4 4 Z" strokeLinejoin="round" /></svg>;
@@ -3032,13 +3039,21 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           ) : (
             <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
           )}
-          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
-          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
-          <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
-          <SliderControl label="Break" value={activeLayer.lineBreak ?? 0} min={0} max={200} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
+          {activeLayer.shape !== "circle" && activeLayer.shape !== "triangle" && (
+            <>
+              <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
+              <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+            </>
+          )}
+          {activeLayer.shape !== "triangle" && (
+            <>
+              <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+              <SliderControl label="Break" value={activeLayer.lineBreak ?? 0} min={0} max={200} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
+            </>
+          )}
           <Label>Border Style</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 4 }}>
-            {FRAME_BORDER_STYLES.map((opt) => {
+            {(activeLayer.shape === "triangle" ? FRAME_BORDER_STYLES.filter((o) => o.id === "single" || o.id === "double") : FRAME_BORDER_STYLES).map((opt) => {
               const active = (activeLayer.borderStyle || "single") === opt.id;
               return (
                 <button
@@ -3058,7 +3073,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                     fontFamily: font.body,
                   }}
                 >
-                  <BorderStyleIcon id={opt.id} active={active} />
+                  <BorderStyleIcon id={opt.id} active={active} shape={activeLayer.shape} />
                   <span style={{ fontSize: 10.5, color: active ? STAMP_INK_BLUE : C.inkSoft, fontWeight: active ? 700 : 500 }}>{opt.label}</span>
                 </button>
               );
@@ -3068,13 +3083,23 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       ) : activeLayer.type === "line" ? (
         <>
           <SliderControl label="Line width" value={activeLayer.width ?? 55} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
-          <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={80} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
           <Label>Orientation</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 7, marginBottom: 10 }}>
-            {[{ id: 0, label: "Horizontal" }, { id: 90, label: "Vertical" }].map((opt) => {
+            {[{ id: 0, label: "Horizontal Bar" }, { id: 90, label: "Vertical Bar" }].map((opt) => {
               const active = Number(activeLayer.rotation ?? 0) === opt.id;
               return (
-                <button key={opt.id} type="button" onClick={() => updateLayer(activeLayer.id, { rotation: opt.id })} style={{ border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.ink, borderRadius: 8, padding: "9px 4px", cursor: "pointer", fontSize: 10.5, fontWeight: active ? 700 : 500 }}>{opt.label}</button>
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => updateLayer(activeLayer.id, {
+                    rotation: opt.id,
+                    // A flat (butt-cap) stroke at the default thin width still
+                    // reads as a "line" rather than a solid bar — bump it up
+                    // to a proper bar thickness the first time this is picked.
+                    strokeWidth: (activeLayer.strokeWidth ?? 4) < 16 ? 24 : activeLayer.strokeWidth,
+                  })}
+                  style={{ border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.ink, borderRadius: 8, padding: "9px 4px", cursor: "pointer", fontSize: 10.5, fontWeight: active ? 700 : 500 }}>{opt.label}</button>
               );
             })}
           </div>
@@ -3095,7 +3120,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           )}
           <SliderControl label="Line size" value={activeLayer.width ?? 55} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
-          {shape !== "circle" && shape !== "square" && (
+          {Number(activeLayer.curve ?? 0) === 0 && (
             <>
               <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
               <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
