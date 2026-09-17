@@ -501,22 +501,37 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       };
 
       if (style === "scalloped" && frameShape === "circle") {
-        // A filled scalloped/wavy ring, like a "PAID" rubber stamp border:
-        // alternating outer/inner points around the circle, filled solid,
-        // with a thin ring just inside it. "Wave amount" controls how deep
-        // the teeth cut in, replacing Stroke width for this style.
+        // A scalloped ring border, like a certificate seal — a thin band with
+        // many small rounded bumps along its outer edge, and a plain circular
+        // inner edge so the middle of the stamp stays open for other content.
+        // (Earlier this filled a solid disc all the way to the centre, which
+        // looked like a big blue blob instead of a border.) "Wave amount"
+        // controls how deep the bumps cut in.
         const outerR = Math.max(4, Math.min(size * 0.48, layer.radius ?? 100));
-        const teeth = 24;
-        const amp = Math.max(2, ((layer.waveAmount ?? 14) / 100) * outerR * 0.9);
-        const innerR = Math.max(2, outerR - amp);
-        const points = teeth * 2;
+        const teeth = 34; // frequent, small bumps rather than a few big points
+        const amp = Math.max(1, ((layer.waveAmount ?? 14) / 100) * outerR * 0.22);
+        const bandWidth = Math.max(sw, amp * 1.6);
+        const innerR = Math.max(2, outerR - amp - bandWidth);
+        const steps = teeth * 8;
+        const outerPoint = (ang) => {
+          const wobble = amp * (0.5 + 0.5 * Math.cos(teeth * ang));
+          const r = outerR - wobble;
+          return [r * Math.cos(ang), r * Math.sin(ang)];
+        };
         ctx.beginPath();
-        for (let i = 0; i <= points; i++) {
-          const ang = (Math.PI * 2 * i) / points - Math.PI / 2;
-          const r = i % 2 === 0 ? outerR : innerR;
-          const px = r * Math.cos(ang);
-          const py = r * Math.sin(ang);
+        for (let i = 0; i <= steps; i++) {
+          const ang = (Math.PI * 2 * i) / steps - Math.PI / 2;
+          const [px, py] = outerPoint(ang);
           if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        // Cut a plain circular hole out of the middle (traced the opposite
+        // direction from the outer edge) so only the ring itself is filled.
+        for (let i = steps; i >= 0; i--) {
+          const ang = (Math.PI * 2 * i) / steps - Math.PI / 2;
+          const px = innerR * Math.cos(ang);
+          const py = innerR * Math.sin(ang);
+          if (i === steps) ctx.moveTo(px, py); else ctx.lineTo(px, py);
         }
         ctx.closePath();
         ctx.fill();
@@ -565,8 +580,14 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
         const chord = Math.min(lineW, 2 * r * 0.98);
         const half = Math.asin(Math.min(0.98, chord / (2 * r)));
         const bend = Math.max(0.05, Math.min(1.25, curveAmount / 80));
-        const signedHalf = curve < 0 ? -half * bend : half * bend;
-        ctx.arc(0, 0, r, Math.PI / 2 + signedHalf, Math.PI / 2 - signedHalf, curve > 0);
+        // Up Curve should bulge upward (like a rainbow ⌢) and Down Curve
+        // downward (like a smile ⌣). Previously both traced the arc around
+        // the same base angle (PI/2, the bottom of the circle) and only
+        // differed in stroke direction, which draws the identical minor arc
+        // either way — so "Up Curve" had no visible effect. Flipping the
+        // base angle to -PI/2 (the top of the circle) for Up Curve fixes it.
+        const baseAngle = curve < 0 ? -Math.PI / 2 : Math.PI / 2;
+        ctx.arc(0, 0, r, baseAngle - half * bend, baseAngle + half * bend, false);
       }
       ctx.stroke();
       ctx.restore();
@@ -1731,7 +1752,20 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     const source = layers.find((l) => l.id === id);
     if (!source || source.locked) return;
     pushHistory();
-    const copy = { ...source, id: uid(), num: layerCounter + 1, imageObj: source.imageObj || null, x: Math.min(100, (source.x ?? 50) + 3), y: Math.min(100, (source.y ?? 50) + 3) };
+    // Lines on a circle/square stamp hide the Horizontal/Vertical position
+    // sliders and are meant to stay centered so their curve follows the
+    // frame's geometry — nudging x/y here (as we do for every other layer,
+    // to visually separate the copy from the original) pulled the curve off
+    // that center and made the duplicate look shifted. Skip the nudge for
+    // exactly that case; everything else keeps the usual offset.
+    const positionLocked = source.type === "line" && (shape === "circle" || shape === "square");
+    const copy = {
+      ...source,
+      id: uid(),
+      num: layerCounter + 1,
+      imageObj: source.imageObj || null,
+      ...(positionLocked ? {} : { x: Math.min(100, (source.x ?? 50) + 3), y: Math.min(100, (source.y ?? 50) + 3) }),
+    };
     setLayerCounter((n) => n + 1);
     setLayers((ls) => [...ls, copy]);
     setActiveLayerId(copy.id);
@@ -1835,10 +1869,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // onto the stamp as a new image layer — no file picker needed. If an
   // image layer is already selected, reuse it instead of stacking a new one.
   const [symbolPickerOpen, setSymbolPickerOpen] = useState(false);
-  const addPreloadedSymbol = (src) => {
+  const addPreloadedSymbol = (src, { forceNew = false } = {}) => {
     const img = new Image();
     img.onload = () => {
-      if (activeLayer && activeLayer.type === "image") {
+      if (!forceNew && activeLayer && activeLayer.type === "image") {
         updateLayer(activeLayer.id, { imageObj: img, imageDataUrl: src });
       } else {
         const num = layerCounter + 1;
@@ -2904,10 +2938,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </button>
         </div>
 
-        {layer.source !== "addText" && (
+        {(
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: 16 }}>
             <input type="checkbox" checked={!!layer.invert} onChange={(e) => updateLayer(layer.id, { invert: e.target.checked })} />
-            Invert
+            Invert (solid box behind text, like a "CERTIFIED" banner)
           </label>
         )}
 
@@ -3035,6 +3069,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <>
           <SliderControl label="Line width" value={activeLayer.width ?? 55} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          <Label>Orientation</Label>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 7, marginBottom: 10 }}>
+            {[{ id: 0, label: "Horizontal" }, { id: 90, label: "Vertical" }].map((opt) => {
+              const active = Number(activeLayer.rotation ?? 0) === opt.id;
+              return (
+                <button key={opt.id} type="button" onClick={() => updateLayer(activeLayer.id, { rotation: opt.id })} style={{ border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.ink, borderRadius: 8, padding: "9px 4px", cursor: "pointer", fontSize: 10.5, fontWeight: active ? 700 : 500 }}>{opt.label}</button>
+              );
+            })}
+          </div>
           <Label>Curve</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, marginBottom: 10 }}>
             {[{ id: 0, label: "Straight" }, { id: -1, label: "Up Curve" }, { id: 1, label: "Down Curve" }].map((opt) => {
@@ -3374,7 +3417,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                       key={sym.id}
                       type="button"
                       title={sym.label}
-                      onClick={() => addPreloadedSymbol(sym.src)}
+                      onClick={() => addPreloadedSymbol(sym.src, { forceNew: true })}
                       style={{
                         border: `1px solid ${C.line}`, background: C.white, borderRadius: 7,
                         padding: 7, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center"
