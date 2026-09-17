@@ -3,6 +3,10 @@
     {
       "source": "/customer",
       "destination": "/"
+    },
+    {
+      "source": "/login",
+      "destination": "/"
     }
   ]
 }
