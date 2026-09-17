@@ -1225,17 +1225,40 @@ function CustomerDesigner() {
 }
 
 /* ================= HOME PAGE (public landing page at "/") ================= */
+const SHOP_PHONE = "9899029807";
+const SHOP_PHONE_DISPLAY = "98990 29807";
+const SHOP_EMAIL = "sharmajikaoffice@gmail.com";
+const SHOP_ADDRESS = "Dayalpur, 33 Ft Road, near Akashdeep School, North East Delhi – 110094";
+const SHOP_MAPS_URL = "https://maps.app.goo.gl/V2vbYqJkxq8sJrnh9";
+
+// Product photos live in /public/images — see the PR description for the
+// exact files to drop in there. Falls back gracefully (broken-image icon
+// only) if a file is missing, so this won't crash the build either way.
+const PRODUCTS = [
+  { img: "/images/stamp-selfink-set.jpg", title: "Self-inking stamps", text: "Ink pad built in. Press and stamp — thousands of impressions before re-inking." },
+  { img: "/images/stamp-blue-flash.jpg", title: "Pre-inked flash stamps", text: "No pad, no lines — a clean, solid impression every time. Good for logos and fine detail." },
+  { img: "/images/stamp-square-blue.jpg", title: "Round & square seals", text: "Company, society, school and clinic seals — name curved around the ring." },
+  { img: "/images/stamp-boxed.jpg", title: "Address & GST stamps", text: "Firm name, full address, GSTIN and phone in one block." },
+  { img: "/images/stamp-white-desk.jpg", title: "Signature & name stamps", text: "Send a clear photo of your signature — we trace it and cut it exactly." },
+  { img: "/images/stamp-handle-red.jpg", title: "Handle stamps & ink pads", text: "The classic wood-handle stamp with a separate pad. Pads and refill ink in stock." },
+];
+
 function HomePage() {
   return (
     <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column" }}>
-      <div style={{ background: C.headerGreen, color: C.white, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ background: C.headerGreen, color: C.white, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <StampMark size={32} />
           <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 18 }}>Sharma Ji Stamps</div>
         </div>
-        <a href="/login" style={{ background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 8, color: C.white, textDecoration: "none", fontFamily: font.body, fontWeight: 600, fontSize: 13, padding: "9px 16px" }}>
-          Staff Login
-        </a>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <a href={`tel:+91${SHOP_PHONE}`} style={{ background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 8, color: C.white, textDecoration: "none", fontFamily: font.body, fontWeight: 600, fontSize: 13, padding: "9px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            📞 {SHOP_PHONE_DISPLAY}
+          </a>
+          <a href="/login" style={{ background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 8, color: C.white, textDecoration: "none", fontFamily: font.body, fontWeight: 600, fontSize: 13, padding: "9px 16px" }}>
+            Staff Login
+          </a>
+        </div>
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "60px 20px 40px", textAlign: "center" }}>
@@ -1251,8 +1274,8 @@ function HomePage() {
           <a href="/customer" style={{ background: C.headerGreen, color: C.white, border: "none", borderRadius: 10, textDecoration: "none", fontFamily: font.body, fontWeight: 700, fontSize: 14.5, padding: "14px 26px", display: "inline-flex", alignItems: "center", gap: 8 }}>
             <Wand2 size={17} /> Design Your Own Stamp
           </a>
-          <a href="/login" style={{ background: "transparent", color: C.headerGreen, border: `1.5px solid ${C.headerGreen}`, borderRadius: 10, textDecoration: "none", fontFamily: font.body, fontWeight: 700, fontSize: 14.5, padding: "14px 26px", display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Users size={17} /> Staff Login
+          <a href={`tel:+91${SHOP_PHONE}`} style={{ background: "transparent", color: C.headerGreen, border: `1.5px solid ${C.headerGreen}`, borderRadius: 10, textDecoration: "none", fontFamily: font.body, fontWeight: 700, fontSize: 14.5, padding: "14px 26px", display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Users size={17} /> Call {SHOP_PHONE_DISPLAY}
           </a>
         </div>
 
@@ -1269,10 +1292,56 @@ function HomePage() {
             </div>
           ))}
         </div>
+
+        {/* ---- product photos ---- */}
+        <div style={{ marginTop: 72, maxWidth: 1000, width: "100%", textAlign: "left" }}>
+          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 24 }}>What we make</div>
+          <div style={{ fontFamily: font.body, fontSize: 13.5, color: C.inkSoft, marginTop: 6, maxWidth: 560 }}>
+            Bring us the text, a card, or a GST certificate — we set it and cut it. Call for a quick quote on size and price.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 16, marginTop: 24 }}>
+            {PRODUCTS.map((p) => (
+              <div key={p.title} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ aspectRatio: "4/3", background: C.paperDark, overflow: "hidden" }}>
+                  <img src={p.img} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </div>
+                <div style={{ padding: "14px 16px 18px" }}>
+                  <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 15 }}>{p.title}</div>
+                  <div style={{ fontFamily: font.body, fontSize: 12.5, color: C.inkSoft, marginTop: 6, lineHeight: 1.5 }}>{p.text}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ---- visit / contact ---- */}
+        <div style={{ marginTop: 72, maxWidth: 640, width: "100%", background: C.white, border: `1px solid ${C.line}`, borderRadius: 14, padding: "28px 26px", textAlign: "left" }}>
+          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 22 }}>Visit the shop</div>
+          <div style={{ fontFamily: font.body, fontSize: 13.5, color: C.inkSoft, marginTop: 6, lineHeight: 1.6 }}>
+            Walk in with your details and most stamps are ready while you wait.
+          </div>
+          <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <Label>Address</Label>
+              <div style={{ fontFamily: font.body, fontSize: 14.5 }}>{SHOP_ADDRESS}</div>
+            </div>
+            <div>
+              <Label>Phone</Label>
+              <a href={`tel:+91${SHOP_PHONE}`} style={{ fontFamily: font.body, fontSize: 14.5, color: C.headerGreen, textDecoration: "none" }}>+91 {SHOP_PHONE_DISPLAY}</a>
+            </div>
+            <div>
+              <Label>Email</Label>
+              <a href={`mailto:${SHOP_EMAIL}`} style={{ fontFamily: font.body, fontSize: 14.5, color: C.headerGreen, textDecoration: "none" }}>{SHOP_EMAIL}</a>
+            </div>
+          </div>
+          <a href={SHOP_MAPS_URL} target="_blank" rel="noopener noreferrer" style={{ marginTop: 20, background: C.headerGreen, color: C.white, border: "none", borderRadius: 10, textDecoration: "none", fontFamily: font.body, fontWeight: 700, fontSize: 13.5, padding: "12px 20px", display: "inline-flex", alignItems: "center", gap: 8 }}>
+            Open in Google Maps
+          </a>
+        </div>
       </div>
 
       <div style={{ textAlign: "center", padding: "18px", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, borderTop: `1px solid ${C.line}` }}>
-        © {new Date().getFullYear()} Sharma Ji Stamps
+        © {new Date().getFullYear()} Sharma Ji Stamps · Dayalpur, North East Delhi · +91 {SHOP_PHONE_DISPLAY}
       </div>
     </div>
   );
