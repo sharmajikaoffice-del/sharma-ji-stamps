@@ -3,7 +3,8 @@ import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, Star, X,
-  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Sun, Moon
+  Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Sun, Moon,
+  LayoutDashboard
 } from "lucide-react";
 
 /* Preloaded symbol PNGs — ready-made icons users can drop onto a stamp
@@ -920,6 +921,7 @@ const SIDEBAR_W = 210;
 
 /* ================= APP SHELL ================= */
 const TABS_ADMIN = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "orders", label: "Orders", icon: Inbox },
@@ -932,6 +934,7 @@ const TABS_ADMIN = [
   
 ];
 const TABS_STAFF = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "entry", label: "Stamp Entry", icon: PenSquare },
   { id: "create", label: "Create Stamp", icon: Wand2 },
   { id: "orders", label: "Orders", icon: Inbox },
@@ -966,7 +969,7 @@ function SharmaJiStampsAdmin() {
     setUser(null);
     try { localStorage.removeItem("sjs_user"); } catch {}
   };
-  const [tab, setTab] = useState("orders");
+  const [tab, setTab] = useState("dashboard");
   const [theme, setTheme] = useState(() => {
     try { return localStorage.getItem("sjs_theme") === "dark" ? "dark" : "light"; } catch { return "light"; }
   });
@@ -998,7 +1001,7 @@ function SharmaJiStampsAdmin() {
   // dashboard, instead of exiting the app straight away.
   const wasHomeRef = useRef(true);
   useEffect(() => {
-    const isHome = tab === "orders" && !moreOpen;
+    const isHome = tab === "dashboard" && !moreOpen;
     if (wasHomeRef.current && !isHome) {
       window.history.pushState({ sjsAway: true }, "");
     }
@@ -1007,7 +1010,7 @@ function SharmaJiStampsAdmin() {
   useEffect(() => {
     const onPopState = () => {
       setMoreOpen(false);
-      setTab("orders");
+      setTab("dashboard");
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -1073,6 +1076,7 @@ function SharmaJiStampsAdmin() {
 
   const tabContent = (
     <>
+      {tab === "dashboard" && <DashboardTab rubbers={rubbers} purchases={purchases} entries={entries} cashManual={cashManual} stockByRubber={stockByRubber} user={user} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
       {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
@@ -4598,6 +4602,220 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
     {(() => { const groups=[]; shown.slice(0,100).forEach(t=>{const last=groups[groups.length-1];if(last&&last.date===t.date)last.items.push(t);else groups.push({date:t.date,items:[t]});}); return groups.map(g=><div key={g.date}><div style={{fontFamily:font.mono,fontSize:10.5,fontWeight:700,color:C.brass,textTransform:"uppercase",letterSpacing:1,margin:"16px 0 6px"}}>{fmtDate(g.date)}</div>{g.items.map(t=><Card key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0,overflow:"hidden"}}><div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.label}</div></div><div style={{textAlign:"right",flexShrink:0}}><div style={{fontFamily:font.mono,fontWeight:700,color:t.type==="in"?C.sage:C.stamp}}>{t.type==="in"?"+":"−"}{inr(t.amount)}</div><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,marginTop:2}}>Bal: {inr(t.balanceAfter)}</div></div></Card>)}</div>); })()}
     {shown.length===0 && <EmptyNote text="No cash transactions for the selected dates."/>}
   </div>;
+}
+
+/* ================= DASHBOARD ================= */
+// Smooth 14-day sales line, drawn with the same Catmull-Rom smoothPath()
+// helper used elsewhere, plus a soft gradient fill under the curve.
+function TrendSVG({ data, color, height = 132 }) {
+  const w = 600, h = height, padL = 6, padR = 6, padT = 14, padB = 6;
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const stepX = data.length > 1 ? (w - padL - padR) / (data.length - 1) : 0;
+  const pts = data.map((d, i) => [padL + i * stepX, padT + (h - padT - padB) * (1 - d.value / max)]);
+  const line = smoothPath(pts);
+  const area = pts.length ? `${line} L ${pts[pts.length - 1][0]},${h - padB} L ${pts[0][0]},${h - padB} Z` : "";
+  const gid = useRef(`tcg${uid()}`).current;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height, display: "block" }} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[0.33, 0.66].map((f) => (
+        <line key={f} x1={padL} x2={w - padR} y1={padT + (h - padT - padB) * f} y2={padT + (h - padT - padB) * f} stroke={C.line} strokeWidth="1" strokeDasharray="3 4" />
+      ))}
+      {area && <path d={area} fill={`url(#${gid})`} stroke="none" />}
+      {line && <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+      {pts.length > 0 && <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="4" fill={color} stroke={C.white} strokeWidth="1.5" />}
+    </svg>
+  );
+}
+
+// Paired cash-in / cash-out bars, one group per day.
+function CashFlowSVG({ data, height = 132 }) {
+  const w = 600, h = height, padL = 4, padR = 4, padT = 10, padB = 20;
+  const max = Math.max(1, ...data.map((d) => Math.max(d.in, d.out)));
+  const groupW = (w - padL - padR) / data.length;
+  const barW = Math.min(18, groupW * 0.26);
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height, display: "block" }} preserveAspectRatio="none">
+      {[0.33, 0.66].map((f) => (
+        <line key={f} x1={padL} x2={w - padR} y1={padT + (h - padT - padB) * f} y2={padT + (h - padT - padB) * f} stroke={C.line} strokeWidth="1" strokeDasharray="3 4" />
+      ))}
+      {data.map((d, i) => {
+        const cx = padL + groupW * i + groupW / 2;
+        const hi = (h - padT - padB) * (d.in / max);
+        const ho = (h - padT - padB) * (d.out / max);
+        return (
+          <g key={i}>
+            <rect x={cx - barW - 3} y={h - padB - hi} width={barW} height={Math.max(hi, d.in > 0 ? 2 : 0)} rx={2.5} fill={C.sage} />
+            <rect x={cx + 3} y={h - padB - ho} width={barW} height={Math.max(ho, d.out > 0 ? 2 : 0)} rx={2.5} fill={C.stamp} />
+            <text x={cx} y={h - 6} textAnchor="middle" fontSize="9.5" fontFamily={font.mono} fill={C.inkSoft}>{d.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function KpiCard({ label, value, sub, accent }) {
+  return (
+    <Card style={{ minWidth: 0 }}>
+      <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.3, color: C.inkSoft, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontFamily: font.display, fontWeight: 800, fontSize: 24, marginTop: 5, color: accent || C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
+      {sub && <div style={{ fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 4 }}>{sub}</div>}
+    </Card>
+  );
+}
+
+function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, user }) {
+  // Customer orders live in their own table and aren't part of refreshAll(),
+  // so the dashboard fetches them the same way OrdersTab does.
+  const [orders, setOrders] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    dbGet("customer_designs").then((rows) => { if (!cancelled) setOrders(Array.isArray(rows) ? rows : []); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const daysAgoISO = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  const todayStr = todayISO();
+  const monthPrefix = todayStr.slice(0, 7);
+
+  const todaySales = useMemo(() => entries.filter((e) => e.date === todayStr).reduce((s, e) => s + Number(e.amount || 0), 0), [entries, todayStr]);
+  const todayCount = entries.filter((e) => e.date === todayStr).length;
+  const monthSales = useMemo(() => entries.filter((e) => (e.date || "").startsWith(monthPrefix)).reduce((s, e) => s + Number(e.amount || 0), 0), [entries, monthPrefix]);
+  const monthCount = entries.filter((e) => (e.date || "").startsWith(monthPrefix)).length;
+
+  const cashBalance = useMemo(() => {
+    const cashIn = entries.filter((e) => (e.payment_mode || "Cash") === "Cash").reduce((s, e) => s + Number(e.amount || 0), 0)
+      + cashManual.filter((c) => c.type === "in").reduce((s, c) => s + Number(c.amount || 0), 0);
+    const cashOut = purchases.filter((p) => (p.payment_mode || "Cash") === "Cash").reduce((s, p) => s + Number(p.total ?? p.amount ?? 0), 0)
+      + cashManual.filter((c) => c.type === "out").reduce((s, c) => s + Number(c.amount || 0), 0);
+    return cashIn - cashOut;
+  }, [entries, purchases, cashManual]);
+
+  const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
+  const lowStock = rubberOnly.filter((r) => (stockByRubber[r.id]?.balance ?? 0) <= 15);
+  const pendingOrders = orders.filter((o) => (o.status || "new") !== "printed");
+
+  const salesTrend = useMemo(() => {
+    const days = Array.from({ length: 14 }, (_, i) => daysAgoISO(13 - i));
+    const map = new Map(days.map((d) => [d, 0]));
+    entries.forEach((e) => { if (map.has(e.date)) map.set(e.date, map.get(e.date) + Number(e.amount || 0)); });
+    return days.map((d) => ({ date: d, value: map.get(d) || 0 }));
+  }, [entries]);
+
+  const cashFlow7d = useMemo(() => {
+    const days = Array.from({ length: 7 }, (_, i) => daysAgoISO(6 - i));
+    return days.map((d) => {
+      const cin = entries.filter((e) => e.date === d && (e.payment_mode || "Cash") === "Cash").reduce((s, e) => s + Number(e.amount || 0), 0)
+        + cashManual.filter((c) => c.date === d && c.type === "in").reduce((s, c) => s + Number(c.amount || 0), 0);
+      const cout = purchases.filter((p) => p.date === d && (p.payment_mode || "Cash") === "Cash").reduce((s, p) => s + Number(p.total ?? p.amount ?? 0), 0)
+        + cashManual.filter((c) => c.date === d && c.type === "out").reduce((s, c) => s + Number(c.amount || 0), 0);
+      return { label: new Date(d).toLocaleDateString("en-IN", { weekday: "short" }).slice(0, 2), in: cin, out: cout };
+    });
+  }, [entries, purchases, cashManual]);
+
+  const topRubbers = useMemo(() => {
+    const map = new Map();
+    entries.forEach((e) => { map.set(e.rubber_id, (map.get(e.rubber_id) || 0) + 1); });
+    return [...map.entries()]
+      .map(([id, count]) => ({ rubber: rubbers.find((r) => r.id === id), count }))
+      .filter((x) => x.rubber)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [entries, rubbers]);
+  const maxTopCount = Math.max(1, ...topRubbers.map((t) => t.count));
+
+  const recentSales = entries.slice(0, 6);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
+        <SectionTitle icon={LayoutDashboard} title={`Welcome, ${user.name.split(" ")[0]}`} bare />
+        <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft }}>{fmtDate(todayStr)}</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 10, marginBottom: 12 }}>
+        <KpiCard label="Today's Sales" value={inr(todaySales)} sub={`${todayCount} stamp${todayCount === 1 ? "" : "s"} today`} accent={C.sage} />
+        <KpiCard label="This Month" value={inr(monthSales)} sub={`${monthCount} stamps sold`} accent={C.stamp} />
+        <KpiCard label="Cash Balance" value={inr(cashBalance)} sub="Across all cash entries" />
+        <KpiCard label="Low Stock" value={lowStock.length} sub="Items ≤ 15 pcs" accent={lowStock.length ? C.stamp : C.sage} />
+        {user.role === "admin" && <KpiCard label="Pending Orders" value={pendingOrders.length} sub="Not yet printed" />}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 12, marginBottom: 12 }}>
+        <Card>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <Label style={{ marginBottom: 0 }}>Sales Trend (14 Days)</Label>
+            <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>{inr(salesTrend.reduce((s, d) => s + d.value, 0))} total</div>
+          </div>
+          <TrendSVG data={salesTrend} color={C.stamp} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft, marginTop: 2 }}>
+            <span>{fmtDate(salesTrend[0].date)}</span><span>{fmtDate(salesTrend[salesTrend.length - 1].date)}</span>
+          </div>
+        </Card>
+        <Card>
+          <Label>Cash Flow (7 Days)</Label>
+          <CashFlowSVG data={cashFlow7d} />
+          <div style={{ display: "flex", gap: 14, marginTop: 4, fontFamily: font.mono, fontSize: 10.5 }}>
+            <span style={{ color: C.sage }}>● Cash In</span><span style={{ color: C.stamp }}>● Cash Out</span>
+          </div>
+        </Card>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 12, marginBottom: 12 }}>
+        <Card>
+          <Label>Top Selling Rubbers</Label>
+          {topRubbers.length === 0 && <EmptyNote text="No sales yet." />}
+          {topRubbers.map(({ rubber, count }) => (
+            <div key={rubber.id} style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rubber.name}</span>
+                <span style={{ fontFamily: font.mono, color: C.inkSoft, flexShrink: 0 }}>{count} sold</span>
+              </div>
+              <div style={{ height: 7, background: C.paperDark, borderRadius: 4, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${(count / maxTopCount) * 100}%`, background: C.stamp, borderRadius: 4 }} />
+              </div>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <Label>Low Stock Alerts</Label>
+          {lowStock.length === 0 && <EmptyNote text="All items are well stocked." />}
+          {lowStock.slice(0, 6).map((r) => {
+            const s = stockByRubber[r.id] || { balance: 0 };
+            return (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${C.paperDark}` }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+                <Tag tone="out">{s.balance} left</Tag>
+              </div>
+            );
+          })}
+        </Card>
+      </div>
+
+      <Card>
+        <Label>Recent Sales</Label>
+        {recentSales.length === 0 && <EmptyNote text="No stamp entries yet." />}
+        {recentSales.map((e) => {
+          const r = rubbers.find((r) => r.id === e.rubber_id);
+          return (
+            <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${C.paperDark}` }}>
+              <div style={{ minWidth: 0, overflow: "hidden" }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r?.name || "Unknown"}</div>
+                <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>{fmtDate(e.date)}</div>
+              </div>
+              <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage, flexShrink: 0 }}>+{inr(e.amount)}</div>
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
 }
 
 /* ================= USERS ================= */
