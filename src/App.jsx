@@ -98,6 +98,28 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+// Compact axis label, e.g. ₹1.2L / ₹8.4k / ₹350 — used on chart y-axes so
+// big rupee values don't crowd the gridlines.
+const fmtAxis = (n) => {
+  const v = Number(n || 0);
+  if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
+  if (v >= 1000) return `₹${(v / 1000).toFixed(1)}k`;
+  return `₹${Math.round(v)}`;
+};
+// Smooth Catmull-Rom-through-Bezier path through a set of [x,y] points, so
+// dashboard trend lines read as gentle curves instead of jagged polylines.
+function smoothPath(pts) {
+  if (!pts.length) return "";
+  if (pts.length < 3) return `M ${pts.map((p) => `${p[0]},${p[1]}`).join(" L ")}`;
+  let d = `M ${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x},${c1y} ${c2x},${c2y} ${p2[0]},${p2[1]}`;
+  }
+  return d;
+}
 function exportToCSV(filename, rows) {
   if (!rows || rows.length === 0) return;
   const headers = Object.keys(rows[0]);
@@ -466,6 +488,19 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
           ctx.arc(0, 0, r, 0, Math.PI * 2);
         }
       };
+
+      // Optional solid fill: frame shapes normally draw as a bare outline
+      // (transparent inside), so anything behind them — another layer's line,
+      // the circle's ring, etc. — always shows through regardless of layer
+      // order. Turning Fill on paints the shape's interior first so it can
+      // actually occlude whatever sits underneath it.
+      if (layer.fill) {
+        ctx.save();
+        tracePath(0);
+        ctx.fillStyle = layer.fillColor || "#FFFFFF";
+        ctx.fill();
+        ctx.restore();
+      }
 
       // Line Break controls the NUMBER OF BREAKS around the border.
       // 0 = continuous border. Every +1 on the slider adds 5 breaks:
@@ -3064,6 +3099,17 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <SliderControl label="Break" value={activeLayer.lineBreak ?? 0} min={0} max={200} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
             </>
           )}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: activeLayer.fill ? 8 : 16 }}>
+            <input type="checkbox" checked={!!activeLayer.fill} onChange={(e) => updateLayer(activeLayer.id, { fill: e.target.checked })} />
+            Fill background (blocks whatever is behind this shape)
+          </label>
+          {activeLayer.fill && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <Label style={{ margin: 0 }}>Fill Color</Label>
+              <input type="color" value={activeLayer.fillColor || "#FFFFFF"} onChange={(e) => updateLayer(activeLayer.id, { fillColor: e.target.value })}
+                style={{ width: 34, height: 26, padding: 0, border: `1px solid ${C.line}`, borderRadius: 6, cursor: "pointer" }} />
+            </div>
+          )}
           <Label>Border Style</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 4 }}>
             {(activeLayer.shape === "triangle" ? FRAME_BORDER_STYLES.filter((o) => o.id === "single" || o.id === "double") : FRAME_BORDER_STYLES).map((opt) => {
@@ -4192,10 +4238,10 @@ function StockTab({ rubbers, stockByRubber }) {
       <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch" }}>
         <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>
-            <col style={{ width: "34%" }} /><col style={{ width: "14%" }} /><col style={{ width: "13%" }} /><col style={{ width: "13%" }} /><col style={{ width: "13%" }} /><col style={{ width: "13%" }} />
+            <col style={{ width: "38%" }} /><col style={{ width: "16%" }} /><col style={{ width: "15%" }} /><col style={{ width: "15%" }} /><col style={{ width: "16%" }} />
           </colgroup>
           <thead><tr>
-            <th style={thStyle}>Rubber / Size</th><th style={{ ...thStyle, textAlign: "right" }}>Rate (₹)</th><th style={{ ...thStyle, textAlign: "right" }}>Open</th><th style={{ ...thStyle, textAlign: "right" }}>In</th><th style={{ ...thStyle, textAlign: "right" }}>Out</th><th style={{ ...thStyle, textAlign: "right" }}>Close</th>
+            <th style={thStyle}>Rubber / Size</th><th style={{ ...thStyle, textAlign: "right" }}>Rate (₹)</th><th style={{ ...thStyle, textAlign: "right" }}>In</th><th style={{ ...thStyle, textAlign: "right" }}>Out</th><th style={{ ...thStyle, textAlign: "right" }}>Close</th>
           </tr></thead>
           <tbody>
             {rubberOnly.map((r) => {
@@ -4209,7 +4255,7 @@ function StockTab({ rubbers, stockByRubber }) {
                   </div>
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>{inr(r.rate)}</td>
-                <td style={{ ...tdStyle, textAlign: "right" }}>{s.opening}</td><td style={{ ...tdStyle, textAlign: "right", color: C.sage }}>+{s.purchased}</td><td style={{ ...tdStyle, textAlign: "right", color: C.stamp }}>−{s.used}</td><td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: low ? C.stamp : C.ink }}>{low ? `${s.balance} ⚠` : s.balance}</td>
+                <td style={{ ...tdStyle, textAlign: "right", color: C.sage }}>+{s.purchased}</td><td style={{ ...tdStyle, textAlign: "right", color: C.stamp }}>−{s.used}</td><td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: low ? C.stamp : C.ink }}>{low ? `${s.balance} ⚠` : s.balance}</td>
               </tr>;
             })}
           </tbody>
@@ -4460,61 +4506,151 @@ function DashboardTab({ entries, purchases, cashManual, rubbers }) {
 }
 
 function LineChart({ data }) {
+  const [hover, setHover] = useState(null);
   if (!data.length) return <EmptyNote text="No data for the selected dates." />;
-  const W=900,H=280,P=38; const max=Math.max(1,...data.map(d=>Math.max(d.in,d.out))); const step=data.length===1 ? 0 : (W-P*2)/(data.length-1);
-  const points=(key)=>data.map((d,i)=>`${P+i*step},${H-P-(d[key]/max)*(H-P*2)}`).join(" ");
-  return <div style={{overflowX:"auto"}}><svg viewBox={`0 0 ${W} ${H}`} width="100%" height="280" role="img" aria-label="Cash flow line chart">
-    {[0,.25,.5,.75,1].map(v=><line key={v} x1={P} x2={W-P} y1={H-P-v*(H-P*2)} y2={H-P-v*(H-P*2)} stroke="#D7DEE8" strokeWidth="1" />)}
-    <polyline fill="none" stroke="#3F7FE8" strokeWidth="3" points={points("in")} />
-    <polyline fill="none" stroke="#263241" strokeWidth="3" points={points("out")} />
-    {data.map((d,i)=><g key={d.date}><circle cx={P+i*step} cy={H-P-(d.in/max)*(H-P*2)} r="3.5" fill="#3F7FE8"/><circle cx={P+i*step} cy={H-P-(d.out/max)*(H-P*2)} r="3.5" fill="#263241"/><text x={P+i*step} y={H-12} textAnchor="middle" fontSize="9" fill="#687587">{new Date(d.date).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})}</text></g>)}
-    <text x={P} y={18} fontSize="10" fill="#3F7FE8">IN</text><text x={P+25} y={18} fontSize="10" fill="#263241">OUT</text>
-  </svg></div>;
+  const W = 900, H = 300, P = 46, PB = 32;
+  const max = Math.max(1, ...data.map(d => Math.max(d.in, d.out)));
+  const step = data.length === 1 ? 0 : (W - P * 2) / (data.length - 1);
+  const xFor = (i) => P + i * step;
+  const yFor = (v) => H - PB - (v / max) * (H - P - PB);
+  const inPts = data.map((d, i) => [xFor(i), yFor(d.in)]);
+  const outPts = data.map((d, i) => [xFor(i), yFor(d.out)]);
+  const inPath = smoothPath(inPts);
+  const outPath = smoothPath(outPts);
+  const areaPath = `${inPath} L ${xFor(data.length - 1)},${H - PB} L ${xFor(0)},${H - PB} Z`;
+  const labelEvery = Math.max(1, Math.ceil(data.length / 9));
+  const hitW = step || (W - P * 2);
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="300" role="img" aria-label="Cash flow line chart" onMouseLeave={() => setHover(null)}>
+        <defs>
+          <linearGradient id="cfInGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3F7FE8" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#3F7FE8" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0, .25, .5, .75, 1].map(v => {
+          const y = H - PB - v * (H - P - PB);
+          return <g key={v}>
+            <line x1={P} x2={W - P} y1={y} y2={y} stroke="#E3E8F0" strokeWidth="1" />
+            <text x={P - 8} y={y + 3} textAnchor="end" fontSize="9.5" fill="#8A97A8">{fmtAxis(v * max)}</text>
+          </g>;
+        })}
+        <path d={areaPath} fill="url(#cfInGrad)" stroke="none" />
+        <path d={outPath} fill="none" stroke="#263241" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5 4" />
+        <path d={inPath} fill="none" stroke="#3F7FE8" strokeWidth="2.75" strokeLinecap="round" />
+        {data.map((d, i) => (
+          <g key={d.date}>
+            <circle cx={xFor(i)} cy={yFor(d.in)} r={hover === i ? 5 : 3.5} fill="#3F7FE8" />
+            <circle cx={xFor(i)} cy={yFor(d.out)} r={hover === i ? 5 : 3.5} fill="#263241" />
+            {i % labelEvery === 0 && <text x={xFor(i)} y={H - 10} textAnchor="middle" fontSize="9" fill="#687587">{new Date(d.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</text>}
+            <rect x={xFor(i) - hitW / 2} y={P} width={hitW} height={H - P - PB} fill="transparent" onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }} />
+          </g>
+        ))}
+        <circle cx={P + 2} cy={16} r="4" fill="#3F7FE8" /><text x={P + 11} y={19} fontSize="10" fill="#3F7FE8" fontWeight="600">IN</text>
+        <circle cx={P + 46} cy={16} r="4" fill="#263241" /><text x={P + 55} y={19} fontSize="10" fill="#263241" fontWeight="600">OUT</text>
+        {hover != null && (() => {
+          const d = data[hover]; const x = xFor(hover);
+          const boxW = 128, boxH = 56;
+          const bx = Math.min(Math.max(x - boxW / 2, P), W - P - boxW);
+          const by = 26;
+          return <g pointerEvents="none">
+            <line x1={x} x2={x} y1={P} y2={H - PB} stroke="#B9C3D1" strokeWidth="1" strokeDasharray="3 3" />
+            <rect x={bx} y={by} width={boxW} height={boxH} rx="8" fill="#1F2937" opacity="0.94" />
+            <text x={bx + 10} y={by + 18} fontSize="10" fill="#DCE9FF">{new Date(d.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</text>
+            <text x={bx + 10} y={by + 35} fontSize="10.5" fill="#8FC1FF" fontWeight="700">IN {inr(d.in)}</text>
+            <text x={bx + 10} y={by + 50} fontSize="10.5" fill="#CBD5E1" fontWeight="700">OUT {inr(d.out)}</text>
+          </g>;
+        })()}
+      </svg>
+    </div>
+  );
 }
 
 function MonthlyQtyRateChart({ data }) {
+  const [hover, setHover] = useState(null);
   if (!data.length) return <EmptyNote text="No sales data yet." />;
-  const W = 900, H = 280, P = 42;
+  const W = 900, H = 300, P = 46, PB = 32;
   const maxQty = Math.max(1, ...data.map(d => d.qty));
   const maxRate = Math.max(1, ...data.map(d => d.rate));
   const step = data.length === 1 ? 0 : (W - P * 2) / (data.length - 1);
-  const yQty = (v) => H - P - (v / maxQty) * (H - P * 2);
-  const yRate = (v) => H - P - (v / maxRate) * (H - P * 2);
-  const qtyPoints = data.map((d, i) => `${P + i * step},${yQty(d.qty)}`).join(" ");
-  const ratePoints = data.map((d, i) => `${P + i * step},${yRate(d.rate)}`).join(" ");
+  const xFor = (i) => P + i * step;
+  const yQty = (v) => H - PB - (v / maxQty) * (H - P - PB);
+  const yRate = (v) => H - PB - (v / maxRate) * (H - P - PB);
+  const barW = Math.min(36, (step || W - P * 2) * 0.4);
+  const ratePath = smoothPath(data.map((d, i) => [xFor(i), yRate(d.rate)]));
+  const labelEvery = Math.max(1, Math.ceil(data.length / 9));
+  const hitW = step || (W - P * 2);
   const monthLabel = (m) => {
     const [y, mo] = m.split("-");
     return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
   };
   return (
     <div style={{ overflowX: "auto" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="280" role="img" aria-label="Monthly qty and rate line chart">
-        {[0, .25, .5, .75, 1].map(v => (
-          <line key={v} x1={P} x2={W - P} y1={H - P - v * (H - P * 2)} y2={H - P - v * (H - P * 2)} stroke="#D7DEE8" strokeWidth="1" />
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="300" role="img" aria-label="Monthly qty and rate chart" onMouseLeave={() => setHover(null)}>
+        {[0, .25, .5, .75, 1].map(v => {
+          const y = H - PB - v * (H - P - PB);
+          return <g key={v}>
+            <line x1={P} x2={W - P} y1={y} y2={y} stroke="#E3E8F0" strokeWidth="1" />
+            <text x={P - 8} y={y + 3} textAnchor="end" fontSize="9.5" fill="#8A97A8">{Math.round(v * maxQty)}</text>
+          </g>;
+        })}
+        {/* Qty as bars (own scale, left axis) so it reads clearly against the
+           very different scale of the average-rate line drawn over it. */}
+        {data.map((d, i) => (
+          <rect key={`bar-${d.month}`} x={xFor(i) - barW / 2} y={yQty(d.qty)} width={barW}
+            height={Math.max(0, (H - PB) - yQty(d.qty))} rx="4"
+            fill={hover === i ? C.stamp : "#B9D2F5"} style={{ transition: "fill .12s" }} />
         ))}
-        <polyline fill="none" stroke={C.stamp} strokeWidth="3" points={qtyPoints} />
-        <polyline fill="none" stroke={C.ink} strokeWidth="3" strokeDasharray="5 4" points={ratePoints} />
+        <path d={ratePath} fill="none" stroke={C.ink} strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" />
         {data.map((d, i) => (
           <g key={d.month}>
-            <circle cx={P + i * step} cy={yQty(d.qty)} r="3.5" fill={C.stamp} />
-            <circle cx={P + i * step} cy={yRate(d.rate)} r="3.5" fill={C.ink} />
-            <text x={P + i * step} y={H - 20} textAnchor="middle" fontSize="9" fill="#687587">{monthLabel(d.month)}</text>
-            <text x={P + i * step} y={H - 8} textAnchor="middle" fontSize="9.5" fontWeight="700" fill={C.stamp}>{d.qty}</text>
+            <circle cx={xFor(i)} cy={yRate(d.rate)} r={hover === i ? 5 : 3.5} fill={C.ink} />
+            {i % labelEvery === 0 && <text x={xFor(i)} y={H - 10} textAnchor="middle" fontSize="9" fill="#687587">{monthLabel(d.month)}</text>}
+            <rect x={xFor(i) - hitW / 2} y={P} width={hitW} height={H - P - PB} fill="transparent" onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }} />
           </g>
         ))}
-        <text x={P} y={18} fontSize="10" fill={C.stamp}>QTY</text>
-        <text x={P + 32} y={18} fontSize="10" fill={C.ink}>RATE (avg ₹)</text>
+        <rect x={P} y={7} width="10" height="10" rx="2" fill="#B9D2F5" /><text x={P + 15} y={16} fontSize="10" fill={C.stamp} fontWeight="600">QTY</text>
+        <line x1={P + 60} x2={P + 78} y1={12} y2={12} stroke={C.ink} strokeWidth="2.5" strokeDasharray="5 4" /><text x={P + 84} y={16} fontSize="10" fill={C.ink} fontWeight="600">RATE (avg)</text>
+        {hover != null && (() => {
+          const d = data[hover]; const x = xFor(hover);
+          const boxW = 132, boxH = 56;
+          const bx = Math.min(Math.max(x - boxW / 2, P), W - P - boxW);
+          const by = 26;
+          return <g pointerEvents="none">
+            <line x1={x} x2={x} y1={P} y2={H - PB} stroke="#B9C3D1" strokeWidth="1" strokeDasharray="3 3" />
+            <rect x={bx} y={by} width={boxW} height={boxH} rx="8" fill="#1F2937" opacity="0.94" />
+            <text x={bx + 10} y={by + 18} fontSize="10" fill="#DCE9FF">{monthLabel(d.month)}</text>
+            <text x={bx + 10} y={by + 35} fontSize="10.5" fill="#8FC1FF" fontWeight="700">Qty {d.qty}</text>
+            <text x={bx + 10} y={by + 50} fontSize="10.5" fill="#CBD5E1" fontWeight="700">Avg Rate {inr(d.rate)}</text>
+          </g>;
+        })()}
       </svg>
     </div>
   );
 }
 
 function DonutChart({ cash, bank }) {
-  const total=cash+bank; if(!total) return <EmptyNote text="No sales for the selected dates." />;
-  const r=62,circ=2*Math.PI*r, cashLen=(cash/total)*circ;
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:28,minHeight:190}}>
-    <div style={{position:"relative",width:150,height:150}}><svg width="150" height="150" viewBox="0 0 150 150"><circle cx="75" cy="75" r={r} fill="none" stroke="#E8EDF4" strokeWidth="22"/><circle cx="75" cy="75" r={r} fill="none" stroke="#3F7FE8" strokeWidth="22" strokeDasharray={`${cashLen} ${circ-cashLen}`} transform="rotate(-90 75 75)" strokeLinecap="butt"/><circle cx="75" cy="75" r="38" fill={C.white}/></svg><div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}><b style={{fontFamily:font.display,fontSize:18}}>{inr(total)}</b><span style={{fontSize:9,color:C.inkSoft}}>SALES</span></div></div>
-    <div style={{fontFamily:font.mono,fontSize:11,display:"grid",gap:10}}><div><span style={{display:"inline-block",width:9,height:9,borderRadius:2,background:C.stamp,marginRight:7}}/>Cash <b>{inr(cash)}</b></div><div><span style={{display:"inline-block",width:9,height:9,borderRadius:2,background:C.paperDark,border:`1px solid ${C.line}`,marginRight:7}}/>Bank <b>{inr(bank)}</b></div></div>
+  const total = cash + bank; if (!total) return <EmptyNote text="No sales for the selected dates." />;
+  const r = 58, circ = 2 * Math.PI * r, cashLen = (cash / total) * circ;
+  const cashPct = Math.round((cash / total) * 100), bankPct = 100 - cashPct;
+  const rounded = cashLen > 0 && cashLen < circ;
+  return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 28, minHeight: 190, flexWrap: "wrap" }}>
+    <div style={{ position: "relative", width: 150, height: 150 }}>
+      <svg width="150" height="150" viewBox="0 0 150 150">
+        <circle cx="75" cy="75" r={r} fill="none" stroke="#E8EDF4" strokeWidth="20" />
+        <circle cx="75" cy="75" r={r} fill="none" stroke="#3F7FE8" strokeWidth="20" strokeDasharray={`${cashLen} ${circ - cashLen}`} strokeLinecap={rounded ? "round" : "butt"} transform="rotate(-90 75 75)" />
+        <circle cx="75" cy="75" r="40" fill={C.white} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+        <b style={{ fontFamily: font.display, fontSize: 17 }}>{inr(total)}</b>
+        <span style={{ fontSize: 9, color: C.inkSoft, letterSpacing: 0.5 }}>SALES</span>
+      </div>
+    </div>
+    <div style={{ fontFamily: font.mono, fontSize: 11.5, display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: C.stamp }} />Cash <b>{inr(cash)}</b><span style={{ color: C.inkSoft }}>({cashPct}%)</span></div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 3, background: C.paperDark, border: `1px solid ${C.line}` }} />Bank <b>{inr(bank)}</b><span style={{ color: C.inkSoft }}>({bankPct}%)</span></div>
+    </div>
   </div>;
 }
 
