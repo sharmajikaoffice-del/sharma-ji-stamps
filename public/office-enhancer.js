@@ -9,9 +9,7 @@
       #root .sjs-responsive-table{margin-right:-2px}
       #root .sjs-responsive-table table{min-width:0!important}
 
-      /* Stock report: the JSX table has an explicit 720px desktop width.
-         On phones remove the desktop colgroup widths and turn each row into
-         a full-width readable card. */
+      /* Stock report mobile: full-width cards with the four stock metrics on one row. */
       #root table[style*="min-width: 720px"]{
         display:block!important;
         width:100%!important;min-width:0!important;max-width:100%!important;
@@ -21,29 +19,38 @@
       #root table[style*="min-width: 720px"] thead{display:none!important}
       #root table[style*="min-width: 720px"] tbody{display:block!important;width:100%!important}
       #root table[style*="min-width: 720px"] tbody tr{
-        display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px;
+        display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 8px;
         width:100%!important;max-width:100%!important;margin:0 0 10px!important;padding:10px!important;
         border:1px solid #e2e8f0!important;border-radius:12px!important;
         background:#fff!important;box-shadow:0 1px 2px rgba(15,23,42,.04);
+        box-sizing:border-box!important;
       }
       #root table[style*="min-width: 720px"] tbody tr:last-child{margin-bottom:0!important}
       #root table[style*="min-width: 720px"] tbody td{
         display:flex!important;align-items:center;justify-content:space-between;
         min-width:0!important;width:100%!important;padding:8px 2px!important;
         border:0!important;white-space:normal!important;overflow:visible!important;
+        box-sizing:border-box!important;
       }
       #root table[style*="min-width: 720px"] tbody td:first-child{
         grid-column:1/-1!important;padding-bottom:10px!important;
         border-bottom:1px solid #eef2f7!important;margin-bottom:3px;
       }
-      #root table[style*="min-width: 720px"] tbody td:nth-child(2)::before{content:"Rate";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace;margin-right:8px}
-      #root table[style*="min-width: 720px"] tbody td:nth-child(3)::before{content:"In";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace;margin-right:8px}
-      #root table[style*="min-width: 720px"] tbody td:nth-child(4)::before{content:"Out";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace;margin-right:8px}
-      #root table[style*="min-width: 720px"] tbody td:nth-child(5)::before{content:"Close";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace;margin-right:8px}
       #root table[style*="min-width: 720px"] tbody td:nth-child(2),
       #root table[style*="min-width: 720px"] tbody td:nth-child(3),
       #root table[style*="min-width: 720px"] tbody td:nth-child(4),
-      #root table[style*="min-width: 720px"] tbody td:nth-child(5){text-align:right!important}
+      #root table[style*="min-width: 720px"] tbody td:nth-child(5){
+        text-align:right!important;justify-content:space-between!important;gap:4px!important;
+        overflow:hidden!important;
+      }
+      #root table[style*="min-width: 720px"] tbody td:nth-child(2)::before{content:"Rate";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace}
+      #root table[style*="min-width: 720px"] tbody td:nth-child(3)::before{content:"In";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace}
+      #root table[style*="min-width: 720px"] tbody td:nth-child(4)::before{content:"Out";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace}
+      #root table[style*="min-width: 720px"] tbody td:nth-child(5)::before{content:"Close";color:#64748b;font:600 10px/1.2 'IBM Plex Mono',monospace}
+      #root table[style*="min-width: 720px"] tbody td:nth-child(2)>*,
+      #root table[style*="min-width: 720px"] tbody td:nth-child(3)>*,
+      #root table[style*="min-width: 720px"] tbody td:nth-child(4)>*,
+      #root table[style*="min-width: 720px"] tbody td:nth-child(5)>*{min-width:0!important}
     }
   `;
   const style=document.createElement('style');style.textContent=css;document.head.appendChild(style);
