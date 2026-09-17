@@ -1224,10 +1224,65 @@ function CustomerDesigner() {
   );
 }
 
+/* ================= HOME PAGE (public landing page at "/") ================= */
+function HomePage() {
+  return (
+    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column" }}>
+      <div style={{ background: C.headerGreen, color: C.white, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <StampMark size={32} />
+          <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 18 }}>Sharma Ji Stamps</div>
+        </div>
+        <a href="/login" style={{ background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 8, color: C.white, textDecoration: "none", fontFamily: font.body, fontWeight: 600, fontSize: 13, padding: "9px 16px" }}>
+          Staff Login
+        </a>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: "60px 20px 40px", textAlign: "center" }}>
+        <StampMark size={90} />
+        <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 34, marginTop: 18, maxWidth: 620, lineHeight: 1.2 }}>
+          Custom Rubber Stamps, Made the Traditional Way
+        </div>
+        <div style={{ fontFamily: font.body, fontSize: 15, color: C.inkSoft, marginTop: 14, maxWidth: 520, lineHeight: 1.6 }}>
+          Round, square and rectangle office stamps — company seals, address stamps, signature stamps and more. Design it online, we print and deliver.
+        </div>
+
+        <div style={{ display: "flex", gap: 14, marginTop: 32, flexWrap: "wrap", justifyContent: "center" }}>
+          <a href="/customer" style={{ background: C.headerGreen, color: C.white, border: "none", borderRadius: 10, textDecoration: "none", fontFamily: font.body, fontWeight: 700, fontSize: 14.5, padding: "14px 26px", display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Wand2 size={17} /> Design Your Own Stamp
+          </a>
+          <a href="/login" style={{ background: "transparent", color: C.headerGreen, border: `1.5px solid ${C.headerGreen}`, borderRadius: 10, textDecoration: "none", fontFamily: font.body, fontWeight: 700, fontSize: 14.5, padding: "14px 26px", display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Users size={17} /> Staff Login
+          </a>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16, marginTop: 56, maxWidth: 880, width: "100%" }}>
+          {[
+            { icon: Stamp, title: "Every Shape & Size", text: "Round, square and rectangle stamps for any business need." },
+            { icon: Wand2, title: "Design Online", text: "Preview your exact stamp layout before it's made." },
+            { icon: Package, title: "Quality Rubber", text: "Durable, sharp, long-lasting impressions every time." },
+          ].map((f) => (
+            <div key={f.title} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 12, padding: "22px 18px", textAlign: "left" }}>
+              <f.icon size={22} color={C.headerGreen} />
+              <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 15, marginTop: 12 }}>{f.title}</div>
+              <div style={{ fontFamily: font.body, fontSize: 12.5, color: C.inkSoft, marginTop: 6, lineHeight: 1.5 }}>{f.text}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", padding: "18px", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, borderTop: `1px solid ${C.line}` }}>
+        © {new Date().getFullYear()} Sharma Ji Stamps
+      </div>
+    </div>
+  );
+}
+
 function SharmaJiStamps() {
-  const isCustomerRoute = typeof window !== "undefined" &&
-    window.location.pathname.replace(/\/$/, "") === "/customer";
-  return isCustomerRoute ? <CustomerDesigner /> : <SharmaJiStampsAdmin />;
+  const path = typeof window !== "undefined" ? window.location.pathname.replace(/\/$/, "") : "";
+  if (path === "/customer") return <CustomerDesigner />;
+  if (path === "") return <HomePage />; // root "/" — public landing page
+  return <SharmaJiStampsAdmin />; // "/login" and everything else — staff login + app
 }
 
 export default SharmaJiStamps;
