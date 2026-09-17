@@ -1287,8 +1287,12 @@ function OrdersTab({ onEditOrder, onBillOrder }) {
 
 /* ================= STAMP ENTRY ================= */
 function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillConsumed }) {
+  // Stamp entries are always against a "Rubber" category item (the actual
+  // impression stock) — Raw material and Machine items shouldn't show up
+  // here, they're only relevant on the Item Master / Purchases screens.
+  const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
   const [date, setDate] = useState(todayISO());
-  const [rubberId, setRubberId] = useState(rubbers[0]?.id || "");
+  const [rubberId, setRubberId] = useState(rubberOnly[0]?.id || "");
   const [mobile, setMobile] = useState("");
   const [discount, setDiscount] = useState(0);
   const [paymentMode, setPaymentMode] = useState("Cash");
@@ -1359,9 +1363,18 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
             <Label>Date</Label>
             <Field type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             <Label>Select Rubber</Label>
-            <Select value={rubberId} onChange={(e) => setRubberId(e.target.value)}>
-              {rubbers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </Select>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
+              {rubber?.photo_url ? (
+                <img src={rubber.photo_url} alt={rubber.name} style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 40, height: 40, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Package size={18} color={C.brass} />
+                </div>
+              )}
+              <Select value={rubberId} onChange={(e) => setRubberId(e.target.value)} style={{ marginBottom: 0, flex: 1 }}>
+                {rubberOnly.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </Select>
+            </div>
             <Label>Customer Mobile No.</Label>
             <Field type="tel" placeholder="98xxxxxxxx" value={mobile} onChange={(e) => setMobile(e.target.value)} />
             <div style={{ display: "flex", gap: 10 }}>
@@ -3084,25 +3097,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <>
           <SliderControl label="Line width" value={activeLayer.width ?? 55} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={80} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
-          <Label>Orientation</Label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 7, marginBottom: 10 }}>
-            {[{ id: 0, label: "Horizontal Bar" }, { id: 90, label: "Vertical Bar" }].map((opt) => {
-              const active = Number(activeLayer.rotation ?? 0) === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => updateLayer(activeLayer.id, {
-                    rotation: opt.id,
-                    // A flat (butt-cap) stroke at the default thin width still
-                    // reads as a "line" rather than a solid bar — bump it up
-                    // to a proper bar thickness the first time this is picked.
-                    strokeWidth: (activeLayer.strokeWidth ?? 4) < 16 ? 24 : activeLayer.strokeWidth,
-                  })}
-                  style={{ border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.ink, borderRadius: 8, padding: "9px 4px", cursor: "pointer", fontSize: 10.5, fontWeight: active ? 700 : 500 }}>{opt.label}</button>
-              );
-            })}
-          </div>
           <Label>Curve</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, marginBottom: 10 }}>
             {[{ id: 0, label: "Straight" }, { id: -1, label: "Up Curve" }, { id: 1, label: "Down Curve" }].map((opt) => {
@@ -3605,6 +3599,34 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                         </button>
                         <button
                           type="button"
+                          title="Bring forward (on top)"
+                          aria-label="Bring forward"
+                          onClick={(e) => { e.stopPropagation(); moveLayerOrder(l.id, 1); }}
+                          style={{
+                            width: 28, height: 28, padding: 0, flexShrink: 0,
+                            display: "grid", placeItems: "center",
+                            border: `1px solid ${C.line}`, borderRadius: 6,
+                            background: C.white, color: C.inkSoft, cursor: "pointer",
+                          }}
+                        >
+                          <ArrowUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          title="Send backward"
+                          aria-label="Send backward"
+                          onClick={(e) => { e.stopPropagation(); moveLayerOrder(l.id, -1); }}
+                          style={{
+                            width: 28, height: 28, padding: 0, flexShrink: 0,
+                            display: "grid", placeItems: "center",
+                            border: `1px solid ${C.line}`, borderRadius: 6,
+                            background: C.white, color: C.inkSoft, cursor: "pointer",
+                          }}
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <button
+                          type="button"
                           title="Duplicate layer"
                           aria-label="Duplicate layer"
                           onClick={(e) => { e.stopPropagation(); duplicateLayer(l.id); }}
@@ -3735,6 +3757,22 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                             style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: l.locked ? STAMP_INK_BLUE : C.inkSoft, flexShrink: 0 }}
                           >
                             {l.locked ? <Lock size={16} /> : <Unlock size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            title="Bring forward (on top)"
+                            onClick={(e) => { e.stopPropagation(); moveLayerOrder(l.id, 1); }}
+                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: C.inkSoft, flexShrink: 0 }}
+                          >
+                            <ArrowUp size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            title="Send backward"
+                            onClick={(e) => { e.stopPropagation(); moveLayerOrder(l.id, -1); }}
+                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: C.inkSoft, flexShrink: 0 }}
+                          >
+                            <ArrowDown size={16} />
                           </button>
                           <button
                             type="button"
