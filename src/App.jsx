@@ -2648,14 +2648,21 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // Uses the same 600dpi source as Download — 300dpi was soft/blurry once the
   // browser scaled the image up to the printer's actual resolution.
   const handlePrint = async () => {
+    const sideChoice = window.prompt("Print position choose karein:\n1 = UP SIDE (0 to 2.92 inch)\n2 = DOWN SIDE (2.92 to 5.84 inch)", "1");
+    if (sideChoice === null) return;
+    const printSide = sideChoice.trim().toLowerCase();
+    if (!["1", "2", "up", "down"].includes(printSide)) {
+      window.alert("Please 1 (UP SIDE) ya 2 (DOWN SIDE) select karein.");
+      return;
+    }
+    const isDownSide = printSide === "2" || printSide === "down";
     const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
 
-    // The user cuts one A4 sheet into 3 equal pieces and feeds one piece at a
-    // time. Each piece is 99mm x 210mm (A4/3). Choose orientation from the
-    // stamp's aspect ratio so the print is not rotated unexpectedly.
-    const feederWidthMm = 99;
-    const feederHeightMm = 210;
-    const orientation = widthMm > heightMm ? "landscape" : "portrait";
+    // Print into one of two 2.92-inch-high bands on a portrait A4 sheet.
+    const feederWidthMm = 210;
+    const feederHeightMm = 297;
+    const bandHeightMm = 2.92 * 25.4;
+    const topOffsetMm = isDownSide ? bandHeightMm : 0;
 
     const printWindow = window.open("", "_blank", "width=800,height=1000");
     if (!printWindow) return;
@@ -2664,23 +2671,26 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Print Stamp - A4/3 - ${widthMm}x${heightMm}mm</title>
+          <title>Print Stamp - ${isDownSide ? "DOWN SIDE" : "UP SIDE"} - ${widthMm}x${heightMm}mm</title>
           <style>
             @page {
-              size: ${feederWidthMm}mm ${feederHeightMm}mm ${orientation};
+              size: A4 portrait;
               margin: 0;
             }
             * { box-sizing: border-box; }
             html, body {
               margin: 0;
               padding: 0;
-              width: ${orientation === "landscape" ? feederHeightMm : feederWidthMm}mm;
-              height: ${orientation === "landscape" ? feederWidthMm : feederHeightMm}mm;
+              width: ${feederWidthMm}mm;
+              height: ${feederHeightMm}mm;
               overflow: hidden;
             }
             .sheet {
-              width: ${orientation === "landscape" ? feederHeightMm : feederWidthMm}mm;
-              height: ${orientation === "landscape" ? feederWidthMm : feederHeightMm}mm;
+              position: absolute;
+              top: ${topOffsetMm}mm;
+              left: 0;
+              width: ${feederWidthMm}mm;
+              height: ${bandHeightMm}mm;
               display: flex;
               align-items: center;
               justify-content: center;
