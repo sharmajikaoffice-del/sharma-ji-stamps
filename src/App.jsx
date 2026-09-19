@@ -4705,13 +4705,25 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
   const lowStock = rubberOnly.filter((r) => (stockByRubber[r.id]?.balance ?? 0) <= 15);
   const pendingOrders = orders.filter((o) => (o.status || "new") !== "printed");
   const salesTrend = useMemo(() => {
-    const days = Array.from({ length: 14 }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (13 - i)); return localISO(d);
-    });
+    // Show the complete sales history: from the first recorded sale through today.
+    // Keep every calendar day in the range so zero-sale days remain visible on the graph.
+    const validDates = entries
+      .map((e) => e.date)
+      .filter(Boolean)
+      .sort();
+    const startKey = validDates[0] || todayStr;
+    const start = new Date(`${startKey}T12:00:00`);
+    const end = new Date(`${todayStr}T12:00:00`);
+    const days = [];
+    for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      days.push(localISO(d));
+    }
     const totals = new Map(days.map((d) => [d, 0]));
-    entries.forEach((e) => { if (totals.has(e.date)) totals.set(e.date, totals.get(e.date) + Number(e.amount || 0)); });
+    entries.forEach((e) => {
+      if (totals.has(e.date)) totals.set(e.date, totals.get(e.date) + Number(e.amount || 0));
+    });
     return days.map((date) => ({ date, value: totals.get(date) || 0 }));
-  }, [entries]);
+  }, [entries, todayStr]);
   const monthlyComparison = monthBuckets.map((m) => ({
     ...m,
     sales: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.amount || 0), 0),
@@ -4773,13 +4785,13 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))", gap: 12 }}>
         <section style={panel}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
-            <div><div style={sectionLabel}>Sales trend · last 14 days</div><div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 700, color: C.ink }}>{inr(salesTrend.reduce((sum, d) => sum + d.value, 0))}</div></div>
-            <span style={{ ...miniStat, background: C.paper, borderRadius: 8, padding: "5px 7px" }}>14 DAYS</span>
+            <div><div style={sectionLabel}>Sales trend · since first sale</div><div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 700, color: C.ink }}>{inr(salesTrend.reduce((sum, d) => sum + d.value, 0))}</div></div>
+            <span style={{ ...miniStat, background: C.paper, borderRadius: 8, padding: "5px 7px" }}>ALL TIME</span>
           </div>
           <div style={{ padding: "12px 0 0" }}>
             <TrendSVG data={salesTrend} color="#3F7FE8" height={145} />
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginTop: 8 }}><span>{fmtDate(salesTrend[0].date)}</span><span>{fmtDate(salesTrend[13].date)}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginTop: 8 }}><span>{fmtDate(salesTrend[0].date)}</span><span>{fmtDate(salesTrend[salesTrend.length - 1].date)}</span></div>
         </section>
 
         <section style={panel}>
