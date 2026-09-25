@@ -1129,12 +1129,7 @@ function SharmaJiStampsAdmin() {
 
         {/* ---- desktop content ---- */}
         <div style={{ marginLeft: SIDEBAR_W, minHeight: "100vh" }}>
-          <div style={{
-            padding: editorActive ? 0 : "18px 18px 34px",
-            width: "100%",
-            maxWidth: editorActive ? "none" : 1320,
-            margin: editorActive ? 0 : "0 auto",
-          }}>
+          <div style={{ padding: editorActive ? 0 : "18px 18px 34px", width: "100%", maxWidth: editorActive ? "none" : 1320, margin: editorActive ? 0 : "0 auto" }}>
             {tabContent}
           </div>
         </div>
@@ -2311,15 +2306,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const handleSaveTemplate = async () => {
     if (saveStatus === "saving") return;
-    const suggested = templateName.trim() || "";
-    const name = window.prompt("Enter template name", suggested);
-    if (name === null) return;
-    const cleanName = name.trim();
-    if (!cleanName) return;
-    setTemplateName(cleanName);
+    const name = window.prompt("Enter template name", templateName.trim() || "");
+    if (name === null || !name.trim()) return;
+    setTemplateName(name.trim());
     setSaveStatus("saving");
     try {
-      const [saved] = await dbInsert("stamp_templates", { id: uid(), name: cleanName, config: buildConfig() });
+      const [saved] = await dbInsert("stamp_templates", { id: uid(), name: name.trim(), config: buildConfig() });
       if (saved?.id) setEditingTemplateId(saved.id);
       setSaveStatus("saved");
       await loadTemplates();
@@ -2328,14 +2320,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       setSaveStatus("error");
     }
   };
-
   const handleUpdateTemplate = async () => {
     if (!editingTemplateId || saveStatus === "saving") return;
     const name = templateName.trim();
-    if (!name) {
-      window.alert("Open or save a template first.");
-      return;
-    }
+    if (!name) return;
     setSaveStatus("saving");
     try {
       await dbUpdate("stamp_templates", editingTemplateId, { name, config: buildConfig() });
@@ -3949,6 +3937,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </Card>
           <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             {canvasBlock}
+            <div style={{ height: 2 }} />
             <div style={{ height: 2 }} />
 
           </div>
