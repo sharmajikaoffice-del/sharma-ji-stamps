@@ -2,7 +2,7 @@
   const css = `
     [role="listbox"]{z-index:10050!important;max-height:min(280px,45vh)!important;overflow:auto!important}
     [role="option"]{scroll-margin:6px}
-    .sjs-dropdown-focus{outline:2px solid var(--accent, #3F7FE8)!important;outline-offset:-2px;background:var(--accent-soft, #EAF2FF)!important}
+    .sjs-dropdown-focus{outline:2px solid var(--accent, var(--accent, #3F7FE8))!important;outline-offset:-2px;background:var(--accent-soft, var(--accent-soft, #EAF2FF))!important}
     .sjs-responsive-table{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 
     /* Create Stamp: the mm-size badge sits on top of the preview boundary and
