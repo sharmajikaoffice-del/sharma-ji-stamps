@@ -3888,6 +3888,42 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 <Printer size={16} /> Print
               </Btn>
             </div>
+            {!customerMode && (
+              <Card style={{ padding: 12, marginTop: 0 }}>
+                <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Field
+                    placeholder="Template name, e.g. Invoice Stamp"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    style={{ flex: 1, marginBottom: 0 }}
+                  />
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} style={{ background: STAMP_INK_BLUE }}>
+                      {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update" : "Save"}
+                    </Btn>
+                    <Btn
+                      type="button"
+                      onClick={startNew}
+                      variant="ghost"
+                      style={{ border: `1px solid ${STAMP_INK_BLUE}`, color: STAMP_INK_BLUE, background: C.white }}
+                    >
+                      <Plus size={15} /> New Template
+                    </Btn>
+                  </div>
+                </div>
+                {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
+                {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 11.5 }}>Couldn't save — check the table exists in Supabase.</div>}
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: 150, justifyContent: "center", borderRadius: 8 }}>
+                    <Download size={16} /> Download stamp
+                  </Btn>
+                  <Btn onClick={handlePrint} style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: 120, justifyContent: "center", borderRadius: 8 }}>
+                    <Printer size={16} /> Print
+                  </Btn>
+                </div>
+              </Card>
+            )}
           </div>
           {mobileCanvasSpacer}
           <Card style={{ ...sidePanelStyle, padding: 12 }}>
