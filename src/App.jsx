@@ -1644,6 +1644,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const [borderStyle, setBorderStyle] = useState("double");
   const [texture, setTexture] = useState(true);
   const [radius, setRadius] = useState(138);
+  const [previewZoom, setPreviewZoom] = useState(1);
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [letterSpacing, setLetterSpacing] = useState(2.5);
   const [logo, setLogo] = useState(null);
@@ -1735,8 +1736,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     1,
     ...rubberSizes.map((r) => Number(r.parsed?.widthMm) || 0)
   );
-  const selectedStampPreviewWidth = Math.max(80, Math.min(320, Math.round(
-    320 * ((Number(selectedDimensions.widthMm) || 1) / maxConfiguredStampWidthMm)
+  const selectedStampPreviewWidth = Math.max(70, Math.min(250, Math.round(
+    250 * ((Number(selectedDimensions.widthMm) || 1) / maxConfiguredStampWidthMm)
   )));
   const selectedStampPreviewHeight = Math.max(80, Math.round(
     selectedStampPreviewWidth * editorAspect
@@ -3446,31 +3447,41 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            position: "relative",
-            width: `${selectedStampPreviewWidth}px`,
-            height: `${selectedStampPreviewHeight}px`,
-            maxWidth: "88%",
-            maxHeight: "88%",
-            border: `2px dashed ${STAMP_INK_BLUE}`,
-            borderRadius: 3,
-            boxShadow: "0 0 0 4px rgba(63,127,232,.10)",
-            background: "rgba(63,127,232,.035)",
-            flexShrink: 0,
-            transition: "width .18s ease, height .18s ease",
-          }}
-        >
-          <canvas
-            ref={canvasRef}
-            onPointerDown={handleCanvasPointerDown}
-            onPointerMove={handleCanvasPointerMove}
-            onPointerUp={handleCanvasPointerUp}
-            onPointerCancel={handleCanvasPointerUp}
-            onClick={handleCanvasClick}
-            title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
-            style={{ width: "100%", height: "100%", display: "block", cursor: layers.length ? "pointer" : "default" }}
-          />
+        <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, maxWidth: "94%" }}>
+          <div
+            style={{
+              position: "relative",
+              width: `${selectedStampPreviewWidth}px`,
+              height: `${selectedStampPreviewHeight}px`,
+              maxWidth: "94%",
+              maxHeight: "82%",
+              border: `2px dashed ${STAMP_INK_BLUE}`,
+              borderRadius: 3,
+              boxShadow: "0 0 0 4px rgba(63,127,232,.10)",
+              background: "rgba(63,127,232,.035)",
+              flexShrink: 0,
+              transform: `scale(${previewZoom})`,
+              transformOrigin: "center center",
+              transition: "transform .15s ease, width .18s ease, height .18s ease",
+            }}
+          >
+            <canvas
+              ref={canvasRef}
+              onPointerDown={handleCanvasPointerDown}
+              onPointerMove={handleCanvasPointerMove}
+              onPointerUp={handleCanvasPointerUp}
+              onPointerCancel={handleCanvasPointerUp}
+              onClick={handleCanvasClick}
+              title={layers.length ? "Click an item on the stamp to edit it" : "Add an item from the toolbar to edit it"}
+              style={{ width: "100%", height: "100%", display: "block", cursor: layers.length ? "pointer" : "default" }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap", transform: `translateY(${Math.max(0, (previewZoom - 1) * 8)}px)` }}>
+            <button type="button" onClick={() => setPreviewZoom((z) => Math.max(0.6, Number((z - 0.1).toFixed(1))))} title="Zoom out" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800 }}>−</button>
+            <span style={{ minWidth: 46, textAlign: "center", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{Math.round(previewZoom * 100)}%</span>
+            <button type="button" onClick={() => setPreviewZoom((z) => Math.min(1.5, Number((z + 0.1).toFixed(1))))} title="Zoom in" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800 }}>+</button>
+            <button type="button" onClick={() => setPreviewZoom(1)} title="Reset zoom" style={{ height: 28, padding: "0 8px", border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: STAMP_INK_BLUE, cursor: "pointer", fontSize: 10, fontWeight: 700 }}>Reset</button>
+          </div>
         </div>
         {layers.length > 0 && (
           <div style={{ marginTop: 5, fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft, textAlign: "center", background: "rgba(255,255,255,.8)", padding: "2px 7px", borderRadius: 10 }}>Click any item on the stamp to edit</div>
