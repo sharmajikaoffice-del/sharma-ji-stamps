@@ -1087,7 +1087,7 @@ function SharmaJiStampsAdmin() {
     <>
       {tab === "dashboard" && <DashboardTab rubbers={rubbers} purchases={purchases} entries={entries} cashManual={cashManual} stockByRubber={stockByRubber} user={user} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
-      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} />}
+      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} theme={theme} onToggleTheme={toggleTheme} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
@@ -1456,6 +1456,14 @@ function OrdersTab({ onEditOrder, onBillOrder }) {
                 </Btn>
               )}
             </div>
+            <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, padding: "10px 10px 0" }}>
+              {activeLayer ? layerPanel : (
+                <>
+                  <Label>Stamp Properties</Label>
+                  {controlFields}
+                </>
+              )}
+            </div>
           </Card>
         ))}
       </div>
@@ -1613,7 +1621,7 @@ function rubberSizeKey(sizeText) {
   return parsed ? `${parsed.widthMm}x${parsed.heightMm}` : String(sizeText ?? "").trim().toLowerCase();
 }
 
-function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed, onEditorActiveChange }) {
+function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed, onEditorActiveChange, theme = "light", onToggleTheme }) {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -1746,8 +1754,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     1,
     ...rubberSizes.map((r) => Number(r.parsed?.widthMm) || 0)
   );
-  const selectedStampPreviewWidth = Math.max(70, Math.min(250, Math.round(
-    250 * ((Number(selectedDimensions.widthMm) || 1) / maxConfiguredStampWidthMm)
+  const selectedStampPreviewWidth = Math.max(60, Math.min(175, Math.round(
+    250 * ((Number(selectedDimensions.widthMm) || 1) / maxConfiguredStampWidthMm) * 0.7
   )));
   const selectedStampPreviewHeight = Math.max(80, Math.round(
     selectedStampPreviewWidth * editorAspect
@@ -3598,6 +3606,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> Save Template</Btn>
               <Btn onClick={handleUpdateTemplate} disabled={saveStatus === "saving" || !editingTemplateId} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white, opacity: editingTemplateId ? 1 : .5 }}><Save size={16} /> Update Template</Btn>
               <Btn onClick={handlePreview} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Eye size={16} /> Preview</Btn>
+              <Btn onClick={onToggleTheme} variant="ghost" title={theme === "dark" ? "Light Mode" : "Dark Mode"} style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} Theme</Btn>
               <Btn onClick={handlePrint} style={{ background: STAMP_INK_BLUE, color: C.white }}><Printer size={16} /> Print</Btn>
             </div>
           </div>
@@ -3770,7 +3779,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       )}
 
       {isDesktop ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(205px, .82fr) minmax(300px, 1.45fr) minmax(170px, .62fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, .30fr) minmax(420px, .70fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
           <Card style={{ ...sidePanelStyle, padding: 0 }}>
             <div style={{ display: "flex", height: 38, borderBottom: `1px solid ${C.line}`, background: C.paper }}>
               {['All', 'Text', 'Figure'].map((t, i) => (
@@ -3937,23 +3946,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </Card>
           <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             {canvasBlock}
-            <div style={{ height: 2 }} />
-            <div style={{ height: 2 }} />
-
           </div>
           {mobileCanvasSpacer}
-          <Card style={{ ...sidePanelStyle, padding: 12 }}>
-            {activeLayer ? (
-              layerPanel
-            ) : (
-              <>
-                <div style={{ padding: 8, color: C.inkSoft, fontFamily: font.mono, fontSize: 11, marginBottom: 12 }}>
-                  Select an item above or click an item on the stamp to edit.
-                </div>
-                {controlFields}
-              </>
-            )}
-          </Card>
+
         </div>
       ) : (
         <>
