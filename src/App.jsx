@@ -1207,7 +1207,7 @@ function SharmaJiStampsAdmin() {
               <Palette size={15} />
               <span>Theme</span>
               <span style={{ display:"inline-flex", gap:2 }}>
-                {["primary","accent","surface"].map((k) => <span key={k} style={{ width:8, height:8, borderRadius:2, background:THEME_PALETTES[theme]?.[k] || C.stamp, border:"1px solid rgba(255,255,255,.45)" />)}}
+                {["primary","accent","surface"].map((k) => <span key={k} style={{ width:8, height:8, borderRadius:2, background:THEME_PALETTES[theme]?.[k] || C.stamp, border:"1px solid rgba(255,255,255,.45)" }} />)}
               </span>
               <select value={theme} onChange={(e)=>setTheme(e.target.value)} aria-label="Theme" style={{ width:16, border:0, outline:0, background:"transparent", color:C.white }}>
                 {THEME_OPTIONS.map((option)=><option key={option.id} value={option.id}>{option.label}</option>)}
