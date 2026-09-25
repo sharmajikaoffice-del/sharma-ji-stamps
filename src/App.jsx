@@ -3566,12 +3566,39 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const toolbarIconBox = { width: isDesktop ? 40 : 32, height: isDesktop ? 40 : 32, borderRadius: 6, border: `${isDesktop ? 2 : 1.5}px solid ${C.white}`, display: "flex", alignItems: "center", justifyContent: "center" };
 
   return (
-    <div style={{ paddingBottom: !isDesktop && view === "editor" ? 76 : 0 }}>
+    <div style={{ paddingTop: isDesktop ? 126 : 0, paddingBottom: !isDesktop && view === "editor" ? 76 : 0 }}>
+      {isDesktop && (
+        <div style={{
+          position: "fixed", top: 0, left: SIDEBAR_W, right: 0, zIndex: 300,
+          background: C.white, borderBottom: `1px solid ${C.line}`,
+          boxShadow: "0 2px 12px rgba(38,50,65,.10)",
+        }}>
+          <div style={{ height: 62, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 9, background: STAMP_INK_BLUE, color: C.white, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={20} /></div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontFamily: font.display, fontWeight: 750, fontSize: 18, lineHeight: 1.05, color: C.ink }}>Create Stamp</div>
+                <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 2 }}>Design and customize your stamp easily</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <Btn onClick={startNew} variant="ghost" style={{ border: `1px solid ${C.line}`, color: C.ink, background: C.white }}><Plus size={16} /> New</Btn>
+              <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update Template" : "Save Template"}</Btn>
+              <Btn onClick={handlePreview} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Eye size={16} /> Preview</Btn>
+              <Btn onClick={handlePrint} style={{ background: STAMP_INK_BLUE, color: C.white }}><Printer size={16} /> Print</Btn>
+            </div>
+          </div>
+        </div>
+      )}
       <div
         style={{
           background: STAMP_INK_BLUE,
           borderRadius: 4,
-          position: "relative",
+          position: isDesktop ? "fixed" : "relative",
+          top: isDesktop ? 62 : undefined,
+          left: isDesktop ? SIDEBAR_W : undefined,
+          right: isDesktop ? 0 : undefined,
+          zIndex: isDesktop ? 299 : undefined,
           padding: isDesktop ? "8px 14px" : "10px",
           minHeight: 54,
           display: "flex",
@@ -3681,9 +3708,11 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </div>
         </div>
 
-        <button type="button" onClick={startNew} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { padding: "8px", flexShrink: 0 }) }}>
-          <Plus size={16} />{isDesktop && " New"}
-        </button>
+        {!isDesktop && (
+          <button type="button" onClick={startNew} style={{ ...toolbarPill, background: C.sage, color: C.white, padding: "8px", flexShrink: 0 }}>
+            <Plus size={16} />
+          </button>
+        )}
       </div>
 
       {/* This layer-switcher tab strip is only needed on mobile, where there's
@@ -3895,20 +3924,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </Card>
           <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             {canvasBlock}
-            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", padding: "2px 0 4px" }}>
-              <Btn
-                onClick={handlePreview}
-                style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: 120, justifyContent: "center", borderRadius: 8 }}
-              >
-                <Eye size={16} /> Preview
-              </Btn>
-              <Btn
-                onClick={handlePrint}
-                style={{ background: STAMP_INK_BLUE, color: C.white, minWidth: 120, justifyContent: "center", borderRadius: 8 }}
-              >
-                <Printer size={16} /> Print
-              </Btn>
-            </div>
+            <div style={{ height: 2 }} />
             {!customerMode && (
               <Card style={{ padding: 12, marginTop: 0 }}>
                 <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
@@ -4211,27 +4227,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
       {!isDesktop && view === "editor" && mobileEditorPanel !== "submit" ? null : !customerMode && <Card id="mobile-stamp-submit">
         <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Field
-            placeholder="Template name, e.g. Invoice Stamp"
-            value={templateName}
-            onChange={(e) => setTemplateName(e.target.value)}
-            style={{ flex: 1, marginBottom: 0 }}
-          />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} style={{ background: STAMP_INK_BLUE }}>
-              {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update" : "Save"}
-            </Btn>
-            <Btn
-              type="button"
-              onClick={startNew}
-              variant="ghost"
-              style={{ border: `1px solid ${STAMP_INK_BLUE}`, color: STAMP_INK_BLUE, background: C.white }}
-            >
-              <Plus size={15} /> New Template
-            </Btn>
-          </div>
-        </div>
+        <Field
+          placeholder="Template name, e.g. Invoice Stamp"
+          value={templateName}
+          onChange={(e) => setTemplateName(e.target.value)}
+          style={{ marginBottom: 10 }}
+        />
         {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
         {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 12 }}>Couldn't save — check the table exists in Supabase.</div>}
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
