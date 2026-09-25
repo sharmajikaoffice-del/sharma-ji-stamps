@@ -2649,6 +2649,36 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     }
   };
 
+  // Opens a clean, print-accurate preview in a new tab without printing.
+  const handlePreview = async () => {
+    try {
+      const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
+      const previewWindow = window.open("", "_blank", "width=900,height=800");
+      if (!previewWindow) return;
+      previewWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Stamp Preview - ${widthMm}x${heightMm}mm</title>
+            <style>
+              html, body { margin:0; min-height:100%; background:#f3f6fa; font-family:Arial,sans-serif; }
+              body { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; box-sizing:border-box; }
+              img { max-width:min(90vw,900px); max-height:80vh; width:auto; height:auto; object-fit:contain; background:#fff; box-shadow:0 8px 30px rgba(0,0,0,.14); }
+              .meta { color:#687587; font-size:13px; }
+            </style>
+          </head>
+          <body>
+            <img src="${dataUrl}" alt="Stamp preview" />
+            <div class="meta">${widthMm} × ${heightMm} mm</div>
+          </body>
+        </html>
+      `);
+      previewWindow.document.close();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Prints the stamp directly (no PNG download, no Word import, no size headaches).
   // Print uses one A4/3 feeder piece at a time; no 3-up copies are generated.
   // scissors mark between each, so one sheet of butter paper yields 3 stamp
@@ -3677,7 +3707,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       )}
 
       {isDesktop ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(205px, .9fr) minmax(260px, 1.05fr) minmax(205px, .9fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(205px, .82fr) minmax(300px, 1.45fr) minmax(170px, .62fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
           <Card style={{ ...sidePanelStyle, padding: 0 }}>
             <div style={{ display: "flex", height: 38, borderBottom: `1px solid ${C.line}`, background: C.paper }}>
               {['All', 'Text', 'Figure'].map((t, i) => (
@@ -3842,7 +3872,23 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               )}
             </div>
           </Card>
-          {canvasBlock}
+          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            {canvasBlock}
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", padding: "2px 0 4px" }}>
+              <Btn
+                onClick={handlePreview}
+                style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: 120, justifyContent: "center", borderRadius: 8 }}
+              >
+                <Eye size={16} /> Preview
+              </Btn>
+              <Btn
+                onClick={handlePrint}
+                style={{ background: STAMP_INK_BLUE, color: C.white, minWidth: 120, justifyContent: "center", borderRadius: 8 }}
+              >
+                <Printer size={16} /> Print
+              </Btn>
+            </div>
+          </div>
           {mobileCanvasSpacer}
           <Card style={{ ...sidePanelStyle, padding: 12 }}>
             {activeLayer ? (
@@ -4115,9 +4161,19 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             onChange={(e) => setTemplateName(e.target.value)}
             style={{ flex: 1, marginBottom: 0 }}
           />
-          <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} style={{ background: STAMP_INK_BLUE }}>
-            {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update" : "Save"}
-          </Btn>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} style={{ background: STAMP_INK_BLUE }}>
+              {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update" : "Save"}
+            </Btn>
+            <Btn
+              type="button"
+              onClick={startNew}
+              variant="ghost"
+              style={{ border: `1px solid ${STAMP_INK_BLUE}`, color: STAMP_INK_BLUE, background: C.white }}
+            >
+              <Plus size={15} /> New Template
+            </Btn>
+          </div>
         </div>
         {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
         {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 12 }}>Couldn't save — check the table exists in Supabase.</div>}
