@@ -116,17 +116,6 @@ const THEME_PALETTES = {
     accent: "#F0997B", textPrimary: "#3A1509", textSecondary: "#5F5E5A", border: "#F5C4B3",
   },
 };
-const LIGHT_C = {
-  paper: "#F3F6EC", paperDark: "#E8EDDF", ink: "#1C2413", inkSoft: "#5F5E5A",
-  stamp: "#3B6D11", stampDark: "#27500A", brass: "#97C459", sage: "#3B6D11",
-  white: "#FFFFFF", line: "#D3D1C7", headerGreen: "#3B6D11",
-};
-const DARK_C = {
-  paper: "#1C1C1A", paperDark: "#242422", ink: "#F1EFE8", inkSoft: "#B4B2A9",
-  stamp: "#B4B2A9", stampDark: "#D3D1C7", brass: "#F1EFE8", sage: "#B4B2A9",
-  white: "#2C2C2A", line: "#444441", headerGreen: "#2C2C2A",
-};
-let C = LIGHT_C;
 const THEME_OPTIONS = [
   {id:"green-olive",label:"Green + olive"},{id:"grey-white-dark",label:"Grey + white (dark)"},
   {id:"white-black-light",label:"White + black (light)"},{id:"navy-gold",label:"Navy + gold"},
