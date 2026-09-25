@@ -1129,7 +1129,12 @@ function SharmaJiStampsAdmin() {
 
         {/* ---- desktop content ---- */}
         <div style={{ marginLeft: SIDEBAR_W, minHeight: "100vh" }}>
-          <div style={{ padding: "18px 18px 34px", width: "100%", maxWidth: 1320, margin: "0 auto" }}>
+          <div style={{
+            padding: editorActive ? 0 : "18px 18px 34px",
+            width: "100%",
+            maxWidth: editorActive ? "none" : 1320,
+            margin: editorActive ? 0 : "0 auto",
+          }}>
             {tabContent}
           </div>
         </div>
@@ -2305,16 +2310,35 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   };
 
   const handleSaveTemplate = async () => {
-    const name = templateName.trim();
-    if (!name || saveStatus === "saving") return;
+    if (saveStatus === "saving") return;
+    const suggested = templateName.trim() || "";
+    const name = window.prompt("Enter template name", suggested);
+    if (name === null) return;
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    setTemplateName(cleanName);
     setSaveStatus("saving");
     try {
-      if (editingTemplateId) {
-        await dbUpdate("stamp_templates", editingTemplateId, { name, config: buildConfig() });
-      } else {
-        const [saved] = await dbInsert("stamp_templates", { id: uid(), name, config: buildConfig() });
-        if (saved?.id) setEditingTemplateId(saved.id);
-      }
+      const [saved] = await dbInsert("stamp_templates", { id: uid(), name: cleanName, config: buildConfig() });
+      if (saved?.id) setEditingTemplateId(saved.id);
+      setSaveStatus("saved");
+      await loadTemplates();
+      setTimeout(() => setSaveStatus(""), 2000);
+    } catch {
+      setSaveStatus("error");
+    }
+  };
+
+  const handleUpdateTemplate = async () => {
+    if (!editingTemplateId || saveStatus === "saving") return;
+    const name = templateName.trim();
+    if (!name) {
+      window.alert("Open or save a template first.");
+      return;
+    }
+    setSaveStatus("saving");
+    try {
+      await dbUpdate("stamp_templates", editingTemplateId, { name, config: buildConfig() });
       setSaveStatus("saved");
       await loadTemplates();
       setTimeout(() => setSaveStatus(""), 2000);
@@ -3583,7 +3607,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
               <Btn onClick={startNew} variant="ghost" style={{ border: `1px solid ${C.line}`, color: C.ink, background: C.white }}><Plus size={16} /> New</Btn>
-              <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update Template" : "Save Template"}</Btn>
+              <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> Save Template</Btn>
+              <Btn onClick={handleUpdateTemplate} disabled={saveStatus === "saving" || !editingTemplateId} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white, opacity: editingTemplateId ? 1 : .5 }}><Save size={16} /> Update Template</Btn>
               <Btn onClick={handlePreview} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Eye size={16} /> Preview</Btn>
               <Btn onClick={handlePrint} style={{ background: STAMP_INK_BLUE, color: C.white }}><Printer size={16} /> Print</Btn>
             </div>
@@ -3925,42 +3950,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             {canvasBlock}
             <div style={{ height: 2 }} />
-            {!customerMode && (
-              <Card style={{ padding: 12, marginTop: 0 }}>
-                <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <Field
-                    placeholder="Template name, e.g. Invoice Stamp"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    style={{ flex: 1, marginBottom: 0 }}
-                  />
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} style={{ background: STAMP_INK_BLUE }}>
-                      {saveStatus === "saving" ? "Saving…" : editingTemplateId ? "Update" : "Save"}
-                    </Btn>
-                    <Btn
-                      type="button"
-                      onClick={startNew}
-                      variant="ghost"
-                      style={{ border: `1px solid ${STAMP_INK_BLUE}`, color: STAMP_INK_BLUE, background: C.white }}
-                    >
-                      <Plus size={15} /> New Template
-                    </Btn>
-                  </div>
-                </div>
-                {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
-                {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 11.5 }}>Couldn't save — check the table exists in Supabase.</div>}
-                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: 150, justifyContent: "center", borderRadius: 8 }}>
-                    <Download size={16} /> Download stamp
-                  </Btn>
-                  <Btn onClick={handlePrint} style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: 120, justifyContent: "center", borderRadius: 8 }}>
-                    <Printer size={16} /> Print
-                  </Btn>
-                </div>
-              </Card>
-            )}
+
           </div>
           {mobileCanvasSpacer}
           <Card style={{ ...sidePanelStyle, padding: 12 }}>
@@ -4225,25 +4215,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         {sizeControls}
       </Card>}
 
-      {!isDesktop && view === "editor" && mobileEditorPanel !== "submit" ? null : !customerMode && <Card id="mobile-stamp-submit">
-        <Label>{editingTemplateId ? "Update this template" : "Save this design as a template"}</Label>
-        <Field
-          placeholder="Template name, e.g. Invoice Stamp"
-          value={templateName}
-          onChange={(e) => setTemplateName(e.target.value)}
-          style={{ marginBottom: 10 }}
-        />
-        {saveStatus === "saved" && <div style={{ marginTop: 8, color: C.sage, fontFamily: font.mono, fontSize: 12 }}>Template saved.</div>}
-        {saveStatus === "error" && <div style={{ marginTop: 8, color: C.stamp, fontFamily: font.mono, fontSize: 12 }}>Couldn't save — check the table exists in Supabase.</div>}
-        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <Btn onClick={handleDownload} style={{ background: STAMP_INK_BLUE, minWidth: isDesktop ? 184 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
-            <Download size={16} /> Download stamp
-          </Btn>
-          <Btn onClick={handlePrint} style={{ background: C.white, color: STAMP_INK_BLUE, border: `1.5px solid ${STAMP_INK_BLUE}`, minWidth: isDesktop ? 130 : "auto", flex: isDesktop ? "none" : 1, justifyContent: "center", borderRadius: 8 }}>
-            <Printer size={16} /> Print
-          </Btn>
-        </div>
-      </Card>}
+
 
       {customerMode && (
         (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : <Card id="mobile-stamp-customer-submit" style={{ marginBottom: 24 }}>
