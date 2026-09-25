@@ -1082,7 +1082,7 @@ function SharmaJiStampsAdmin() {
     <>
       {tab === "dashboard" && <DashboardTab rubbers={rubbers} purchases={purchases} entries={entries} cashManual={cashManual} stockByRubber={stockByRubber} user={user} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
-      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} />}
+      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} theme={theme} toggleTheme={toggleTheme} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
@@ -1223,7 +1223,7 @@ function CustomerDesigner() {
           <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 1.2 }}>CUSTOMER STAMP DESIGNER</div>
         </div>
         {error && <div style={{ marginBottom: 8, padding: 9, background: "#FFF4E5", border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11.5, color: C.inkSoft }}>{error}</div>}
-        <CreateStampTab rubbers={rubbers} customerMode />
+        <CreateStampTab rubbers={rubbers} customerMode theme={theme} toggleTheme={toggleTheme} />
       </div>
     </div>
   );
@@ -1608,7 +1608,7 @@ function rubberSizeKey(sizeText) {
   return parsed ? `${parsed.widthMm}x${parsed.heightMm}` : String(sizeText ?? "").trim().toLowerCase();
 }
 
-function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed, onEditorActiveChange }) {
+function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed, onEditorActiveChange, theme = "light", toggleTheme }) {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -3561,7 +3561,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         style={{
           background: STAMP_INK_BLUE,
           borderRadius: 4,
-          position: "relative",
+          position: "sticky",
+          top: 0,
+          zIndex: 150,
           padding: isDesktop ? "8px 14px" : "10px",
           minHeight: 54,
           display: "flex",
@@ -3675,6 +3677,61 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           <Plus size={16} />{isDesktop && " New"}
         </button>
       </div>
+
+      {isDesktop && (
+        <Card style={{
+          margin: "8px 0 0",
+          padding: "8px 10px",
+          position: "sticky",
+          top: 0,
+          zIndex: 140,
+          background: C.white,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontWeight: 750, fontSize: 12.5, color: C.ink, whiteSpace: "nowrap" }}>Stamp Size</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(120px, 1fr))", gap: 8, flex: 1, minWidth: 0 }}>
+              {rubberSizes.map((r) => {
+                const active = r.id === selectedRubberId;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => { setSelectedRubberId(r.id); setPlateSize(r.parsed.widthMm); setSizeMenuOpen(false); }}
+                    style={{
+                      border: `1.5px solid ${active ? STAMP_INK_BLUE : C.line}`,
+                      background: active ? "#F3F8FF" : C.white,
+                      color: active ? STAMP_INK_BLUE : C.ink,
+                      borderRadius: 8, padding: "7px 9px", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+                      minWidth: 0, fontFamily: font.body,
+                    }}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: active ? 750 : 650 }}>{r.name}</span>
+                    <span style={{ fontFamily: font.mono, fontSize: 10, whiteSpace: "nowrap", color: active ? STAMP_INK_BLUE : C.inkSoft }}>{r.parsed.widthMm}×{r.parsed.heightMm} mm</span>
+                    {r.rate != null && <span style={{ fontFamily: font.mono, fontWeight: 800, fontSize: 10.5, color: STAMP_INK_BLUE, whiteSpace: "nowrap" }}>{inr(r.rate)}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {toggleTheme && (
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Light Mode" : "Dark Mode"}
+                style={{
+                  height: 38, minWidth: 42, padding: "0 10px", borderRadius: 8,
+                  border: `1px solid ${C.line}`, background: C.paper, color: C.ink,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  fontFamily: font.body, fontWeight: 700, fontSize: 11,
+                }}
+              >
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+                <span>{theme === "dark" ? "Light" : "Dark"}</span>
+              </button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* This layer-switcher tab strip is only needed on mobile, where there's
           no separate layer list like the desktop's left "All/Text/Figure"
@@ -4181,7 +4238,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </div>
       )}
 
-      {!isDesktop && view === "editor" && mobileEditorPanel !== "size" ? null : <Card id="mobile-stamp-size">
+      {!isDesktop && (view !== "editor" || mobileEditorPanel === "size") && <Card id="mobile-stamp-size">
         <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Stamp Size</div>
         <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
           Set the stamp width and height. Changes are applied to the selected stamp canvas.
