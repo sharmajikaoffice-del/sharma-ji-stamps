@@ -1147,7 +1147,7 @@ function SharmaJiStampsAdmin() {
 
   if (isDesktop) {
     return (
-      <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, overflowX: "hidden" }}>
+      <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, overflowX: "hidden", "--accent": C.primary, "--accent-strong": C.primaryHover, "--accent-soft": C.border }}>
         {/* ---- desktop sidebar ---- */}
         <div style={{ position: "fixed", top: 0, bottom: 0, left: 0, width: SIDEBAR_W, background: C.headerGreen, color: C.white, display: "flex", flexDirection: "column", overflowY: "auto", boxShadow: "2px 0 12px rgba(36,95,196,.12)" }}>
           <div style={{ padding: "22px 18px 18px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.14)" }}>
