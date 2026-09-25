@@ -3,6 +3,7 @@ import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, Star, X,
+  Palette,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Save, Sun, Moon,
   LayoutDashboard
 } from "lucide-react";
@@ -81,19 +82,24 @@ async function uploadPhoto(file, folder) {
 }
 
 /* ---------- design tokens ---------- */
-const LIGHT_C = {
-  // Desktop theme tuned to the blue editor shown in the reference UI.
-  paper: "#F3F6FA", paperDark: "#E8EDF4", ink: "#263241", inkSoft: "#687587",
-  stamp: "#3F7FE8", stampDark: "#245FC4", brass: "#3F7FE8", sage: "#3F7FE8",
-  white: "#FFFFFF", line: "#D7DEE8", headerGreen: "#3F7FE8",
+const THEME_PALETTES = {
+  "green-olive": { paper:"#F3F6EC", paperDark:"#E8EDDF", ink:"#1C2413", inkSoft:"#5F5E5A", stamp:"#3B6D11", stampDark:"#27500A", brass:"#97C459", sage:"#3B6D11", white:"#FFFFFF", line:"#D3D1C7", headerGreen:"#3B6D11" },
+  "grey-white-dark": { paper:"#1C1C1A", paperDark:"#242422", ink:"#F1EFE8", inkSoft:"#B4B2A9", stamp:"#B4B2A9", stampDark:"#D3D1C7", brass:"#F1EFE8", sage:"#B4B2A9", white:"#2C2C2A", line:"#444441", headerGreen:"#2C2C2A" },
+  "white-black-light": { paper:"#FFFFFF", paperDark:"#F0F0EE", ink:"#1A1A1A", inkSoft:"#5F5E5A", stamp:"#2C2C2A", stampDark:"#000000", brass:"#888780", sage:"#2C2C2A", white:"#F7F7F5", line:"#D3D1C7", headerGreen:"#2C2C2A" },
+  "navy-gold": { paper:"#F0F5FA", paperDark:"#E2EDF7", ink:"#042C53", inkSoft:"#5F5E5A", stamp:"#042C53", stampDark:"#0C447C", brass:"#EF9F27", sage:"#042C53", white:"#FFFFFF", line:"#B5D4F4", headerGreen:"#042C53" },
+  "maroon-cream": { paper:"#FDF6F3", paperDark:"#F8E9E3", ink:"#3A1509", inkSoft:"#5F5E5A", stamp:"#4A1B0C", stampDark:"#712B13", brass:"#D85A30", sage:"#4A1B0C", white:"#FFFFFF", line:"#F0997B", headerGreen:"#4A1B0C" },
+  "teal-charcoal": { paper:"#F2F9F6", paperDark:"#E2F1EB", ink:"#04342C", inkSoft:"#5F5E5A", stamp:"#04342C", stampDark:"#085041", brass:"#1D9E75", sage:"#04342C", white:"#FFFFFF", line:"#9FE1CB", headerGreen:"#04342C" },
+  "purple-lavender": { paper:"#F5F4FE", paperDark:"#ECEAFB", ink:"#26215C", inkSoft:"#5F5E5A", stamp:"#26215C", stampDark:"#3C3489", brass:"#7F77DD", sage:"#26215C", white:"#FFFFFF", line:"#CECBF6", headerGreen:"#26215C" },
+  "coral-sand": { paper:"#FBF6F0", paperDark:"#F5E9DD", ink:"#3A1509", inkSoft:"#5F5E5A", stamp:"#993C1D", stampDark:"#D85A30", brass:"#F0997B", sage:"#993C1D", white:"#FFFFFF", line:"#F5C4B3", headerGreen:"#993C1D" },
 };
-const DARK_C = {
-  ...LIGHT_C,
-  paper: "#111827", paperDark: "#1F2937", ink: "#F3F4F6", inkSoft: "#AAB4C2",
-  white: "#182231", line: "#334155",
-};
-// Mutable palette: the admin shell switches this before rendering its children.
-// Stamp ink/header colors intentionally stay blue in both themes.
+const THEME_OPTIONS = [
+  {id:"green-olive",label:"Green + olive"},{id:"grey-white-dark",label:"Grey + white (dark)"},
+  {id:"white-black-light",label:"White + black (light)"},{id:"navy-gold",label:"Navy + gold"},
+  {id:"maroon-cream",label:"Maroon + cream"},{id:"teal-charcoal",label:"Teal + charcoal"},
+  {id:"purple-lavender",label:"Purple + lavender"},{id:"coral-sand",label:"Coral + sand"},
+];
+const LIGHT_C = THEME_PALETTES["green-olive"];
+const DARK_C = THEME_PALETTES["grey-white-dark"];
 let C = LIGHT_C;
 const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -980,13 +986,20 @@ function SharmaJiStampsAdmin() {
     try { localStorage.setItem("sjs_active_tab", tab); } catch {}
   }, [tab]);
   const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem("sjs_theme") === "dark" ? "dark" : "light"; } catch { return "light"; }
+    try {
+      const saved = localStorage.getItem("sjs_theme_id");
+      if (saved && THEME_PALETTES[saved]) return saved;
+      return localStorage.getItem("sjs_theme") === "dark" ? "grey-white-dark" : "green-olive";
+    } catch { return "green-olive"; }
   });
-  C = theme === "dark" ? DARK_C : LIGHT_C;
+  C = THEME_PALETTES[theme] || LIGHT_C;
   useEffect(() => {
-    try { localStorage.setItem("sjs_theme", theme); } catch {}
+    try { localStorage.setItem("sjs_theme_id", theme); localStorage.setItem("sjs_theme", theme === "grey-white-dark" ? "dark" : "light"); } catch {}
   }, [theme]);
-  const toggleTheme = () => setTheme((v) => v === "dark" ? "light" : "dark");
+  const toggleTheme = () => setTheme((v) => {
+    const i = THEME_OPTIONS.findIndex((x) => x.id === v);
+    return THEME_OPTIONS[(i + 1) % THEME_OPTIONS.length].id;
+  });
   const [moreOpen, setMoreOpen] = useState(false);
   const [orderToEdit, setOrderToEdit] = useState(null);
   const editOrder = (order) => { setOrderToEdit(order); setTab("create"); };
@@ -3598,7 +3611,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> Save Template</Btn>
               <Btn onClick={handleUpdateTemplate} disabled={saveStatus === "saving" || !editingTemplateId} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white, opacity: editingTemplateId ? 1 : .5 }}><Save size={16} /> Update Template</Btn>
               <Btn onClick={handlePreview} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Eye size={16} /> Preview</Btn>
-              <Btn onClick={onToggleTheme} variant="ghost" title={theme === "dark" ? "Light Mode" : "Dark Mode"} style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} Theme</Btn>
+              <Btn onClick={onToggleTheme} variant="ghost" title="Change theme" style={{ border: `1px solid ${C.line}`, color: C.stamp, background: C.white }}><Palette size={16} /> {THEME_OPTIONS.find((x) => x.id === theme)?.label || "Theme"}</Btn>
               <Btn onClick={handlePrint} style={{ background: STAMP_INK_BLUE, color: C.white }}><Printer size={16} /> Print</Btn>
             </div>
           </div>
@@ -3771,7 +3784,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       )}
 
       {isDesktop ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, .30fr) minmax(420px, .70fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(205px, .82fr) minmax(300px, 1.45fr) minmax(170px, .62fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
           <Card style={{ ...sidePanelStyle, padding: 0 }}>
             <div style={{ display: "flex", height: 38, borderBottom: `1px solid ${C.line}`, background: C.paper }}>
               {['All', 'Text', 'Figure'].map((t, i) => (
@@ -3940,7 +3953,18 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             {canvasBlock}
           </div>
           {mobileCanvasSpacer}
-
+          <Card style={{ ...sidePanelStyle, padding: 12 }}>
+            {activeLayer ? (
+              layerPanel
+            ) : (
+              <>
+                <div style={{ padding: 8, color: C.inkSoft, fontFamily: font.mono, fontSize: 11, marginBottom: 12 }}>
+                  Select an item above or click an item on the stamp to edit.
+                </div>
+                {controlFields}
+              </>
+            )}
+          </Card>
         </div>
       ) : (
         <>
