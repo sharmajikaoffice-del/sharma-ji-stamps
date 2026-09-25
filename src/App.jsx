@@ -1803,8 +1803,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     1,
     ...rubberSizes.map((r) => Number(r.parsed?.widthMm) || 0)
   );
-  const selectedStampPreviewWidth = Math.max(60, Math.min(175, Math.round(
-    250 * ((Number(selectedDimensions.widthMm) || 1) / maxConfiguredStampWidthMm) * 0.7
+  const selectedStampPreviewWidth = Math.max(48, Math.min(125, Math.round(
+    250 * ((Number(selectedDimensions.widthMm) || 1) / maxConfiguredStampWidthMm) * 0.49
   )));
   const selectedStampPreviewHeight = Math.max(80, Math.round(
     selectedStampPreviewWidth * editorAspect
@@ -3555,7 +3555,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               style={{ width: "100%", height: "100%", display: "block", cursor: layers.length ? "pointer" : "default" }}
             />
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap", transform: `translateY(${Math.max(0, (previewZoom - 1) * 8)}px)` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap", transform: "translateY(8px)", marginTop: 2 }}>
             <button type="button" onClick={() => setPreviewZoom((z) => Math.max(0.6, Number((z - 0.1).toFixed(1))))} title="Zoom out" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800 }}>−</button>
             <span style={{ minWidth: 46, textAlign: "center", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>{Math.round(previewZoom * 100)}%</span>
             <button type="button" onClick={() => setPreviewZoom((z) => Math.min(1.5, Number((z + 0.1).toFixed(1))))} title="Zoom in" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800 }}>+</button>
@@ -3655,9 +3655,13 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> Save Template</Btn>
               <Btn onClick={handleUpdateTemplate} disabled={saveStatus === "saving" || !editingTemplateId} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white, opacity: editingTemplateId ? 1 : .5 }}><Save size={16} /> Update Template</Btn>
               <Btn onClick={handlePreview} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Eye size={16} /> Preview</Btn>
-              <label style={{ display:"inline-flex", alignItems:"center", gap:6, border:`1px solid ${C.line}`, borderRadius:8, padding:"0 8px", height:38, background:C.white, color:C.stamp, fontSize:12.5, fontWeight:600, whiteSpace:"nowrap" }}>
-                <Palette size={16} />
-                <select value={theme} onChange={(e) => onThemeChange?.(e.target.value)} title="Choose theme" style={{ border:"none", outline:"none", background:"transparent", color:C.stamp, fontFamily:font.body, fontWeight:600, fontSize:12.5, cursor:"pointer" }}>
+              <label style={{ display:"inline-flex", alignItems:"center", gap:7, border:`1px solid ${C.line}`, borderRadius:8, padding:"0 9px", height:38, background:C.white, color:C.stamp, fontSize:12, fontWeight:700, whiteSpace:"nowrap", cursor:"pointer" }}>
+                <Palette size={15} />
+                <span>Theme</span>
+                <span style={{ display:"inline-flex", gap:3, alignItems:"center" }}>
+                  {["primary","accent","surface"].map((k) => <span key={k} style={{ width:10, height:10, borderRadius:3, background:THEME_PALETTES[theme]?.[k] || C.stamp, border:`1px solid ${C.border || C.line}` }} />)}
+                </span>
+                <select value={theme} onChange={(e) => onThemeChange?.(e.target.value)} title="Choose theme" aria-label="Theme" style={{ width:18, border:"none", outline:"none", background:"transparent", color:C.stamp, cursor:"pointer" }}>
                   {THEME_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
               </label>
@@ -3833,7 +3837,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       )}
 
       {isDesktop ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(205px, .82fr) minmax(300px, 1.45fr) minmax(170px, .62fr)", gap: 10, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: 8, border: `1px solid ${C.line}`, borderTop: "none" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(205px, .82fr) minmax(300px, 1.45fr) minmax(170px, .62fr)", gap: 8, alignItems: "stretch", width: "100%", background: "#EEF1F5", padding: "8px 0 8px 8px", border: `1px solid ${C.line}`, borderTop: "none" }}>
           <Card style={{ ...sidePanelStyle, padding: 0 }}>
             <div style={{ display: "flex", height: 38, borderBottom: `1px solid ${C.line}`, background: C.paper }}>
               {['All', 'Text', 'Figure'].map((t, i) => (
