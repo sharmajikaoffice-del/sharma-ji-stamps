@@ -260,7 +260,7 @@ function addInkTexture(ctx, w, h, color, seed) {
   ctx.restore();
 }
 
-const STAMP_INK_BLUE = "#3F7FE8";
+let STAMP_INK_BLUE = "#3F7FE8";
 const STAMP_CANVAS_SIZE = 320;
 const STAMP_SHAPES = [
   { id: "circle", label: "Round" },
@@ -1037,6 +1037,7 @@ function SharmaJiStampsAdmin() {
       textPrimary: t.textPrimary, textSecondary: t.textSecondary, border: t.border,
     };
   })();
+  STAMP_INK_BLUE = C.primary || "#3F7FE8";
   useEffect(() => {
     try { localStorage.setItem("sjs_theme_id", theme); localStorage.setItem("sjs_theme", theme === "grey-white-dark" ? "dark" : "light"); } catch {}
   }, [theme]);
@@ -1213,9 +1214,16 @@ function SharmaJiStampsAdmin() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={toggleTheme} title={theme === "dark" ? "Light Mode" : "Dark Mode"} style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34 }}>
-              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
+            <label style={{ background:"rgba(255,255,255,.12)", border:"1px solid rgba(255,255,255,.24)", borderRadius:8, color:C.white, display:"flex", alignItems:"center", gap:5, padding:"6px 8px", fontFamily:font.body, fontSize:11.5, fontWeight:700 }}>
+              <Palette size={15} />
+              <span>Theme</span>
+              <span style={{ display:"inline-flex", gap:2 }}>
+                {["primary","accent","surface"].map((k) => <span key={k} style={{ width:8, height:8, borderRadius:2, background:THEME_PALETTES[theme]?.[k] || C.stamp, border:"1px solid rgba(255,255,255,.45)" />)}}
+              </span>
+              <select value={theme} onChange={(e)=>setTheme(e.target.value)} aria-label="Theme" style={{ width:16, border:0, outline:0, background:"transparent", color:C.white }}>
+                {THEME_OPTIONS.map((option)=><option key={option.id} value={option.id}>{option.label}</option>)}
+              </select>
+            </label>
             <button onClick={logout} style={{ background: "none", border: "none", color: C.white, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontFamily: font.body, fontSize: 12 }}><LogOut size={16} /> Logout</button>
           </div>
         </div>
