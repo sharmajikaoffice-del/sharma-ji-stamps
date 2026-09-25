@@ -83,15 +83,50 @@ async function uploadPhoto(file, folder) {
 
 /* ---------- design tokens ---------- */
 const THEME_PALETTES = {
-  "green-olive": { paper:"#F3F6EC", paperDark:"#E8EDDF", ink:"#1C2413", inkSoft:"#5F5E5A", stamp:"#3B6D11", stampDark:"#27500A", brass:"#97C459", sage:"#3B6D11", white:"#FFFFFF", line:"#D3D1C7", headerGreen:"#3B6D11" },
-  "grey-white-dark": { paper:"#1C1C1A", paperDark:"#242422", ink:"#F1EFE8", inkSoft:"#B4B2A9", stamp:"#B4B2A9", stampDark:"#D3D1C7", brass:"#F1EFE8", sage:"#B4B2A9", white:"#2C2C2A", line:"#444441", headerGreen:"#2C2C2A" },
-  "white-black-light": { paper:"#FFFFFF", paperDark:"#F0F0EE", ink:"#1A1A1A", inkSoft:"#5F5E5A", stamp:"#2C2C2A", stampDark:"#000000", brass:"#888780", sage:"#2C2C2A", white:"#F7F7F5", line:"#D3D1C7", headerGreen:"#2C2C2A" },
-  "navy-gold": { paper:"#F0F5FA", paperDark:"#E2EDF7", ink:"#042C53", inkSoft:"#5F5E5A", stamp:"#042C53", stampDark:"#0C447C", brass:"#EF9F27", sage:"#042C53", white:"#FFFFFF", line:"#B5D4F4", headerGreen:"#042C53" },
-  "maroon-cream": { paper:"#FDF6F3", paperDark:"#F8E9E3", ink:"#3A1509", inkSoft:"#5F5E5A", stamp:"#4A1B0C", stampDark:"#712B13", brass:"#D85A30", sage:"#4A1B0C", white:"#FFFFFF", line:"#F0997B", headerGreen:"#4A1B0C" },
-  "teal-charcoal": { paper:"#F2F9F6", paperDark:"#E2F1EB", ink:"#04342C", inkSoft:"#5F5E5A", stamp:"#04342C", stampDark:"#085041", brass:"#1D9E75", sage:"#04342C", white:"#FFFFFF", line:"#9FE1CB", headerGreen:"#04342C" },
-  "purple-lavender": { paper:"#F5F4FE", paperDark:"#ECEAFB", ink:"#26215C", inkSoft:"#5F5E5A", stamp:"#26215C", stampDark:"#3C3489", brass:"#7F77DD", sage:"#26215C", white:"#FFFFFF", line:"#CECBF6", headerGreen:"#26215C" },
-  "coral-sand": { paper:"#FBF6F0", paperDark:"#F5E9DD", ink:"#3A1509", inkSoft:"#5F5E5A", stamp:"#993C1D", stampDark:"#D85A30", brass:"#F0997B", sage:"#993C1D", white:"#FFFFFF", line:"#F5C4B3", headerGreen:"#993C1D" },
+  "green-olive": {
+    bg: "#F3F6EC", surface: "#FFFFFF", primary: "#3B6D11", primaryHover: "#27500A",
+    accent: "#97C459", textPrimary: "#1C2413", textSecondary: "#5F5E5A", border: "#D3D1C7",
+  },
+  "grey-white-dark": {
+    bg: "#1C1C1A", surface: "#2C2C2A", primary: "#B4B2A9", primaryHover: "#D3D1C7",
+    accent: "#F1EFE8", textPrimary: "#F1EFE8", textSecondary: "#B4B2A9", border: "#444441",
+  },
+  "white-black-light": {
+    bg: "#FFFFFF", surface: "#F7F7F5", primary: "#2C2C2A", primaryHover: "#000000",
+    accent: "#888780", textPrimary: "#1A1A1A", textSecondary: "#5F5E5A", border: "#D3D1C7",
+  },
+  "navy-gold": {
+    bg: "#F0F5FA", surface: "#FFFFFF", primary: "#042C53", primaryHover: "#0C447C",
+    accent: "#EF9F27", textPrimary: "#042C53", textSecondary: "#5F5E5A", border: "#B5D4F4",
+  },
+  "maroon-cream": {
+    bg: "#FDF6F3", surface: "#FFFFFF", primary: "#4A1B0C", primaryHover: "#712B13",
+    accent: "#D85A30", textPrimary: "#3A1509", textSecondary: "#5F5E5A", border: "#F0997B",
+  },
+  "teal-charcoal": {
+    bg: "#F2F9F6", surface: "#FFFFFF", primary: "#04342C", primaryHover: "#085041",
+    accent: "#1D9E75", textPrimary: "#04342C", textSecondary: "#5F5E5A", border: "#9FE1CB",
+  },
+  "purple-lavender": {
+    bg: "#F5F4FE", surface: "#FFFFFF", primary: "#26215C", primaryHover: "#3C3489",
+    accent: "#7F77DD", textPrimary: "#26215C", textSecondary: "#5F5E5A", border: "#CECBF6",
+  },
+  "coral-sand": {
+    bg: "#FBF6F0", surface: "#FFFFFF", primary: "#993C1D", primaryHover: "#D85A30",
+    accent: "#F0997B", textPrimary: "#3A1509", textSecondary: "#5F5E5A", border: "#F5C4B3",
+  },
 };
+const LIGHT_C = {
+  paper: "#F3F6EC", paperDark: "#E8EDDF", ink: "#1C2413", inkSoft: "#5F5E5A",
+  stamp: "#3B6D11", stampDark: "#27500A", brass: "#97C459", sage: "#3B6D11",
+  white: "#FFFFFF", line: "#D3D1C7", headerGreen: "#3B6D11",
+};
+const DARK_C = {
+  paper: "#1C1C1A", paperDark: "#242422", ink: "#F1EFE8", inkSoft: "#B4B2A9",
+  stamp: "#B4B2A9", stampDark: "#D3D1C7", brass: "#F1EFE8", sage: "#B4B2A9",
+  white: "#2C2C2A", line: "#444441", headerGreen: "#2C2C2A",
+};
+let C = LIGHT_C;
 const THEME_OPTIONS = [
   {id:"green-olive",label:"Green + olive"},{id:"grey-white-dark",label:"Grey + white (dark)"},
   {id:"white-black-light",label:"White + black (light)"},{id:"navy-gold",label:"Navy + gold"},
@@ -992,7 +1027,16 @@ function SharmaJiStampsAdmin() {
       return localStorage.getItem("sjs_theme") === "dark" ? "grey-white-dark" : "green-olive";
     } catch { return "green-olive"; }
   });
-  C = THEME_PALETTES[theme] || LIGHT_C;
+  C = (() => {
+    const t = THEME_PALETTES[theme] || THEME_PALETTES["green-olive"];
+    return {
+      paper: t.bg, paperDark: t.bg, ink: t.textPrimary, inkSoft: t.textSecondary,
+      stamp: t.primary, stampDark: t.primaryHover, brass: t.accent, sage: t.primary,
+      white: t.surface, line: t.border, headerGreen: t.primary,
+      primary: t.primary, primaryHover: t.primaryHover, accent: t.accent,
+      textPrimary: t.textPrimary, textSecondary: t.textSecondary, border: t.border,
+    };
+  })();
   useEffect(() => {
     try { localStorage.setItem("sjs_theme_id", theme); localStorage.setItem("sjs_theme", theme === "grey-white-dark" ? "dark" : "light"); } catch {}
   }, [theme]);
