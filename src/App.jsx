@@ -1178,9 +1178,16 @@ function SharmaJiStampsAdmin() {
               );
             })}
           </div>
-          <button onClick={toggleTheme} style={{ margin: "0 14px 8px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.22)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: font.body, fontSize: 12.5, padding: "9px 0" }}>
-            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </button>
+          <label style={{ margin: "0 14px 8px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: font.body, fontSize: 12.5, padding: "9px 8px", boxSizing: "border-box" }}>
+            <Palette size={15} />
+            <span>Theme</span>
+            <span style={{ display:"inline-flex", gap:3, alignItems:"center" }}>
+              {["primary","accent","surface"].map((k) => <span key={k} style={{ width:10, height:10, borderRadius:3, background:THEME_PALETTES[theme]?.[k] || C.stamp, border:`1px solid rgba(255,255,255,.45)` }} />)}
+            </span>
+            <select value={theme} onChange={(e) => setTheme(e.target.value)} title="Choose theme" aria-label="Theme" style={{ width:18, border:"none", outline:"none", background:"transparent", color:C.white, cursor:"pointer" }}>
+              {THEME_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
+          </label>
           <button onClick={logout} style={{ margin: 14, background: "none", border: "1px solid rgba(255,255,255,0.28)", borderRadius: 8, color: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: font.body, fontSize: 12.5, padding: "9px 0" }}><LogOut size={15} /> Logout</button>
         </div>
 
@@ -3655,17 +3662,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> Save Template</Btn>
               <Btn onClick={handleUpdateTemplate} disabled={saveStatus === "saving" || !editingTemplateId} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white, opacity: editingTemplateId ? 1 : .5 }}><Save size={16} /> Update Template</Btn>
               <Btn onClick={handlePreview} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Eye size={16} /> Preview</Btn>
-              <label style={{ display:"inline-flex", alignItems:"center", gap:7, border:`1px solid ${C.line}`, borderRadius:8, padding:"0 9px", height:38, background:C.white, color:C.stamp, fontSize:12, fontWeight:700, whiteSpace:"nowrap", cursor:"pointer" }}>
-                <Palette size={15} />
-                <span>Theme</span>
-                <span style={{ display:"inline-flex", gap:3, alignItems:"center" }}>
-                  {["primary","accent","surface"].map((k) => <span key={k} style={{ width:10, height:10, borderRadius:3, background:THEME_PALETTES[theme]?.[k] || C.stamp, border:`1px solid ${C.border || C.line}` }} />)}
-                </span>
-                <select value={theme} onChange={(e) => onThemeChange?.(e.target.value)} title="Choose theme" aria-label="Theme" style={{ width:18, border:"none", outline:"none", background:"transparent", color:C.stamp, cursor:"pointer" }}>
-                  {THEME_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                </select>
-              </label>
-              <Btn onClick={handlePrint} style={{ background: STAMP_INK_BLUE, color: C.white }}><Printer size={16} /> Print</Btn>
+                            <Btn onClick={handlePrint} style={{ background: C.primary, color: C.white }}><Printer size={16} /> Print</Btn>
             </div>
           </div>
         </div>
