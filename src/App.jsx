@@ -1100,7 +1100,7 @@ function SharmaJiStampsAdmin() {
     <>
       {tab === "dashboard" && <DashboardTab rubbers={rubbers} purchases={purchases} entries={entries} cashManual={cashManual} stockByRubber={stockByRubber} user={user} />}
       {tab === "entry" && <StampEntryTab rubbers={rubbers} entries={entries} refresh={refreshAll} user={user} initialFill={entryToFill} onFillConsumed={() => setEntryToFill(null)} />}
-      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} theme={theme} onToggleTheme={toggleTheme} />}
+      {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} theme={theme} onThemeChange={setTheme} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
@@ -1626,7 +1626,7 @@ function rubberSizeKey(sizeText) {
   return parsed ? `${parsed.widthMm}x${parsed.heightMm}` : String(sizeText ?? "").trim().toLowerCase();
 }
 
-function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed, onEditorActiveChange, theme = "light", onToggleTheme }) {
+function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = null, onOrderConsumed, onEditorActiveChange, theme = "green-olive", onThemeChange }) {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -3611,7 +3611,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Copy size={16} /> Save Template</Btn>
               <Btn onClick={handleUpdateTemplate} disabled={saveStatus === "saving" || !editingTemplateId} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white, opacity: editingTemplateId ? 1 : .5 }}><Save size={16} /> Update Template</Btn>
               <Btn onClick={handlePreview} variant="ghost" style={{ border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}><Eye size={16} /> Preview</Btn>
-              <Btn onClick={onToggleTheme} variant="ghost" title="Change theme" style={{ border: `1px solid ${C.line}`, color: C.stamp, background: C.white }}><Palette size={16} /> {THEME_OPTIONS.find((x) => x.id === theme)?.label || "Theme"}</Btn>
+              <label style={{ display:"inline-flex", alignItems:"center", gap:6, border:`1px solid ${C.line}`, borderRadius:8, padding:"0 8px", height:38, background:C.white, color:C.stamp, fontSize:12.5, fontWeight:600, whiteSpace:"nowrap" }}>
+                <Palette size={16} />
+                <select value={theme} onChange={(e) => onThemeChange?.(e.target.value)} title="Choose theme" style={{ border:"none", outline:"none", background:"transparent", color:C.stamp, fontFamily:font.body, fontWeight:600, fontSize:12.5, cursor:"pointer" }}>
+                  {THEME_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </label>
               <Btn onClick={handlePrint} style={{ background: STAMP_INK_BLUE, color: C.white }}><Printer size={16} /> Print</Btn>
             </div>
           </div>
