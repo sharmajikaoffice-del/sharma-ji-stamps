@@ -872,7 +872,7 @@ const Btn = ({ children, variant = "solid", ...props }) => {
   const styles = variant === "ghost" ? { background: "transparent", color: C.ink, border: `1.5px solid ${C.ink}` } : { background: C.headerGreen, color: C.white, border: "none" };
   return <button {...props} style={{ ...styles, padding: "10px 16px", borderRadius: 8, fontWeight: 600, fontSize: 13.5, fontFamily: font.body, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, ...props.style }}>{children}</button>;
 };
-const Tag = ({ children, tone = "in" }) => <span style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, padding: "3px 8px", borderRadius: 20, textTransform: "uppercase", background: tone === "in" ? "#EAF2FF" : "#F3E0DC", color: tone === "in" ? C.sage : C.stampDark }}>{children}</span>;
+const Tag = ({ children, tone = "in" }) => <span style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, padding: "3px 8px", borderRadius: 20, textTransform: "uppercase", background: tone === "in" ? C.paperDark : "#F3E0DC", color: tone === "in" ? C.sage : C.stampDark }}>{children}</span>;
 
 /* ================= LOGIN ================= */
 function Login({ users, onLogin }) {
@@ -1161,7 +1161,7 @@ function SharmaJiStampsAdmin() {
             {tabs.map((t) => {
               const Icon = t.icon; const active = tab === t.id;
               return (
-                <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 10, background: active ? "rgba(255,255,255,0.14)" : "none", border: "none", borderRadius: 8, padding: "10px 12px", cursor: "pointer", color: active ? C.white : "#EAF2FF", fontFamily: font.body, fontSize: 13.5, textAlign: "left" }}>
+                <button key={t.id} onClick={() => setTab(t.id)} style={{ display: "flex", alignItems: "center", gap: 10, background: active ? "rgba(255,255,255,0.14)" : "none", border: "none", borderRadius: 8, padding: "10px 12px", cursor: "pointer", color: active ? C.white : C.paperDark, fontFamily: font.body, fontSize: 13.5, textAlign: "left" }}>
                   <Icon size={17} />
                   {t.label}
                 </button>
@@ -1192,7 +1192,7 @@ function SharmaJiStampsAdmin() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column", overflowX: "hidden" }}>
+    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, display: "flex", flexDirection: "column", overflowX: "hidden", "--accent": C.primary, "--accent-strong": C.primaryHover, "--accent-soft": C.border }}>
       {!editorActive && (
         <div style={{ background: C.headerGreen, color: C.white, padding: "16px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1251,7 +1251,7 @@ function SharmaJiStampsAdmin() {
               {moreTabs.map((t) => {
                 const Icon = t.icon; const active = tab === t.id;
                 return (
-                  <button key={t.id} onClick={() => { setTab(t.id); setMoreOpen(false); }} style={{ background: active ? "#EAF2FF" : C.paper, border: `1px solid ${active ? C.stamp : C.line}`, borderRadius: 10, padding: "14px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: active ? C.stamp : C.ink }}>
+                  <button key={t.id} onClick={() => { setTab(t.id); setMoreOpen(false); }} style={{ background: active ? C.paperDark : C.paper, border: `1px solid ${active ? C.stamp : C.line}`, borderRadius: 10, padding: "14px 6px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: active ? C.stamp : C.ink }}>
                     <Icon size={20} />
                     <span style={{ fontSize: 11, fontFamily: font.mono, letterSpacing: 0.3, textAlign: "center" }}>{t.label}</span>
                   </button>
@@ -3105,8 +3105,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <div style={{
           width: vw, height: vh, borderRadius: large ? 8 : 6,
           border: `2px solid ${active ? STAMP_INK_BLUE : C.inkSoft}`,
-          background: active ? "#EAF2FF" : "#F7FAFD",
-          boxShadow: active ? `0 0 0 3px rgba(39,91,156,.10)` : "inset 0 0 0 1px rgba(255,255,255,.8)",
+          background: active ? C.paperDark : C.paper,
+          boxShadow: active ? `0 0 0 3px rgba(0,0,0,.06)` : "inset 0 0 0 1px rgba(255,255,255,.8)",
           display: "flex", alignItems: "center", justifyContent: "center",
           position: "relative", overflow: "hidden",
         }}>
@@ -3140,11 +3140,11 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 }}
                 style={{
                   border: `1.5px solid ${active ? STAMP_INK_BLUE : C.line}`,
-                  background: active ? "#F3F8FF" : C.white,
+                  background: active ? C.paper : C.white,
                   color: active ? STAMP_INK_BLUE : C.ink,
                   borderRadius: 11, padding: "10px 7px 9px", cursor: "pointer",
                   textAlign: "center", fontFamily: font.body, minHeight: 126,
-                  boxShadow: active ? "0 4px 14px rgba(39,91,156,.10)" : "none",
+                  boxShadow: active ? "0 4px 14px rgba(0,0,0,.06)" : "none",
                 }}
               >
                 <SizeVisual r={r} active={active} />
@@ -3280,7 +3280,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 onClick={() => updateLayer(layer.id, layoutPatch(opt.id))}
                 style={{
                   border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
-                  background: active ? "#EAF2FF" : C.white,
+                  background: active ? C.paperDark : C.white,
                   borderRadius: 8,
                   padding: "10px 4px 8px",
                   cursor: "pointer",
@@ -3387,7 +3387,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                   onClick={() => updateLayer(activeLayer.id, { borderStyle: opt.id })}
                   style={{
                     border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
-                    background: active ? "#EAF2FF" : C.white,
+                    background: active ? C.paperDark : C.white,
                     borderRadius: 8,
                     padding: "10px 4px 8px",
                     cursor: "pointer",
@@ -3414,7 +3414,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             {[{ id: 0, label: "Straight" }, { id: -1, label: "Up Curve" }, { id: 1, label: "Down Curve" }].map((opt) => {
               const active = Number(activeLayer.curve ?? 0) === opt.id;
               return (
-                <button key={opt.id} type="button" onClick={() => updateLayer(activeLayer.id, { curve: opt.id })} style={{ border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.ink, borderRadius: 8, padding: "9px 4px", cursor: "pointer", fontSize: 10.5, fontWeight: active ? 700 : 500 }}>{opt.label}</button>
+                <button key={opt.id} type="button" onClick={() => updateLayer(activeLayer.id, { curve: opt.id })} style={{ border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, background: active ? C.paperDark : C.white, color: active ? STAMP_INK_BLUE : C.ink, borderRadius: 8, padding: "9px 4px", cursor: "pointer", fontSize: 10.5, fontWeight: active ? 700 : 500 }}>{opt.label}</button>
               );
             })}
           </div>
@@ -3540,8 +3540,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               maxHeight: "82%",
               border: `2px dashed ${STAMP_INK_BLUE}`,
               borderRadius: 3,
-              boxShadow: "0 0 0 4px rgba(63,127,232,.10)",
-              background: "rgba(63,127,232,.035)",
+              boxShadow: "0 0 0 4px rgba(0,0,0,.06)",
+              background: "rgba(0,0,0,.025)",
               flexShrink: 0,
               transform: `scale(${previewZoom})`,
               transformOrigin: "center center",
@@ -3862,7 +3862,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                       onClick={() => setActiveLayerId(l.id)}
                       style={{
                         width: "100%",
-                        background: active ? "#EAF2FF" : "transparent",
+                        background: active ? C.paperDark : "transparent",
                         borderBottom: `1px solid ${C.line}`,
                         padding: "8px 2px",
                         cursor: "pointer",
@@ -3925,7 +3925,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                             width: 28, height: 28, padding: 0, flexShrink: 0,
                             display: "grid", placeItems: "center",
                             border: `1px solid ${l.locked ? STAMP_INK_BLUE : C.line}`, borderRadius: 6,
-                            background: l.locked ? "#EAF2FF" : C.white, color: l.locked ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer",
+                            background: l.locked ? C.paperDark : C.white, color: l.locked ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer",
                           }}
                         >
                           {l.locked ? <Lock size={14} /> : <Unlock size={14} />}
@@ -3967,7 +3967,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                             width: 28, height: 28, padding: 0, flexShrink: 0,
                             display: "grid", placeItems: "center",
                             border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`, borderRadius: 6,
-                            background: active ? "#EAF2FF" : C.white, color: active ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer",
+                            background: active ? C.paperDark : C.white, color: active ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer",
                           }}
                         >
                           <Copy size={14} />
@@ -4037,7 +4037,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                           style={{
                             width: "100%",
                             border: `1px solid ${selected ? STAMP_INK_BLUE : C.line}`,
-                            background: selected ? "#EAF2FF" : C.white,
+                            background: selected ? C.paperDark : C.white,
                             borderRadius: 8,
                             padding: "8px 9px",
                             display: "flex",
@@ -4218,7 +4218,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                           padding: "10px 8px 9px",
                           border: `1.5px solid ${active ? STAMP_INK_BLUE : C.line}`,
                           borderRadius: 9,
-                          background: active ? "#EAF2FF" : C.white,
+                          background: active ? C.paperDark : C.white,
                           color: active ? STAMP_INK_BLUE : C.ink,
                           cursor: "pointer",
                           textAlign: "center",
@@ -4307,7 +4307,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 type="button"
                 onClick={() => scrollToMobileEditorSection(item.id)}
                 style={{
-                  border: "none", background: active ? "#EAF2FF" : C.white,
+                  border: "none", background: active ? C.paperDark : C.white,
                   color: active ? STAMP_INK_BLUE : C.inkSoft,
                   minWidth: 0, height: 58, display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center", gap: 2,
@@ -4466,7 +4466,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
                 <div style={{ flex: 1, marginLeft: 12 }}>
                   <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft }}>{fmtDate(e.date)}</div>
                   <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{e.mobile || "no mobile"}</div>
-                  <div style={{ display: "inline-flex", marginTop: 5, padding: "2px 7px", borderRadius: 999, background: (e.payment_mode || "Cash") === "Bank" ? "#EAF2FF" : "#EEF8F1", color: (e.payment_mode || "Cash") === "Bank" ? C.stampDark : "#2D7A4A", fontFamily: font.mono, fontSize: 10, fontWeight: 700 }}>{(e.payment_mode || "Cash") === "Bank" ? "🏦 BANK" : "💵 CASH"}</div>
+                  <div style={{ display: "inline-flex", marginTop: 5, padding: "2px 7px", borderRadius: 999, background: (e.payment_mode || "Cash") === "Bank" ? C.paperDark : "#EEF8F1", color: (e.payment_mode || "Cash") === "Bank" ? C.stampDark : "#2D7A4A", fontFamily: font.mono, fontSize: 10, fontWeight: 700 }}>{(e.payment_mode || "Cash") === "Bank" ? "🏦 BANK" : "💵 CASH"}</div>
                   {e.remarks && <div style={{ fontFamily: font.body, fontSize: 12, color: C.ink, marginTop: 4, fontStyle: "italic" }}>"{e.remarks}"</div>}
                   {e.image_url ? (
                     <a href={e.image_url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 6 }}>
@@ -4669,7 +4669,7 @@ function PurchaseTab({ rubbers, purchases, refresh }) {
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,gap:10,flexWrap:"wrap"}}><Btn variant="ghost" onClick={addRow}><Plus size={15}/> Add Item</Btn><div style={{textAlign:"right"}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,letterSpacing:1}}>TOTAL</div><div style={{fontFamily:font.display,fontSize:24,fontWeight:800}}>{inr(itemsAmount)}</div></div></div><Btn onClick={save} disabled={busy} style={{width:"100%",justifyContent:"center",marginTop:12}}><Plus size={16}/> {busy?"Saving…":"Save Purchase"}</Btn>
     </Card>
     <Label>Purchase List</Label>
-    {grouped.slice(0,30).map(g=>{const mode=g.modes.size===1?[...g.modes][0]:"Mixed";return <Card key={g.date}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}><div><div style={{fontWeight:800,fontSize:14}}>{fmtDate(g.date)}</div><div style={{display:"inline-flex",marginTop:5,padding:"2px 8px",borderRadius:999,background:mode==="Bank"?"#EAF2FF":"#EEF8F1",color:mode==="Bank"?C.stampDark:"#2D7A4A",fontFamily:font.mono,fontSize:10,fontWeight:700}}>{mode==="Bank"?"🏦 BANK":mode==="Cash"?"💵 CASH":"CASH + BANK"}</div></div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:800,fontSize:15}}>{inr(g.total)}</div></div><div style={{borderTop:`1px solid ${C.line}`}}>{g.items.map((p,i)=>{const r=rubbers.find(r=>r.id===p.rubber_id);return editId===p.id?<div key={p.id} style={{padding:"10px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Date</Label><Field type="date" value={editDate} onChange={e=>setEditDate(e.target.value)}/></div><div><Label>Payment Mode</Label><div style={{display:"flex",gap:6}}><Btn variant={editPaymentMode==="Cash"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Cash")} style={{flex:1,justifyContent:"center"}}>Cash</Btn><Btn variant={editPaymentMode==="Bank"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Bank")} style={{flex:1,justifyContent:"center"}}>Bank</Btn></div></div></div><Label>Item / Category / Size</Label><Select value={editRubberId} onChange={e=>setEditRubberId(e.target.value)}>{rubbers.map(rb=><option key={rb.id} value={rb.id}>{optionLabel(rb)}</option>)}</Select><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Qty</Label><Field type="number" value={editQty} onChange={e=>setEditQty(e.target.value)}/></div><div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={e=>setEditRate(e.target.value)}/></div></div><div style={{display:"flex",gap:8}}><Btn onClick={saveEdit} disabled={editBusy} style={{flex:1,justifyContent:"center"}}>{editBusy?"Saving…":"Save"}</Btn><Btn variant="ghost" onClick={()=>setEditId(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn></div></div>:<div key={p.id} style={{display:"grid",gridTemplateColumns:"32px minmax(160px,1fr) 80px 100px 110px 50px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{fontFamily:font.mono,color:C.inkSoft}}>{i+1}</div><div><div style={{fontWeight:600}}>{r?.name||"Unknown Item"}</div><div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:2}}><span style={{fontFamily:font.mono,fontSize:9,padding:"1px 6px",borderRadius:999,background:C.paperDark}}>{catLabel(r?.category)}</span>{r?.category==="rubber"&&r?.size&&<span style={{fontFamily:font.mono,fontSize:9,color:C.inkSoft}}>Size: {r.size}</span>}</div></div><div style={{fontFamily:font.mono}}>Qty {p.qty}</div><div style={{fontFamily:font.mono}}>₹{Number(p.purchase_rate||0).toFixed(2)}</div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:700}}>{inr(p.total??p.amount??0)}</div><div style={{display:"flex",gap:2,justifyContent:"flex-end"}}><button onClick={()=>startEdit(p)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer"}}><PenSquare size={15}/></button><button onClick={()=>removePurchase(p.id)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={15}/></button></div></div>})}</div><div style={{display:"flex",justifyContent:"flex-end",paddingTop:10,fontFamily:font.mono,fontWeight:800}}>TOTAL&nbsp;&nbsp; {inr(g.total)}</div></Card>})}
+    {grouped.slice(0,30).map(g=>{const mode=g.modes.size===1?[...g.modes][0]:"Mixed";return <Card key={g.date}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}><div><div style={{fontWeight:800,fontSize:14}}>{fmtDate(g.date)}</div><div style={{display:"inline-flex",marginTop:5,padding:"2px 8px",borderRadius:999,background:mode==="Bank"?C.paperDark:"#EEF8F1",color:mode==="Bank"?C.stampDark:"#2D7A4A",fontFamily:font.mono,fontSize:10,fontWeight:700}}>{mode==="Bank"?"🏦 BANK":mode==="Cash"?"💵 CASH":"CASH + BANK"}</div></div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:800,fontSize:15}}>{inr(g.total)}</div></div><div style={{borderTop:`1px solid ${C.line}`}}>{g.items.map((p,i)=>{const r=rubbers.find(r=>r.id===p.rubber_id);return editId===p.id?<div key={p.id} style={{padding:"10px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Date</Label><Field type="date" value={editDate} onChange={e=>setEditDate(e.target.value)}/></div><div><Label>Payment Mode</Label><div style={{display:"flex",gap:6}}><Btn variant={editPaymentMode==="Cash"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Cash")} style={{flex:1,justifyContent:"center"}}>Cash</Btn><Btn variant={editPaymentMode==="Bank"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Bank")} style={{flex:1,justifyContent:"center"}}>Bank</Btn></div></div></div><Label>Item / Category / Size</Label><Select value={editRubberId} onChange={e=>setEditRubberId(e.target.value)}>{rubbers.map(rb=><option key={rb.id} value={rb.id}>{optionLabel(rb)}</option>)}</Select><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Qty</Label><Field type="number" value={editQty} onChange={e=>setEditQty(e.target.value)}/></div><div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={e=>setEditRate(e.target.value)}/></div></div><div style={{display:"flex",gap:8}}><Btn onClick={saveEdit} disabled={editBusy} style={{flex:1,justifyContent:"center"}}>{editBusy?"Saving…":"Save"}</Btn><Btn variant="ghost" onClick={()=>setEditId(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn></div></div>:<div key={p.id} style={{display:"grid",gridTemplateColumns:"32px minmax(160px,1fr) 80px 100px 110px 50px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{fontFamily:font.mono,color:C.inkSoft}}>{i+1}</div><div><div style={{fontWeight:600}}>{r?.name||"Unknown Item"}</div><div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:2}}><span style={{fontFamily:font.mono,fontSize:9,padding:"1px 6px",borderRadius:999,background:C.paperDark}}>{catLabel(r?.category)}</span>{r?.category==="rubber"&&r?.size&&<span style={{fontFamily:font.mono,fontSize:9,color:C.inkSoft}}>Size: {r.size}</span>}</div></div><div style={{fontFamily:font.mono}}>Qty {p.qty}</div><div style={{fontFamily:font.mono}}>₹{Number(p.purchase_rate||0).toFixed(2)}</div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:700}}>{inr(p.total??p.amount??0)}</div><div style={{display:"flex",gap:2,justifyContent:"flex-end"}}><button onClick={()=>startEdit(p)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer"}}><PenSquare size={15}/></button><button onClick={()=>removePurchase(p.id)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={15}/></button></div></div>})}</div><div style={{display:"flex",justifyContent:"flex-end",paddingTop:10,fontFamily:font.mono,fontWeight:800}}>TOTAL&nbsp;&nbsp; {inr(g.total)}</div></Card>})}
     {purchases.length===0&&<EmptyNote text="No purchases recorded yet."/>}
   </div>;
 }
