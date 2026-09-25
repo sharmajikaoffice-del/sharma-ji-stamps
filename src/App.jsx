@@ -1456,14 +1456,6 @@ function OrdersTab({ onEditOrder, onBillOrder }) {
                 </Btn>
               )}
             </div>
-            <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 8, padding: "10px 10px 0" }}>
-              {activeLayer ? layerPanel : (
-                <>
-                  <Label>Stamp Properties</Label>
-                  {controlFields}
-                </>
-              )}
-            </div>
           </Card>
         ))}
       </div>
