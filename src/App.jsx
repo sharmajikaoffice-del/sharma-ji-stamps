@@ -1267,6 +1267,21 @@ function SharmaJiStampsAdmin() {
 
 /* ================= CUSTOMER DESIGNER ================= */
 function CustomerDesigner() {
+  const customerThemeId = (() => {
+    try {
+      const saved = localStorage.getItem("sjs_theme_id");
+      return THEME_PALETTES[saved] ? saved : "green-olive";
+    } catch { return "green-olive"; }
+  })();
+  const customerTheme = THEME_PALETTES[customerThemeId] || THEME_PALETTES["green-olive"];
+  C = {
+    paper: customerTheme.bg, paperDark: customerTheme.bg, ink: customerTheme.textPrimary, inkSoft: customerTheme.textSecondary,
+    stamp: customerTheme.primary, stampDark: customerTheme.primaryHover, brass: customerTheme.accent, sage: customerTheme.primary,
+    white: customerTheme.surface, line: customerTheme.border, headerGreen: customerTheme.primary,
+    primary: customerTheme.primary, primaryHover: customerTheme.primaryHover, accent: customerTheme.accent,
+    textPrimary: customerTheme.textPrimary, textSecondary: customerTheme.textSecondary, border: customerTheme.border,
+  };
+  STAMP_INK_BLUE = C.primary;
   const [rubbers, setRubbers] = useState([]);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -1282,7 +1297,7 @@ function CustomerDesigner() {
     return () => { cancelled = true; };
   }, []);
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink }}>
+    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, "--accent": C.primary, "--accent-strong": C.primaryHover, "--accent-soft": C.border }}>
       <div style={{ maxWidth: 1100, width: "100%", margin: "0 auto", padding: "12px 10px 70px" }}>
         <div style={{ marginBottom: 10, textAlign: "center" }}>
           <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 21 }}>Sharma Ji Stamps</div>
