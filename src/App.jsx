@@ -1297,7 +1297,7 @@ function CustomerDesigner() {
     return () => { cancelled = true; };
   }, []);
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, "--accent": C.primary, "--accent-strong": C.primaryHover, "--accent-soft": C.border }}>
+    <div className="sjs-customer-page" style={{ minHeight: "100vh", background: C.paper, fontFamily: font.body, color: C.ink, "--accent": C.primary, "--accent-strong": C.primaryHover, "--accent-soft": C.border }}>
       <div style={{ maxWidth: 1100, width: "100%", margin: "0 auto", padding: "12px 10px 70px" }}>
         <div style={{ marginBottom: 10, textAlign: "center" }}>
           <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 21 }}>Sharma Ji Stamps</div>
