@@ -2092,71 +2092,9 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         rotation: 0
       };
 
-      if (existingCount === 0) {
-        // Circle: keep the traditional curved text + centre text.
-        if (shape === "circle") {
-          const top = {
-            id: uid(), type: "circleText", num: num + 1,
-            text: "YOUR COMPANY NAME", radius: radius * 0.82, spacing: 4,
-            start: 90, fontFamily: "Arial", fontSize: 13, bold: true,
-            flipX: false, fontStyle: "normal", tall: false, invert: false,
-            layout: "topArc"
-          };
-          const bottom = {
-            id: uid(), type: "circleText", num: num + 2,
-            text: "YOUR ADDRESS", radius: radius * 0.82, spacing: 4,
-            start: 90, fontFamily: "Arial", fontSize: 13, bold: true,
-            flipX: true, fontStyle: "normal", tall: false, invert: false,
-            layout: "bottomArc"
-          };
-          const center = {
-            id: uid(), type: "centerText", num: num + 3,
-            text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16,
-            bold: true, flipX: false, x: 50, y: 50, rotation: 0,
-            fontStyle: "normal", tall: false, invert: false, layout: "center"
-          };
-          setLayerCounter(num + 3);
-          setLayers((ls) => [...ls, layer, top, bottom, center]);
-          setActiveLayerId(center.id);
-          return;
-        }
-
-        // Triangle: three editable text layers, one parallel to each edge,
-        // plus a normal centre text layer.
-        if (shape === "triangle") {
-          const sideTexts = [
-            ["YOUR COMPANY NAME", 13, 0],
-            ["YOUR ADDRESS", 11, 1],
-            ["AUTHORIZED SIGNATORY", 11, 2],
-          ].map(([label, fontSize, side], i) => ({
-            id: uid(), type: "centerText", num: num + 1 + i,
-            text: label, size: fontSize, fontFamily: "Arial", fontSize,
-            bold: true, flipX: false, x: 50, y: 50, rotation: 0,
-            fontStyle: "normal", tall: false, invert: false,
-            layout: ["rightRotated", "bottom", "leftRotated"][side], triangleFrameId: id, triangleSide: side,
-            // Triangle side text keeps its own fixed geometry. Resizing the
-            // triangle frame must resize only the triangle, never the text.
-            triangleTextRadius: radius
-          }));
-          const center = {
-            id: uid(), type: "centerText", num: num + 4,
-            text: "CENTRAL TEXT", size: 16, fontFamily: "Arial", fontSize: 16,
-            bold: true, flipX: false, x: 50, y: 50, rotation: 0,
-            fontStyle: "normal", tall: false, invert: false, layout: "center"
-          };
-          setLayerCounter(num + 4);
-          setLayers((ls) => [...ls, layer, ...sideTexts, center]);
-          setActiveLayerId(center.id);
-          return;
-        }
-
-        // Rectangle/Square: ONLY the box. Do not inject curved or any other
-        // automatic text layers.
-        setLayerCounter(num);
-        setLayers((ls) => [...ls, layer]);
-        setActiveLayerId(id);
-        return;
-      }
+      // Shapes are inserted as shapes only. Text is always added manually
+      // through the Add Text button, so inserting Circle / Square / Triangle
+      // never creates default text layers.
     } else if (type === "line") {
       layer = { ...layer, width: 55, strokeWidth: 4, curve: 0, curveAmount: 24, arcRadius: 0, x: 50, y: 50, rotation: 0 };
     } else if (type === "image") {
