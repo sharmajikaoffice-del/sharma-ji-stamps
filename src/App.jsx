@@ -864,6 +864,13 @@ function TemplateThumb({ config, size = 140 }) {
     return () => { cancelled = true; };
   }, [config?.logoDataUrl]);
 
+  const previewDims = (() => {
+    if (config?.shape === "circle" || config?.shape === "square") return { width: 1, height: 1 };
+    const parsed = parseRubberSize(config?.rubberSize);
+    return parsed || { width: 1, height: 1 };
+  })();
+  const previewAspectRatio = `${previewDims.width} / ${previewDims.height}`;
+
   useEffect(() => {
     const hydratedLayers = (Array.isArray(config?.layers) ? config.layers : []).map((layer) => ({
       ...layer,
@@ -871,13 +878,26 @@ function TemplateThumb({ config, size = 140 }) {
     }));
     drawStampOnCanvas(ref.current, {
       ...config,
+      width: previewDims.width,
+      height: previewDims.height,
       layers: hydratedLayers,
       inkColor: config.inkColor || STAMP_INK_BLUE,
       logo: logoImg,
     }, size);
-  }, [config, logoImg, layerImages, size]);
+  }, [config, logoImg, layerImages, size, previewDims.width, previewDims.height]);
 
-  return <canvas ref={ref} style={{ width: size, maxWidth: "100%", height: "auto", aspectRatio: "1 / 1", display: "block" }} />;
+  return (
+    <canvas
+      ref={ref}
+      style={{
+        width: size,
+        maxWidth: "100%",
+        height: "auto",
+        aspectRatio: previewAspectRatio,
+        display: "block",
+      }}
+    />
+  );
 }
 
 function useFonts() {
