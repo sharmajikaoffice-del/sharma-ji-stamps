@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LogOut, Plus, Search, Trash2, RotateCcw,
   Stamp, Package, Tag as TagIcon, ShoppingCart, PenSquare, Wallet, Users, BookOpen, Download, Maximize2, Undo2, Redo2, Copy, ArrowUp, ArrowDown,
-  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, Star, X,
+  Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, Star, X, Upload,
   Palette,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Save, Sun, Moon,
   LayoutDashboard
@@ -1927,6 +1927,17 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const dragRef = useRef(null);
   const layerImageInputRef = useRef(null);
   const layerVectorInputRef = useRef(null);
+  const customShapeInputRef = useRef(null);
+  const CUSTOM_SHAPES_KEY = "sjs_custom_shapes_v1";
+  const [shapePickerOpen, setShapePickerOpen] = useState(false);
+  const [customShapes, setCustomShapes] = useState(() => {
+    try {
+      const raw = localStorage.getItem(CUSTOM_SHAPES_KEY);
+      return Array.isArray(JSON.parse(raw)) ? JSON.parse(raw).slice(0, 12) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const LAYER_TYPE_NAMES = { circleText: "Text around the circle", centerText: "Text in the centre", frame: "Frame", line: "Line", image: "Image" };
   const FRAME_SHAPE_NAMES = { circle: "Circle", square: "Square", triangle: "Triangle" };
@@ -2232,6 +2243,61 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   };
   const activeLayer = layers.find((l) => l.id === activeLayerId) || null;
   const filteredLayers = layers.filter((l) => layerTypeMatchesFilter(l, layerFilter));
+
+  const persistCustomShapes = (next) => {
+    const safe = Array.isArray(next) ? next.slice(0, 12) : [];
+    setCustomShapes(safe);
+    try { localStorage.setItem(CUSTOM_SHAPES_KEY, JSON.stringify(safe)); } catch {}
+  };
+
+  const addImageDataAsShape = (dataUrl, label = "My Shape") => {
+    if (!dataUrl) return;
+    const img = new Image();
+    img.onload = () => {
+      pushHistory();
+      const num = layerCounter + 1;
+      const id = uid();
+      const layer = {
+        id, type: "image", num, size: 18, x: 50, y: 68, rotation: 0,
+        imageDataUrl: dataUrl, imageObj: img, source: "customShape", shapeLabel: label,
+      };
+      setLayerCounter(num);
+      setLayers((ls) => [...ls, layer]);
+      setActiveLayerId(id);
+    };
+    img.src = dataUrl;
+  };
+
+  const handleCustomShapeUpload = (e) => {
+    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith("image/") || /\\.svg$/i.test(f.name));
+    if (!files.length) return;
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = String(ev.target.result || "");
+        if (!dataUrl) return;
+        const label = file.name.replace(/\\.[^.]+$/, "").slice(0, 22) || "My Shape";
+        persistCustomShapes([
+          { id: uid(), label, src: dataUrl },
+          ...customShapes,
+        ]);
+        addImageDataAsShape(dataUrl, label);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+    setShapePickerOpen(false);
+  };
+
+  const addCustomShape = (sym) => {
+    addImageDataAsShape(sym.src, sym.label || "My Shape");
+    setShapePickerOpen(false);
+  };
+
+  const removeCustomShape = (id, e) => {
+    e?.stopPropagation?.();
+    persistCustomShapes(customShapes.filter((s) => s.id !== id));
+  };
 
   const handleLayerImageUpload = (e) => {
     const file = e.target.files[0];
@@ -3998,6 +4064,82 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           <button type="button" onClick={() => addLayer("frame", { shape: "triangle" })} style={toolbarIconBtn} title="Insert Triangle">
             <span style={toolbarIconBox}><Triangle size={18} /></span> Triangle
           </button>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setShapePickerOpen((v) => !v)}
+              style={toolbarIconBtn}
+              title="More Shapes"
+              aria-label="More Shapes"
+            >
+              <span style={toolbarIconBox}><Star size={18} /></span>
+              Shapes
+            </button>
+            {shapePickerOpen && (
+              <div style={{
+                position: "fixed", top: isDesktop ? 64 : 58, left: isDesktop ? 330 : 8, zIndex: 181,
+                width: isDesktop ? 280 : "calc(100vw - 16px)", maxWidth: 300, padding: 10,
+                background: C.white, border: `1px solid ${C.line}`, borderRadius: 10,
+                boxShadow: "0 8px 24px rgba(0,0,0,.14)"
+              }}>
+                <div style={{ fontSize: 10, fontFamily: font.mono, color: C.inkSoft, marginBottom: 8, letterSpacing: 1 }}>MY SHAPES / ART</div>
+                {customShapes.length === 0 ? (
+                  <div style={{ padding: "8px 4px", fontSize: 11, color: C.inkSoft, fontFamily: font.mono }}>
+                    Apne PNG / JPG / SVG shapes yahan add karo.
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7, marginBottom: 8 }}>
+                    {customShapes.map((sym) => (
+                      <div key={sym.id} style={{ position: "relative" }}>
+                        <button
+                          type="button"
+                          title={sym.label}
+                          onClick={() => addCustomShape(sym)}
+                          style={{
+                            width: "100%", minHeight: 54, border: `1px solid ${C.line}`, background: C.white,
+                            borderRadius: 7, padding: 5, cursor: "pointer", display: "flex",
+                            alignItems: "center", justifyContent: "center"
+                          }}
+                        >
+                          <img src={sym.src} alt={sym.label} style={{ width: 40, height: 40, objectFit: "contain" }} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => removeCustomShape(sym.id, e)}
+                          title="Remove saved shape"
+                          aria-label="Remove saved shape"
+                          style={{
+                            position: "absolute", top: -5, right: -5, width: 17, height: 17, border: "none",
+                            borderRadius: "50%", background: C.stamp, color: C.white, cursor: "pointer",
+                            fontSize: 11, lineHeight: "17px", padding: 0
+                          }}
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => customShapeInputRef.current?.click()}
+                  style={{
+                    width: "100%", border: `1px dashed ${C.brass}`, background: C.paperDark, color: C.ink,
+                    borderRadius: 8, padding: "9px 10px", cursor: "pointer", display: "flex",
+                    alignItems: "center", justifyContent: "center", gap: 7, fontFamily: font.body, fontWeight: 700, fontSize: 12
+                  }}
+                >
+                  <Upload size={15} /> Upload / Insert Shape
+                </button>
+                <input
+                  ref={customShapeInputRef}
+                  type="file"
+                  accept="image/*,.svg"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={handleCustomShapeUpload}
+                />
+              </div>
+            )}
+          </div>
           <button type="button" onClick={() => addLayer("line")} style={toolbarIconBtn} title="Insert Line">
             <span style={toolbarIconBox}><span style={{ fontSize: 21, lineHeight: 1 }}>―</span></span> Line
           </button>
