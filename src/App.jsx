@@ -5292,6 +5292,14 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
     });
     return days.map((date) => ({ date, value: totals.get(date) || 0 }));
   }, [entries, todayStr]);
+  const monthlyTrend = useMemo(() => monthBuckets.map((m) => ({
+    ...m,
+    qty: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.qty || 1), 0),
+    moneyIn: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+      + cashManual.filter((c) => (c.date || "").startsWith(m.key) && c.type === "in").reduce((sum, c) => sum + Number(c.amount || 0), 0),
+    moneyOut: purchases.filter((p) => (p.date || "").startsWith(m.key)).reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0)
+      + cashManual.filter((c) => (c.date || "").startsWith(m.key) && c.type === "out").reduce((sum, c) => sum + Number(c.amount || 0), 0),
+  })), [monthBuckets, entries, purchases, cashManual]);
   const monthlyComparison = monthBuckets.map((m) => ({
     ...m,
     sales: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.amount || 0), 0),
@@ -5350,34 +5358,23 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))", gap: 12 }}>
-        <section style={panel}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
-            <div><div style={sectionLabel}>Sales trend · since first sale</div><div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 700, color: C.ink }}>{inr(salesTrend.reduce((sum, d) => sum + d.value, 0))}</div></div>
-            <span style={{ ...miniStat, background: C.paper, borderRadius: 8, padding: "5px 7px" }}>ALL TIME</span>
+      <section style={{ ...panel, width: "100%", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={sectionLabel}>Monthly trend · all time</div>
+            <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 700, color: C.ink }}>Quantity / Money In / Money Out</div>
           </div>
-          <div style={{ padding: "12px 0 0" }}>
-            <TrendSVG data={salesTrend} color="#3F7FE8" height={145} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginTop: 8 }}><span>{fmtDate(salesTrend[0].date)}</span><span>{fmtDate(salesTrend[salesTrend.length - 1].date)}</span></div>
-        </section>
-
-        <section style={panel}>
-          <div style={{ ...sectionLabel, marginBottom: 5 }}>Monthly sales vs purchases</div>
-          <div style={{ fontSize: 12, color: C.inkSoft, marginBottom: 10 }}>Six-month comparison · amounts in ₹</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {monthlyComparison.map((m) => <div key={m.key}>
-              <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginBottom: 4 }}><span>{m.label}</span><span>Sales {inr(m.sales)} · Purchases {inr(m.purchases)}</span></div>
-              <div style={{ display: "grid", gap: 3 }}>
-                <div style={{ height: 7, background: C.paperDark, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${m.sales / maxMonthly * 100}%`, height: "100%", background: "#3F7FE8", borderRadius: 6 }} /></div>
-                <div style={{ height: 7, background: C.paperDark, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${m.purchases / maxMonthly * 100}%`, height: "100%", background: "#F0A44B", borderRadius: 6 }} /></div>
-              </div>
-            </div>)}
-          </div>
-          <div style={{ display: "flex", gap: 14, ...miniStat, marginTop: 12 }}><span><b style={{ color: "#3F7FE8" }}>●</b> Sales</span><span><b style={{ color: "#F0A44B" }}>●</b> Purchases</span></div>
-        </section>
-      </div>
-
+          <span style={{ ...miniStat, background: C.paper, borderRadius: 8, padding: "6px 9px" }}>ALL TIME · MONTHLY</span>
+        </div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, marginTop: 12 }}>
+          <span><b style={{ color: "#3F7FE8" }}>●</b> Quantity (Nos)</span>
+          <span><b style={{ color: "#159A83" }}>●</b> Money In (₹)</span>
+          <span><b style={{ color: "#E58B45" }}>●</b> Money Out (₹)</span>
+        </div>
+        <div style={{ paddingTop: 10, width: "100%", overflow: "hidden" }}>
+          <MonthlyTrendSVG data={monthlyTrend} height={250} />
+        </div>
+      </section>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: 12 }}>
         <section style={panel}>
           <div style={sectionLabel}>Cash flow · last 7 days</div>
