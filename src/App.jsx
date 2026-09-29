@@ -3183,6 +3183,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5, lineHeight: 1.5, textAlign: "center" }}>
           {FRAME_SHAPE_NAMES[activeLayer.shape || "circle"]} selected — edit its shape properties on the right.
         </div>
+      ) : activeLayer?.type === "line" ? (
+        <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5, lineHeight: 1.5, textAlign: "center" }}>
+          Line selected — edit line properties below.
+        </div>
       ) : !activeLayer ? (
         <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5, lineHeight: 1.5, textAlign: "center" }}>
           Select a layer above to edit it.
