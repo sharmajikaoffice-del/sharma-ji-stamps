@@ -3291,16 +3291,74 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               {fontOptions.map((f) => <option key={f} value={f}>{f}</option>)}
             </Select>
           </div>
-          <div>
-            <Label>Size</Label>
-            <Field
-              type="number"
-              min={5}
-              max={100}
-              value={layer.fontSize ?? layer.size ?? 16}
-              onChange={(e) => { const v = Number(e.target.value) || 0; updateLayer(layer.id, { fontSize: v, size: v }); }}
-              style={{ marginBottom: 0 }}
-            />
+          <div className="sjs-text-size-control">
+            <div className="sjs-text-size-desktop">
+              <Label>Size</Label>
+              <Field
+                type="number"
+                min={5}
+                max={100}
+                value={layer.fontSize ?? layer.size ?? 16}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") return;
+                  const v = Math.min(100, Math.max(5, Number(raw)));
+                  if (Number.isFinite(v)) updateLayer(layer.id, { fontSize: v, size: v });
+                }}
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+            <div className="sjs-text-size-mobile">
+              <Label>Size</Label>
+              <div className="sjs-text-size-mobile-row">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = Number(layer.fontSize ?? layer.size ?? 16);
+                    const v = Math.max(5, Math.round((current - 0.5) * 10) / 10);
+                    updateLayer(layer.id, { fontSize: v, size: v });
+                  }}
+                  aria-label="Decrease text size by 0.5"
+                >−</button>
+                <input
+                  type="range"
+                  min="5"
+                  max="100"
+                  step="0.5"
+                  value={Number(layer.fontSize ?? layer.size ?? 16)}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    updateLayer(layer.id, { fontSize: v, size: v });
+                  }}
+                  aria-label="Text size"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = Number(layer.fontSize ?? layer.size ?? 16);
+                    const v = Math.min(100, Math.round((current + 0.5) * 10) / 10);
+                    updateLayer(layer.id, { fontSize: v, size: v });
+                  }}
+                  aria-label="Increase text size by 0.5"
+                >+</button>
+                <input
+                  className="sjs-text-size-value"
+                  type="number"
+                  min="5"
+                  max="100"
+                  step="0.5"
+                  inputMode="decimal"
+                  value={Number(layer.fontSize ?? layer.size ?? 16)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") return;
+                    const v = Math.min(100, Math.max(5, Number(raw)));
+                    if (Number.isFinite(v)) updateLayer(layer.id, { fontSize: v, size: v });
+                  }}
+                  aria-label="Text size value"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3365,17 +3423,20 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
       {activeLayer.type === "centerText" && activeLayer.layout !== "triangleSide" && !["bottom", "rightRotated", "leftRotated"].includes(activeLayer.layout) && (
         <>
-          <Label>Quick align</Label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-            <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Left</button>
-            <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Center</button>
-            <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Right</button>
-          </div>
-          {activeLayer.source !== "addText" && (
+          <div className="sjs-mobile-hidden-text-alignment">
+            <Label>Quick align</Label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-              <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Top</button>
-              <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Middle</button>
-              <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Bottom</button>
+              <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Left</button>
+              <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Center</button>
+              <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Right</button>
+            </div>
+          {activeLayer.source !== "addText" && (
+            <div className="sjs-mobile-hidden-text-alignment">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
+                <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Top</button>
+                <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Middle</button>
+                <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Bottom</button>
+              </div>
             </div>
           )}
         </>
