@@ -601,17 +601,24 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       ctx.setLineDash([]);
 
       const drawTraceWithBreak = (inset, breakValue) => {
-        if (frameShape === "circle" && breakValue > 0) {
+        if (breakValue <= 0) {
+          ctx.setLineDash([]);
+          tracePath(inset);
+          ctx.stroke();
+          return;
+        }
+
+        const breakCount = Math.max(1, Math.round(breakValue * 5));
+        const gapFraction = breakCount >= 150 ? 0.34 : breakCount >= 50 ? 0.32 : 0.28;
+
+        if (frameShape === "circle") {
           const r = Math.max(4, Math.min(size * 0.48, layer.radius ?? 100) - inset);
-          const breakCount = Math.max(1, Math.round(breakValue * 5));
           const step = (Math.PI * 2) / breakCount;
-          // Each break is a sharp, evenly distributed gap. The gap fraction is
-          // intentionally modest so even 500 breaks remain visible as fine segments.
-          const gapFraction = breakCount >= 300 ? 0.38 : breakCount >= 50 ? 0.32 : 0.28;
           const gapAngle = step * gapFraction;
           const drawAngle = step - gapAngle;
           const offset = -Math.PI / 2 + gapAngle / 2;
 
+          ctx.setLineDash([]);
           for (let i = 0; i < breakCount; i++) {
             const start = offset + i * step;
             const end = start + drawAngle;
@@ -620,8 +627,14 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
             ctx.stroke();
           }
         } else {
+          const pathScale = frameShape === "triangle"
+            ? Math.max(12, Math.min(size * 2.4, (layer.radius ?? 100) * 4.5))
+            : Math.max(12, (((layer.width ?? 45) / 100) * size + ((layer.height ?? 45) / 100) * canvasHeight) * 2);
+          const period = Math.max(ctx.lineWidth * 2, pathScale / breakCount);
+          ctx.setLineDash([period * (1 - gapFraction), period * gapFraction]);
           tracePath(inset);
           ctx.stroke();
+          ctx.setLineDash([]);
         }
       };
 
@@ -691,6 +704,16 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       const curveAmount = Math.max(0, Number(layer.curveAmount ?? 24));
       ctx.lineWidth = layer.strokeWidth ?? 4;
       ctx.lineCap = "butt";
+      const lineBreak = Math.max(0, Number(layer.lineBreak ?? 0));
+      const lineBreakCount = Math.max(1, Math.round(lineBreak * 5));
+      const lineGapFraction = lineBreakCount >= 150 ? 0.34 : lineBreakCount >= 50 ? 0.32 : 0.28;
+      if (lineBreak > 0) {
+        const linePathLength = Math.max(ctx.lineWidth * 2, lineW);
+        const linePeriod = Math.max(ctx.lineWidth * 2, linePathLength / lineBreakCount);
+        ctx.setLineDash([linePeriod * (1 - lineGapFraction), linePeriod * lineGapFraction]);
+      } else {
+        ctx.setLineDash([]);
+      }
       ctx.beginPath();
       if (curve === 0) {
         ctx.moveTo(-lineW / 2, 0);
@@ -3551,7 +3574,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
             </>
           )}
-          {activeLayer.shape !== "triangle" && (
+          {(
             <>
               <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
               <BreakSliderControl value={activeLayer.lineBreak ?? 0} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
@@ -3618,6 +3641,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           )}
           <SliderControl label="Line size" value={activeLayer.width ?? 55} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+          <BreakSliderControl value={activeLayer.lineBreak ?? 0} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
           {Number(activeLayer.curve ?? 0) === 0 && (
             <>
               <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
