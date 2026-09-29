@@ -1929,7 +1929,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const layerVectorInputRef = useRef(null);
   const customShapeInputRef = useRef(null);
   const CUSTOM_SHAPES_KEY = "sjs_custom_shapes_v1";
-  const [shapePickerOpen, setShapePickerOpen] = useState(false);
   const [customShapes, setCustomShapes] = useState(() => {
     try {
       const raw = localStorage.getItem(CUSTOM_SHAPES_KEY);
@@ -4064,6 +4063,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           flex: 1, WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none", padding: isDesktop ? 0 : 0
         }}>
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            <button type="button" onClick={undoLayers} title="Undo" aria-label="Undo" style={toolbarIconBtn}><Undo2 size={18} /></button>
+            <button type="button" onClick={redoLayers} title="Redo" aria-label="Redo" style={toolbarIconBtn}><Redo2 size={18} /></button>
+          </div>
           <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn} title="Add Text">
             <span style={toolbarIconBox}><Type size={18} /></span>
             Add Text
