@@ -4066,7 +4066,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           {isDesktop && (
             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button type="button" onClick={undoLayers} title="Undo" aria-label="Undo" style={toolbarIconBtn}><Undo2 size={18} /></button>
-              <button type="button" onClick={redoLayers} title="Redo" aria-label="Redo" style={toolbarIconBtn}><Undo2 size={18} style={{ transform: "scaleX(-1)" }} /></button>
+              <button type="button" onClick={redoLayers} title="Redo" aria-label="Redo" style={toolbarIconBtn}><Redo2 size={18} /></button>
             </div>
           )}
           <button type="button" onClick={() => addLayer("centerText")} style={toolbarIconBtn} title="Add Text">
