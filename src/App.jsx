@@ -5393,22 +5393,46 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))", gap: 12 }}>
-        <section style={{ ...panel, gridColumn: "1 / -1" }}>
+        <section style={{ ...panel, gridColumn: "1 / -1", padding: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12, flexWrap: "wrap" }}>
             <div>
-              <div style={sectionLabel}>Monthly trend · all time</div>
-              <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 700, color: C.ink }}>Quantity / Money In / Money Out</div>
-              <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 4 }}>Monthly totals from the first recorded entry through this month</div>
+              <div style={sectionLabel}>Monthly overview · all time</div>
+              <div style={{ fontFamily: font.display, fontSize: 21, fontWeight: 700, color: C.ink }}>Quantity / Money In / Money Out</div>
+              <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 4 }}>All-time history grouped month-wise. The last completed month is highlighted below.</div>
             </div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>
-              <span><b style={{ color: "#3F7FE8" }}>●</b> Quantity ({lastMonth.qty})</span>
-              <span><b style={{ color: "#159A83" }}>●</b> Money In ({inr(lastMonth.moneyIn)})</span>
-              <span><b style={{ color: "#E58B45" }}>●</b> Money Out ({inr(lastMonth.moneyOut)})</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+              <span style={{ border: `1px solid ${C.line}`, background: C.paperDark, borderRadius: 8, padding: "7px 10px", fontFamily: font.mono, fontSize: 10.5, color: C.ink }}>Monthly</span>
+              <span style={{ border: `1px solid ${C.line}`, background: C.white, borderRadius: 8, padding: "7px 10px", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>All Time</span>
             </div>
           </div>
-          <div style={{ padding: "14px 0 0", overflowX: "auto" }}>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 8, marginTop: 14 }}>
+            <div style={{ padding: "10px 12px", border: `1px solid #3F7FE844`, background: "#3F7FE80A", borderRadius: 10 }}>
+              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>LAST MONTH · QUANTITY</div>
+              <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 3 }}>{lastMonth.qty}</div>
+            </div>
+            <div style={{ padding: "10px 12px", border: `1px solid #159A8344`, background: "#159A830A", borderRadius: 10 }}>
+              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>LAST MONTH · MONEY IN</div>
+              <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 3 }}>{inr(lastMonth.moneyIn)}</div>
+            </div>
+            <div style={{ padding: "10px 12px", border: `1px solid #E58B4544`, background: "#E58B450A", borderRadius: 10 }}>
+              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>LAST MONTH · MONEY OUT</div>
+              <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 3 }}>{inr(lastMonth.moneyOut)}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>
+              <span><b style={{ color: "#3F7FE8" }}>●</b> Quantity (Nos)</span>
+              <span><b style={{ color: "#159A83" }}>●</b> Money In (₹)</span>
+              <span><b style={{ color: "#E58B45" }}>●</b> Money Out (₹)</span>
+            </div>
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>Last month: {lastMonth.label}</span>
+          </div>
+
+          <div style={{ padding: "10px 0 0", overflowX: "auto" }}>
             <div style={{ minWidth: Math.max(560, monthlyTrend.length * 42) }}>
-              <MonthlyTrendSVG data={monthlyTrend} height={230} />
+              <MonthlyTrendSVG data={monthlyTrend} height={250} />
             </div>
           </div>
         </section>
