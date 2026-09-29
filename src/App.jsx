@@ -783,6 +783,49 @@ function binarizeCanvasToBlack(canvas, alphaThreshold = 90) {
 }
 
 /* Slider row with prev/next step arrows — matches the "Radius / Stroke width / Line break" controls. */
+function BreakSliderControl({ value = 0, onChange }) {
+  const actualMax = 40;
+  const sliderMax = 100;
+  const actualStep = 0.1;
+  const clamp = (n) => Math.min(actualMax, Math.max(0, n));
+  const actual = clamp(Number(value) || 0);
+  const sliderValue = Math.round((actual / actualMax) * sliderMax);
+  const fmt = (n) => (Math.round(n * 10) / 10).toString();
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontFamily: font.body, fontSize: 13, color: C.ink, marginBottom: 6 }}>
+        Break <span style={{ color: C.brass, fontFamily: font.mono, fontSize: 12 }}>[ {fmt(actual)} ]</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => onChange(clamp(actual - 0.5))}
+          style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: C.white, color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={sliderMax}
+          step={1}
+          value={sliderValue}
+          onChange={(e) => onChange(clamp((Number(e.target.value) / sliderMax) * actualMax))}
+          style={{ flex: 1, accentColor: STAMP_INK_BLUE, cursor: "pointer" }}
+        />
+        <button
+          type="button"
+          onClick={() => onChange(clamp(actual + 0.5))}
+          style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${C.line}`, background: C.white, color: C.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SliderControl({ label, value, min, max, step = 0.1, onChange }) {
   const fmt = (n) => (Math.round(n * 10) / 10).toString();
   const clamp = (n) => Math.min(max, Math.max(min, n));
@@ -3511,7 +3554,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           {activeLayer.shape !== "triangle" && (
             <>
               <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
-              <SliderControl label="Break" value={activeLayer.lineBreak ?? 0} min={0} max={200} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
+              <BreakSliderControl value={activeLayer.lineBreak ?? 0} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
             </>
           )}
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: activeLayer.fill ? 8 : 16 }}>
