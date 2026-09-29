@@ -5227,47 +5227,6 @@ function CashFlowSVG({ data, height = 132 }) {
   );
 }
 
-function MonthlyTrendSVG({ data, height = 240 }) {
-  const w = 900, h = height, padL = 52, padR = 52, padT = 22, padB = 38;
-  const moneyMax = Math.max(1, ...data.map((d) => Math.max(d.moneyIn, d.moneyOut)));
-  const qtyMax = Math.max(1, ...data.map((d) => d.qty));
-  const innerW = w - padL - padR, innerH = h - padT - padB;
-  const stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
-  const point = (value, max, i) => [padL + i * stepX, padT + innerH * (1 - value / max)];
-  const makePath = (key, max) => smoothPath(data.map((d, i) => point(Number(d[key] || 0), max, i)));
-  const inPath = makePath("moneyIn", moneyMax);
-  const outPath = makePath("moneyOut", moneyMax);
-  const qtyPath = makePath("qty", qtyMax);
-  const ticks = [0, 0.25, 0.5, 0.75, 1];
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height, display: "block" }} preserveAspectRatio="none">
-      {ticks.map((f) => {
-        const y = padT + innerH * (1 - f);
-        return <line key={f} x1={padL} x2={w - padR} y1={y} y2={y} stroke={C.line} strokeWidth="1" strokeDasharray="3 4" />;
-      })}
-      {ticks.map((f) => <text key={`m${f}`} x={padL - 8} y={padT + innerH * (1 - f) + 3} textAnchor="end" fontSize="9.5" fontFamily={font.mono} fill={C.inkSoft}>{inr(Math.round(moneyMax * f))}</text>)}
-      {ticks.map((f) => <text key={`q${f}`} x={w - padR + 8} y={padT + innerH * (1 - f) + 3} textAnchor="start" fontSize="9.5" fontFamily={font.mono} fill={C.inkSoft}>{Math.round(qtyMax * f)}</text>)}
-      {inPath && <path d={inPath} fill="none" stroke="#159A83" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-      {outPath && <path d={outPath} fill="none" stroke="#E58B45" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-      {qtyPath && <path d={qtyPath} fill="none" stroke="#3F7FE8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-      {data.map((d, i) => {
-        const [x, yi] = point(d.moneyIn, moneyMax, i);
-        const [, yo] = point(d.moneyOut, moneyMax, i);
-        const [, yq] = point(d.qty, qtyMax, i);
-        return <g key={d.key}>
-          <circle cx={x} cy={yi} r="3.2" fill="#159A83" stroke={C.white} strokeWidth="1.2" />
-          <circle cx={x} cy={yo} r="3.2" fill="#E58B45" stroke={C.white} strokeWidth="1.2" />
-          <circle cx={x} cy={yq} r="3.2" fill="#3F7FE8" stroke={C.white} strokeWidth="1.2" />
-          <text x={x} y={h - 12} textAnchor="middle" fontSize="9.5" fontFamily={font.mono} fill={C.inkSoft}>{d.label}</text>
-        </g>;
-      })}
-      <text x="12" y={padT + innerH / 2} transform={`rotate(-90 12 ${padT + innerH / 2})`} textAnchor="middle" fontSize="9.5" fontFamily={font.mono} fill={C.inkSoft}>Money (₹)</text>
-      <text x={w - 8} y={padT + innerH / 2} transform={`rotate(90 ${w - 8} ${padT + innerH / 2})`} textAnchor="middle" fontSize="9.5" fontFamily={font.mono} fill={C.inkSoft}>Quantity</text>
-    </svg>
-  );
-}
-
-
 function KpiCard({ label, value, sub, accent }) {
   return (
     <Card style={{ minWidth: 0 }}>
@@ -5294,25 +5253,10 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
   const todayStr = localISO(new Date());
   const monthPrefix = todayStr.slice(0, 7);
   const today = new Date();
-  const monthBuckets = useMemo(() => {
-    const keys = [
-      ...entries.map((e) => e.date).filter(Boolean),
-      ...purchases.map((p) => p.date).filter(Boolean),
-      ...cashManual.map((c) => c.date).filter(Boolean),
-    ].map((d) => String(d).slice(0, 7)).filter(Boolean).sort();
-    const startKey = keys[0] || monthPrefix;
-    const [sy, sm] = startKey.split("-").map(Number);
-    const [ey, em] = monthPrefix.split("-").map(Number);
-    const out = [];
-    let y = sy, m = sm;
-    while (y < ey || (y === ey && m <= em)) {
-      const key = `${y}-${String(m).padStart(2, "0")}`;
-      const d = new Date(y, m - 1, 1);
-      out.push({ key, label: d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" }) });
-      m += 1; if (m > 12) { m = 1; y += 1; }
-    }
-    return out;
-  }, [entries, purchases, cashManual, monthPrefix]);
+  const monthBuckets = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - (5 - i), 1);
+    return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, label: d.toLocaleDateString("en-IN", { month: "short" }) };
+  });
   const todaySales = entries.filter((e) => e.date === todayStr).reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const todayCount = entries.filter((e) => e.date === todayStr).length;
   const monthSales = entries.filter((e) => (e.date || "").startsWith(monthPrefix)).reduce((sum, e) => sum + Number(e.amount || 0), 0);
@@ -5328,17 +5272,31 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
   const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
   const lowStock = rubberOnly.filter((r) => (stockByRubber[r.id]?.balance ?? 0) <= 15);
   const pendingOrders = orders.filter((o) => (o.status || "new") !== "printed");
-  const monthlyTrend = useMemo(() => monthBuckets.map((m) => ({
+  const salesTrend = useMemo(() => {
+    // Show the complete sales history: from the first recorded sale through today.
+    // Keep every calendar day in the range so zero-sale days remain visible on the graph.
+    const validDates = entries
+      .map((e) => e.date)
+      .filter(Boolean)
+      .sort();
+    const startKey = validDates[0] || todayStr;
+    const start = new Date(`${startKey}T12:00:00`);
+    const end = new Date(`${todayStr}T12:00:00`);
+    const days = [];
+    for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      days.push(localISO(d));
+    }
+    const totals = new Map(days.map((d) => [d, 0]));
+    entries.forEach((e) => {
+      if (totals.has(e.date)) totals.set(e.date, totals.get(e.date) + Number(e.amount || 0));
+    });
+    return days.map((date) => ({ date, value: totals.get(date) || 0 }));
+  }, [entries, todayStr]);
+  const monthlyComparison = monthBuckets.map((m) => ({
     ...m,
-    qty: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.qty || 1), 0),
-    moneyIn: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.amount || 0), 0)
-      + cashManual.filter((c) => (c.date || "").startsWith(m.key) && c.type === "in").reduce((sum, c) => sum + Number(c.amount || 0), 0),
-    moneyOut: purchases.filter((p) => (p.date || "").startsWith(m.key)).reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0)
-      + cashManual.filter((c) => (c.date || "").startsWith(m.key) && c.type === "out").reduce((sum, c) => sum + Number(c.amount || 0), 0),
-  })), [monthBuckets, entries, purchases, cashManual]);
-  const lastMonthKey = (() => { const d = new Date(today.getFullYear(), today.getMonth() - 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
-  const lastMonth = monthlyTrend.find((m) => m.key === lastMonthKey) || { qty: 0, moneyIn: 0, moneyOut: 0 };
-  const monthlyComparison = monthlyTrend.slice(-6);
+    sales: entries.filter((e) => (e.date || "").startsWith(m.key)).reduce((sum, e) => sum + Number(e.amount || 0), 0),
+    purchases: purchases.filter((p) => (p.date || "").startsWith(m.key)).reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0),
+  }));
   const cashFlow7d = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(); d.setDate(d.getDate() - (6 - i)); const key = localISO(d);
@@ -5357,7 +5315,7 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
   }, [entries, rubbers]);
   const maxTopCount = Math.max(1, ...topRubbers.map((t) => t.count));
   const recentSales = entries.slice(0, 5);
-
+  const maxMonthly = Math.max(1, ...monthlyComparison.flatMap((m) => [m.sales, m.purchases]));
   const paymentTotals = ["Cash", "UPI", "Card", "Bank"].map((mode) => ({
     mode, amount: entries.filter((e) => (e.payment_mode || "Cash").toLowerCase() === mode.toLowerCase()).reduce((sum, e) => sum + Number(e.amount || 0), 0)
   })).filter((x) => x.amount > 0);
@@ -5393,68 +5351,30 @@ function DashboardTab({ rubbers, purchases, entries, cashManual, stockByRubber, 
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,340px),1fr))", gap: 12 }}>
-        <section style={{ ...panel, gridColumn: "1 / -1", padding: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <div style={sectionLabel}>Monthly overview · all time</div>
-              <div style={{ fontFamily: font.display, fontSize: 21, fontWeight: 700, color: C.ink }}>Quantity / Money In / Money Out</div>
-              <div style={{ fontSize: 11, color: C.inkSoft, marginTop: 4 }}>All-time history grouped month-wise. The last completed month is highlighted below.</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-              <span style={{ border: `1px solid ${C.line}`, background: C.paperDark, borderRadius: 8, padding: "7px 10px", fontFamily: font.mono, fontSize: 10.5, color: C.ink }}>Monthly</span>
-              <span style={{ border: `1px solid ${C.line}`, background: C.white, borderRadius: 8, padding: "7px 10px", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>All Time</span>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 8, marginTop: 14 }}>
-            <div style={{ padding: "10px 12px", border: `1px solid #3F7FE844`, background: "#3F7FE80A", borderRadius: 10 }}>
-              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>LAST MONTH · QUANTITY</div>
-              <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 3 }}>{lastMonth.qty}</div>
-            </div>
-            <div style={{ padding: "10px 12px", border: `1px solid #159A8344`, background: "#159A830A", borderRadius: 10 }}>
-              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>LAST MONTH · MONEY IN</div>
-              <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 3 }}>{inr(lastMonth.moneyIn)}</div>
-            </div>
-            <div style={{ padding: "10px 12px", border: `1px solid #E58B4544`, background: "#E58B450A", borderRadius: 10 }}>
-              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>LAST MONTH · MONEY OUT</div>
-              <div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 800, color: C.ink, marginTop: 3 }}>{inr(lastMonth.moneyOut)}</div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>
-              <span><b style={{ color: "#3F7FE8" }}>●</b> Quantity (Nos)</span>
-              <span><b style={{ color: "#159A83" }}>●</b> Money In (₹)</span>
-              <span><b style={{ color: "#E58B45" }}>●</b> Money Out (₹)</span>
-            </div>
-            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>Last month: {lastMonth.label}</span>
-          </div>
-
-          <div style={{ padding: "10px 0 0", overflowX: "auto" }}>
-            <div style={{ minWidth: Math.max(560, monthlyTrend.length * 42) }}>
-              <MonthlyTrendSVG data={monthlyTrend} height={250} />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,300px),1fr))", gap: 12 }}>
         <section style={panel}>
-          <div style={sectionLabel}>Last 6 months summary</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            {monthlyComparison.map((m) => <div key={m.key} style={{ paddingBottom: 8, borderBottom: `1px solid ${C.paperDark}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11 }}><b>{m.label}</b><span style={miniStat}>Qty {m.qty}</span></div>
-              <div style={{ ...miniStat, marginTop: 4 }}>In {inr(m.moneyIn)} · Out {inr(m.moneyOut)}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "start" }}>
+            <div><div style={sectionLabel}>Sales trend · since first sale</div><div style={{ fontFamily: font.display, fontSize: 20, fontWeight: 700, color: C.ink }}>{inr(salesTrend.reduce((sum, d) => sum + d.value, 0))}</div></div>
+            <span style={{ ...miniStat, background: C.paper, borderRadius: 8, padding: "5px 7px" }}>ALL TIME</span>
+          </div>
+          <div style={{ padding: "12px 0 0" }}>
+            <TrendSVG data={salesTrend} color="#3F7FE8" height={145} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginTop: 8 }}><span>{fmtDate(salesTrend[0].date)}</span><span>{fmtDate(salesTrend[salesTrend.length - 1].date)}</span></div>
+        </section>
+
+        <section style={panel}>
+          <div style={{ ...sectionLabel, marginBottom: 5 }}>Monthly sales vs purchases</div>
+          <div style={{ fontSize: 12, color: C.inkSoft, marginBottom: 10 }}>Six-month comparison · amounts in ₹</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {monthlyComparison.map((m) => <div key={m.key}>
+              <div style={{ display: "flex", justifyContent: "space-between", ...miniStat, marginBottom: 4 }}><span>{m.label}</span><span>Sales {inr(m.sales)} · Purchases {inr(m.purchases)}</span></div>
+              <div style={{ display: "grid", gap: 3 }}>
+                <div style={{ height: 7, background: C.paperDark, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${m.sales / maxMonthly * 100}%`, height: "100%", background: "#3F7FE8", borderRadius: 6 }} /></div>
+                <div style={{ height: 7, background: C.paperDark, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${m.purchases / maxMonthly * 100}%`, height: "100%", background: "#F0A44B", borderRadius: 6 }} /></div>
+              </div>
             </div>)}
           </div>
-        </section>
-        <section style={panel}>
-          <div style={sectionLabel}>Previous month</div>
-          <div style={{ display: "grid", gap: 10 }}>
-            <KpiCard label="Quantity" value={String(lastMonth.qty)} sub="Last calendar month" accent="#3F7FE8" />
-            <KpiCard label="Money in" value={inr(lastMonth.moneyIn)} sub="Sales + cash receipts" accent="#159A83" />
-            <KpiCard label="Money out" value={inr(lastMonth.moneyOut)} sub="Purchases + cash expenses" accent="#E58B45" />
-          </div>
+          <div style={{ display: "flex", gap: 14, ...miniStat, marginTop: 12 }}><span><b style={{ color: "#3F7FE8" }}>●</b> Sales</span><span><b style={{ color: "#F0A44B" }}>●</b> Purchases</span></div>
         </section>
       </div>
 
