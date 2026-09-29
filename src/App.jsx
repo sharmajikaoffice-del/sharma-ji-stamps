@@ -4044,11 +4044,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { padding: "8px", flexShrink: 0 }) }}>
           <ChevronLeft size={16} />{isDesktop && " Back"}
         </button>
-        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-          <button type="button" onClick={undoLayers} title="Undo" aria-label="Undo" style={toolbarIconBtn}><Undo2 size={18} /></button>
-          <button type="button" onClick={redoLayers} title="Redo" aria-label="Redo" style={toolbarIconBtn}><Redo2 size={18} /></button>
-        </div>
-
         <div style={{
           display: "flex", alignItems: "center", gap: isDesktop ? 22 : 6,
           flexDirection: "row",
@@ -4070,82 +4065,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           <button type="button" onClick={() => addLayer("frame", { shape: "triangle" })} style={toolbarIconBtn} title="Insert Triangle">
             <span style={toolbarIconBox}><Triangle size={18} /></span> Triangle
           </button>
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => setShapePickerOpen((v) => !v)}
-              style={toolbarIconBtn}
-              title="More Shapes"
-              aria-label="More Shapes"
-            >
-              <span style={toolbarIconBox}><Star size={18} /></span>
-              Shapes
-            </button>
-            {shapePickerOpen && (
-              <div style={{
-                position: "fixed", top: isDesktop ? 64 : 58, left: isDesktop ? 330 : 8, zIndex: 181,
-                width: isDesktop ? 280 : "calc(100vw - 16px)", maxWidth: 300, padding: 10,
-                background: C.white, border: `1px solid ${C.line}`, borderRadius: 10,
-                boxShadow: "0 8px 24px rgba(0,0,0,.14)"
-              }}>
-                <div style={{ fontSize: 10, fontFamily: font.mono, color: C.inkSoft, marginBottom: 8, letterSpacing: 1 }}>MY SHAPES / ART</div>
-                {customShapes.length === 0 ? (
-                  <div style={{ padding: "8px 4px", fontSize: 11, color: C.inkSoft, fontFamily: font.mono }}>
-                    Apne PNG / JPG / SVG shapes yahan add karo.
-                  </div>
-                ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7, marginBottom: 8 }}>
-                    {customShapes.map((sym) => (
-                      <div key={sym.id} style={{ position: "relative" }}>
-                        <button
-                          type="button"
-                          title={sym.label}
-                          onClick={() => addCustomShape(sym)}
-                          style={{
-                            width: "100%", minHeight: 54, border: `1px solid ${C.line}`, background: C.white,
-                            borderRadius: 7, padding: 5, cursor: "pointer", display: "flex",
-                            alignItems: "center", justifyContent: "center"
-                          }}
-                        >
-                          <img src={sym.src} alt={sym.label} style={{ width: 40, height: 40, objectFit: "contain" }} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => removeCustomShape(sym.id, e)}
-                          title="Remove saved shape"
-                          aria-label="Remove saved shape"
-                          style={{
-                            position: "absolute", top: -5, right: -5, width: 17, height: 17, border: "none",
-                            borderRadius: "50%", background: C.stamp, color: C.white, cursor: "pointer",
-                            fontSize: 11, lineHeight: "17px", padding: 0
-                          }}
-                        >×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => customShapeInputRef.current?.click()}
-                  style={{
-                    width: "100%", border: `1px dashed ${C.brass}`, background: C.paperDark, color: C.ink,
-                    borderRadius: 8, padding: "9px 10px", cursor: "pointer", display: "flex",
-                    alignItems: "center", justifyContent: "center", gap: 7, fontFamily: font.body, fontWeight: 700, fontSize: 12
-                  }}
-                >
-                  <Upload size={15} /> Upload / Insert Shape
-                </button>
-                <input
-                  ref={customShapeInputRef}
-                  type="file"
-                  accept="image/*,.svg"
-                  multiple
-                  style={{ display: "none" }}
-                  onChange={handleCustomShapeUpload}
-                />
-              </div>
-            )}
-          </div>
           <button type="button" onClick={() => addLayer("line")} style={toolbarIconBtn} title="Insert Line">
             <span style={toolbarIconBox}><span style={{ fontSize: 21, lineHeight: 1 }}>―</span></span> Line
           </button>
@@ -4172,12 +4091,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             {symbolPickerOpen && (
               <div style={{
                 position: "fixed", top: isDesktop ? 64 : 58, right: isDesktop ? 18 : 8, zIndex: 180,
-                minWidth: 170, padding: 8, background: C.white,
+                width: isDesktop ? 270 : "calc(100vw - 16px)", maxWidth: 300, padding: 9, background: C.white,
                 border: `1px solid ${C.line}`, borderRadius: 10,
                 boxShadow: "0 8px 24px rgba(0,0,0,.14)"
               }}>
                 <div style={{ fontSize: 10, fontFamily: font.mono, color: C.inkSoft, marginBottom: 7, letterSpacing: 1 }}>ADD SYMBOL</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
                   {PRELOADED_SYMBOLS.map((sym) => (
                     <button
                       key={sym.id}
@@ -4193,6 +4112,67 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                     </button>
                   ))}
                 </div>
+
+                {!customerMode && (
+                  <>
+                    <div style={{
+                      marginTop: 9, marginBottom: 7, paddingTop: 8,
+                      borderTop: `1px solid ${C.line}`,
+                      fontSize: 10, fontFamily: font.mono, color: C.inkSoft, letterSpacing: 1
+                    }}>MY SHAPES / ART</div>
+                    {customShapes.length > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 7 }}>
+                        {customShapes.map((sym) => (
+                          <div key={sym.id} style={{ position: "relative" }}>
+                            <button
+                              type="button"
+                              title={sym.label}
+                              onClick={() => addCustomShape(sym)}
+                              style={{
+                                width: "100%", minHeight: 48, border: `1px solid ${C.line}`,
+                                background: C.white, borderRadius: 7, padding: 4, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center"
+                              }}
+                            >
+                              <img src={sym.src} alt={sym.label} style={{ width: 34, height: 34, objectFit: "contain" }} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => removeCustomShape(sym.id, e)}
+                              title="Remove saved shape"
+                              aria-label="Remove saved shape"
+                              style={{
+                                position: "absolute", top: -5, right: -5, width: 16, height: 16,
+                                border: "none", borderRadius: "50%", background: C.stamp, color: C.white,
+                                cursor: "pointer", fontSize: 10, lineHeight: "16px", padding: 0
+                              }}
+                            >×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => customShapeInputRef.current?.click()}
+                      style={{
+                        width: "100%", border: `1px dashed ${C.brass}`, background: C.paperDark,
+                        color: C.ink, borderRadius: 8, padding: "9px 10px", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                        fontFamily: font.body, fontWeight: 700, fontSize: 12
+                      }}
+                    >
+                      <Upload size={15} /> Upload New Shape / Art
+                    </button>
+                    <input
+                      ref={customShapeInputRef}
+                      type="file"
+                      accept="image/*,.svg"
+                      multiple
+                      style={{ display: "none" }}
+                      onChange={handleCustomShapeUpload}
+                    />
+                  </>
+                )}
               </div>
             )}
           </div>
