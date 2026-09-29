@@ -322,3 +322,68 @@ tbody tr:hover { background:rgba(63,127,232,.035); }
 @media (prefers-reduced-motion:reduce) {
   *,*::before,*::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; animation-iteration-count:1!important; }
 }
+
+
+/* ================================================================
+   MOBILE TEXT PROPERTY CONTROLS
+   Desktop keeps the existing numeric Size field and alignment buttons.
+   Mobile gets a touch-friendly 0.5-step slider + editable value.
+   ================================================================ */
+.sjs-text-size-mobile { display:none; }
+
+@media (max-width:900px) {
+  .sjs-text-size-desktop { display:none!important; }
+  .sjs-text-size-mobile { display:block!important; }
+
+  .sjs-text-size-mobile-row {
+    display:grid;
+    grid-template-columns:40px minmax(0,1fr) 40px 72px;
+    align-items:center;
+    gap:7px;
+  }
+
+  .sjs-text-size-mobile-row > button {
+    width:40px;
+    height:42px;
+    min-height:42px!important;
+    padding:0;
+    border:1px solid var(--border-strong);
+    border-radius:9px;
+    background:var(--surface);
+    color:var(--text-h);
+    font-size:21px;
+    font-weight:700;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .sjs-text-size-mobile-row > button:active {
+    transform:scale(.96);
+  }
+
+  .sjs-text-size-mobile-row > input[type="range"] {
+    width:100%;
+    min-width:0;
+    height:42px;
+    accent-color:var(--accent);
+    cursor:pointer;
+  }
+
+  .sjs-text-size-mobile-row .sjs-text-size-value {
+    width:72px!important;
+    min-height:42px!important;
+    height:42px;
+    margin:0!important;
+    padding:0 8px!important;
+    text-align:center;
+    font-family:var(--mono);
+    font-weight:600;
+  }
+
+  .sjs-mobile-hidden-text-alignment {
+    display:none!important;
+  }
+}
