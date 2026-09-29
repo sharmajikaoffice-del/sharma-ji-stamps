@@ -383,9 +383,9 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     }
 
     ctx.font = `600 ${Number(topTextSize) || 12}px Georgia, 'Times New Roman', serif`;
-    drawArcText(ctx, topText.toUpperCase(), cx, cy, textR, 0, 1, letterSpacing);
+    drawArcText(ctx, topText, cx, cy, textR, 0, 1, letterSpacing);
     ctx.font = `600 ${Number(bottomTextSize) || 12}px Georgia, 'Times New Roman', serif`;
-    drawArcText(ctx, bottomText.toUpperCase(), cx, cy, textR, 0, -1, letterSpacing);
+    drawArcText(ctx, bottomText, cx, cy, textR, 0, -1, letterSpacing);
 
     if (logo) {
       const logoSize = 44;
@@ -396,10 +396,10 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     }
 
     ctx.font = `700 ${Number(centerTextSize) || 16}px Georgia, 'Times New Roman', serif`;
-    ctx.fillText(centerLine1.toUpperCase(), cx, logo ? cy + 4 : cy - 4);
+    ctx.fillText(centerLine1, cx, logo ? cy + 4 : cy - 4);
     if (centerLine2) {
       ctx.font = `400 ${Number(centerText2Size) || 11}px Georgia, 'Times New Roman', serif`;
-      ctx.fillText(centerLine2.toUpperCase(), cx, cy + (logo ? 24 : 16));
+      ctx.fillText(centerLine2, cx, cy + (logo ? 24 : 16));
     }
 
   } else {
@@ -425,7 +425,7 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     }
 
     ctx.font = "700 16px Georgia, 'Times New Roman', serif";
-    ctx.fillText(rectLine1.toUpperCase(), cx, cursorY);
+    ctx.fillText(rectLine1, cx, cursorY);
     cursorY += 22;
 
     ctx.lineWidth = 1;
@@ -439,7 +439,7 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
     cursorY += 20;
 
     ctx.font = "italic 400 10px Georgia, 'Times New Roman', serif";
-    ctx.fillText(rectLine3.toUpperCase(), cx, cursorY + 4);
+    ctx.fillText(rectLine3, cx, cursorY + 4);
   }
 
   if (texture) addInkTexture(ctx, size, canvasHeight, inkColor, 42);
@@ -465,7 +465,7 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       // arc (like the built-in top-text/bottom-text pair already does), so every
       // letter stays upright and readable — NOT a mirror image of each letter.
       const direction = layer.flipX ? -1 : 1;
-      drawArcText(ctx, (layer.text || "").toUpperCase(), cx, cy, layer.radius ?? 130, startAngle, direction, layer.spacing ?? 4, {
+      drawArcText(ctx, (layer.text || ""), cx, cy, layer.radius ?? 130, startAngle, direction, layer.spacing ?? 4, {
         tall: !!layer.tall,
         invert: !!layer.invert,
         invertColor: inkColor,
