@@ -865,9 +865,13 @@ function TemplateThumb({ config, size = 140 }) {
   }, [config?.logoDataUrl]);
 
   const previewDims = (() => {
-    if (config?.shape === "circle" || config?.shape === "square") return { width: 1, height: 1 };
+    if (config?.shape === "circle" || config?.shape === "square") return { width: 320, height: 320 };
     const parsed = parseRubberSize(config?.rubberSize);
-    return parsed || { width: 1, height: 1 };
+    if (!parsed) return { width: 320, height: 320 };
+    return {
+      width: 320,
+      height: Math.max(40, 320 * (parsed.heightMm / parsed.widthMm)),
+    };
   })();
   const previewAspectRatio = `${previewDims.width} / ${previewDims.height}`;
 
