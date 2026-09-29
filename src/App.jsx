@@ -704,13 +704,15 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       const curveAmount = Math.max(0, Number(layer.curveAmount ?? 24));
       ctx.lineWidth = layer.strokeWidth ?? 4;
       ctx.lineCap = "butt";
-      const lineBreak = Math.max(0, Number(layer.lineBreak ?? 0));
-      const lineBreakCount = Math.max(1, Math.round(lineBreak * 5));
-      const lineGapFraction = lineBreakCount >= 150 ? 0.34 : lineBreakCount >= 50 ? 0.32 : 0.28;
+      const lineBreak = Math.min(40, Math.max(0, Number(layer.lineBreak ?? 0)));
       if (lineBreak > 0) {
-        const linePathLength = Math.max(ctx.lineWidth * 2, lineW);
-        const linePeriod = Math.max(ctx.lineWidth * 2, linePathLength / lineBreakCount);
-        ctx.setLineDash([linePeriod * (1 - lineGapFraction), linePeriod * lineGapFraction]);
+        // A line uses Break as GAP SIZE, not as a break-count. This keeps the
+        // pattern predictable at every slider value and prevents tiny dash
+        // fragments at the high end of the 0-40 range.
+        const breakRatio = lineBreak / 40;
+        const dashLength = Math.max(ctx.lineWidth * 1.5, lineW * 0.10);
+        const gapLength = Math.max(ctx.lineWidth * 1.5, dashLength * (0.35 + breakRatio * 2.15));
+        ctx.setLineDash([dashLength, gapLength]);
       } else {
         ctx.setLineDash([]);
       }
