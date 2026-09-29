@@ -864,13 +864,16 @@ function TemplateThumb({ config, size = 140 }) {
     return () => { cancelled = true; };
   }, [config?.logoDataUrl]);
 
+  // Render thumbnails at 2x backing resolution for crisp mobile downscaling,
+  // while keeping the actual display size small.
+  const previewBase = STAMP_CANVAS_SIZE * 2;
   const previewDims = (() => {
-    if (config?.shape === "circle" || config?.shape === "square") return { width: 320, height: 320 };
+    if (config?.shape === "circle" || config?.shape === "square") return { width: previewBase, height: previewBase };
     const parsed = parseRubberSize(config?.rubberSize);
-    if (!parsed) return { width: 320, height: 320 };
+    if (!parsed) return { width: previewBase, height: previewBase };
     return {
-      width: 320,
-      height: Math.max(40, 320 * (parsed.heightMm / parsed.widthMm)),
+      width: previewBase,
+      height: Math.max(80, previewBase * (parsed.heightMm / parsed.widthMm)),
     };
   })();
   const previewAspectRatio = `${previewDims.width} / ${previewDims.height}`;
