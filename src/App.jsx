@@ -596,7 +596,7 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       if (layer.fill) {
         ctx.save();
         tracePath(0);
-        ctx.fillStyle = layer.fillColor || "#FFFFFF";
+        ctx.fillStyle = inkColor || STAMP_INK_BLUE || "#000000";
         ctx.fill();
         ctx.restore();
       }
@@ -3455,6 +3455,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       if (id === "double") return <svg {...common}><path d="M11 1.5 L20.3 19 L1.7 19 Z" strokeLinejoin="round" /><path d="M11 6 L16.8 16.7 L5.2 16.7 Z" strokeLinejoin="round" /></svg>;
       return null;
     }
+    if (shape === "square") {
+      if (id === "single") return <svg {...common}><rect x="3" y="3" width="16" height="16" rx="1.5" /></svg>;
+      if (id === "double") return <svg {...common}><rect x="2" y="2" width="18" height="18" rx="1.5" /><rect x="6" y="6" width="10" height="10" rx="1" /></svg>;
+    }
     if (id === "single") return <svg {...common}><circle cx="11" cy="11" r="8" /></svg>;
     if (id === "double") return <svg {...common}><circle cx="11" cy="11" r="9" /><circle cx="11" cy="11" r="5.5" /></svg>;
     if (id === "scalloped") return <svg {...common}><path d="M11 1.5 L12.6 4 L15.3 2.8 L15.6 5.7 L18.5 5.4 L17.3 8.1 L20 9.7 L17.5 11.3 L20 12.9 L17.3 14.5 L18.5 17.2 L15.6 16.9 L15.3 19.8 L12.6 18.6 L11 21.1 L9.4 18.6 L6.7 19.8 L6.4 16.9 L3.5 17.2 L4.7 14.5 L2 12.9 L4.5 11.3 L2 9.7 L4.7 8.1 L3.5 5.4 L6.4 5.7 L6.7 2.8 L9.4 4 Z" strokeLinejoin="round" /></svg>;
@@ -3675,10 +3679,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             )}
           </>
           {activeLayer.shape === "square" && activeLayer.borderStyle === "filled" ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <Label style={{ margin: 0 }}>Fill Color</Label>
-              <input type="color" value={activeLayer.fillColor || "#FFFFFF"} onChange={(e) => updateLayer(activeLayer.id, { fillColor: e.target.value, fill: true })}
-                style={{ width: 34, height: 26, padding: 0, border: `1px solid ${C.line}`, borderRadius: 6, cursor: "pointer" }} />
+            <div style={{
+              marginBottom: 16, padding: "9px 10px", borderRadius: 8,
+              background: C.paperDark, border: `1px solid ${C.line}`,
+              color: C.inkSoft, fontFamily: font.mono, fontSize: 10.5
+            }}>
+              Filled box: solid stamp ink. Stroke / Break are disabled.
             </div>
           ) : (
             <>
@@ -3698,7 +3704,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           <Label>Border Style</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 4 }}>
             {(activeLayer.shape === "square"
-              ? FRAME_BORDER_STYLES.filter((o) => o.id === "filled")
+              ? FRAME_BORDER_STYLES.filter((o) => o.id === "single" || o.id === "double" || o.id === "filled")
               : activeLayer.shape === "triangle"
                 ? FRAME_BORDER_STYLES.filter((o) => o.id === "single" || o.id === "double")
                 : FRAME_BORDER_STYLES.filter((o) => o.id !== "filled")
@@ -3709,7 +3715,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                   key={opt.id}
                   type="button"
                   onClick={() => updateLayer(activeLayer.id, opt.id === "filled"
-                    ? { borderStyle: "filled", fill: true, fillColor: activeLayer.fillColor || "#FFFFFF", lineBreak: 0, strokeWidth: activeLayer.strokeWidth ?? 4 }
+                    ? { borderStyle: "filled", fill: true, lineBreak: 0, strokeWidth: activeLayer.strokeWidth ?? 4 }
                     : { borderStyle: opt.id, fill: false })}
                   style={{
                     border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
