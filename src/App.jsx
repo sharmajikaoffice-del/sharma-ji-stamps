@@ -3450,6 +3450,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Center</button>
               <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Right</button>
             </div>
+          </div>
           {activeLayer.source !== "addText" && (
             <div className="sjs-mobile-hidden-text-alignment">
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
