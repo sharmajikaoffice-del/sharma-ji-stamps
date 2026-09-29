@@ -4493,6 +4493,30 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
 
 
+      {!customerMode && (
+        (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : (
+          <Card id="mobile-stamp-submit" style={{ marginBottom: 24 }}>
+            <div style={{ fontWeight: 750, fontSize: 17, marginBottom: 6 }}>Template</div>
+            <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
+              {editingTemplateId ? "Existing template ko update karein, ya naam badal kar Save Template se naya template banayein." : "Is design ko template ke roop mein save karein."}
+            </div>
+            <Field placeholder="Template name" value={templateName} onChange={(e) => setTemplateName(e.target.value)} maxLength={80} />
+            <div style={{ display: "grid", gridTemplateColumns: editingTemplateId ? "1fr 1fr" : "1fr", gap: 10 }}>
+              <Btn onClick={handleSaveTemplate} disabled={saveStatus === "saving"} style={{ width: "100%", justifyContent: "center", background: STAMP_INK_BLUE }}>
+                <Copy size={16} /> Save Template
+              </Btn>
+              {editingTemplateId && (
+                <Btn onClick={handleUpdateTemplate} disabled={saveStatus === "saving"} style={{ width: "100%", justifyContent: "center", background: C.primary }}>
+                  <Save size={16} /> Update Template
+                </Btn>
+              )}
+            </div>
+            {saveStatus === "saved" && <div style={{ marginTop: 9, color: C.headerGreen, fontFamily: font.mono, fontSize: 11.5 }}>Template saved successfully.</div>}
+            {saveStatus === "error" && <div style={{ marginTop: 9, color: "#a33", fontFamily: font.mono, fontSize: 11.5 }}>Template save/update failed. Please try again.</div>}
+          </Card>
+        )
+      )}
+
       {customerMode && (
         (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : <Card id="mobile-stamp-customer-submit" style={{ marginBottom: 24 }}>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Submit & Download Preview</div>
