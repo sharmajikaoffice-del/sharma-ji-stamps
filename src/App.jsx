@@ -561,7 +561,16 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
           // shape can be a true rectangle, not just a square.
           const w = Math.max(6, ((layer.width ?? 45) / 100) * size - inset * 2);
           const h = Math.max(6, ((layer.height ?? 45) / 100) * canvasHeight - inset * 2);
-          ctx.rect(-w / 2, -h / 2, w, h);
+          const corner = Math.min(
+            Math.max(0, Number(layer.cornerRadius ?? 0)),
+            w / 2,
+            h / 2
+          );
+          if (corner > 0 && ctx.roundRect) {
+            ctx.roundRect(-w / 2, -h / 2, w, h, corner);
+          } else {
+            ctx.rect(-w / 2, -h / 2, w, h);
+          }
         } else if (frameShape === "triangle") {
           // Equilateral triangle inscribed in a circle of radius r.
           const r = Math.max(4, Math.min(size * 0.48, layer.radius ?? 100) - inset * 1.6);
@@ -638,7 +647,14 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
         }
       };
 
-      if (style === "scalloped" && frameShape === "circle") {
+      if (style === "filled" && frameShape === "square") {
+        // Filled rectangle is a solid box: no outline stroke and no line-break.
+        ctx.save();
+        tracePath(0);
+        ctx.fillStyle = layer.fillColor || "#FFFFFF";
+        ctx.fill();
+        ctx.restore();
+      } else if (style === "scalloped" && frameShape === "circle") {
         // A scalloped ring border, like a certificate seal — a thin band with
         // many small rounded bumps along its outer edge, and a plain circular
         // inner edge so the middle of the stamp stays open for other content.
@@ -3318,7 +3334,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     </div>
   );
 
-  const fontOptions = ["Arial", "Georgia", "Times New Roman", "Verdana", "Courier New", "Trebuchet MS"];
+  const fontOptions = ["Arial", "Georgia", "Times New Roman", "Verdana", "Courier New", "Trebuchet MS", "Smile Moon", "Marseille", "UNDESA", "Garesin", "Crown Monarch"];
 
   // Add Text exposes only the three requested layouts. Other shape-specific
   // text behavior continues to use its existing rendering/layouts.
@@ -3363,6 +3379,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     { id: "double", label: "Double" },
     { id: "scalloped", label: "Scalloped" },
     { id: "dashed", label: "Dashed" },
+    { id: "filled", label: "Filled" },
   ];
   const BorderStyleIcon = ({ id, active, shape }) => {
     const stroke = active ? STAMP_INK_BLUE : C.inkSoft;
@@ -3376,6 +3393,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     if (id === "double") return <svg {...common}><circle cx="11" cy="11" r="9" /><circle cx="11" cy="11" r="5.5" /></svg>;
     if (id === "scalloped") return <svg {...common}><path d="M11 1.5 L12.6 4 L15.3 2.8 L15.6 5.7 L18.5 5.4 L17.3 8.1 L20 9.7 L17.5 11.3 L20 12.9 L17.3 14.5 L18.5 17.2 L15.6 16.9 L15.3 19.8 L12.6 18.6 L11 21.1 L9.4 18.6 L6.7 19.8 L6.4 16.9 L3.5 17.2 L4.7 14.5 L2 12.9 L4.5 11.3 L2 9.7 L4.7 8.1 L3.5 5.4 L6.4 5.7 L6.7 2.8 L9.4 4 Z" strokeLinejoin="round" /></svg>;
     if (id === "dashed") return <svg {...common}><circle cx="11" cy="11" r="8" strokeDasharray="2.5 2.5" /></svg>;
+    if (id === "filled") return <svg {...common} fill={stroke}><rect x="3" y="3" width="16" height="16" rx="2" stroke="none" /></svg>;
     return null;
   };
 
@@ -3569,10 +3587,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           ) : (
             <SliderControl label="Radius" value={activeLayer.radius ?? 100} min={30} max={150} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { radius: v })} />
           )}
-          {(activeLayer.borderStyle || "single") === "scalloped" ? (
-            <SliderControl label="Wave amount" value={activeLayer.waveAmount ?? 14} min={2} max={40} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { waveAmount: v })} />
-          ) : (
-            <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+          {activeLayer.shape === "square" && activeLayer.borderStyle === "filled" ? null : (
+            (activeLayer.borderStyle || "single") === "scalloped" ? (
+              <SliderControl label="Wave amount" value={activeLayer.waveAmount ?? 14} min={2} max={40} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { waveAmount: v })} />
+            ) : (
+              <SliderControl label="Stroke width" value={activeLayer.strokeWidth ?? 4} min={1} max={25} step={0.1} onChange={(v) => updateLayer(activeLayer.id, { strokeWidth: v })} />
+            )
           )}
           {activeLayer.shape !== "circle" && activeLayer.shape !== "triangle" && (
             <>
@@ -3580,32 +3600,51 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
             </>
           )}
-          {(
-            <>
-              <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+          <>
+            <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+            {activeLayer.shape === "square" && activeLayer.borderStyle === "filled" ? (
+              <SliderControl label="Corner curve" value={activeLayer.cornerRadius ?? 0} min={0} max={40} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { cornerRadius: v })} />
+            ) : (
               <BreakSliderControl value={activeLayer.lineBreak ?? 0} onChange={(v) => updateLayer(activeLayer.id, { lineBreak: v })} />
-            </>
-          )}
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: activeLayer.fill ? 8 : 16 }}>
-            <input type="checkbox" checked={!!activeLayer.fill} onChange={(e) => updateLayer(activeLayer.id, { fill: e.target.checked })} />
-            Fill background (blocks whatever is behind this shape)
-          </label>
-          {activeLayer.fill && (
+            )}
+          </>
+          {activeLayer.shape === "square" && activeLayer.borderStyle === "filled" ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
               <Label style={{ margin: 0 }}>Fill Color</Label>
-              <input type="color" value={activeLayer.fillColor || "#FFFFFF"} onChange={(e) => updateLayer(activeLayer.id, { fillColor: e.target.value })}
+              <input type="color" value={activeLayer.fillColor || "#FFFFFF"} onChange={(e) => updateLayer(activeLayer.id, { fillColor: e.target.value, fill: true })}
                 style={{ width: 34, height: 26, padding: 0, border: `1px solid ${C.line}`, borderRadius: 6, cursor: "pointer" }} />
             </div>
+          ) : (
+            <>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: activeLayer.fill ? 8 : 16 }}>
+                <input type="checkbox" checked={!!activeLayer.fill} onChange={(e) => updateLayer(activeLayer.id, { fill: e.target.checked })} />
+                Fill background (blocks whatever is behind this shape)
+              </label>
+              {activeLayer.fill && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <Label style={{ margin: 0 }}>Fill Color</Label>
+                  <input type="color" value={activeLayer.fillColor || "#FFFFFF"} onChange={(e) => updateLayer(activeLayer.id, { fillColor: e.target.value })}
+                    style={{ width: 34, height: 26, padding: 0, border: `1px solid ${C.line}`, borderRadius: 6, cursor: "pointer" }} />
+                </div>
+              )}
+            </>
           )}
           <Label>Border Style</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 4 }}>
-            {(activeLayer.shape === "triangle" ? FRAME_BORDER_STYLES.filter((o) => o.id === "single" || o.id === "double") : FRAME_BORDER_STYLES).map((opt) => {
+            {(activeLayer.shape === "square"
+              ? FRAME_BORDER_STYLES.filter((o) => o.id === "filled")
+              : activeLayer.shape === "triangle"
+                ? FRAME_BORDER_STYLES.filter((o) => o.id === "single" || o.id === "double")
+                : FRAME_BORDER_STYLES.filter((o) => o.id !== "filled")
+            ).map((opt) => {
               const active = (activeLayer.borderStyle || "single") === opt.id;
               return (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => updateLayer(activeLayer.id, { borderStyle: opt.id })}
+                  onClick={() => updateLayer(activeLayer.id, opt.id === "filled"
+                    ? { borderStyle: "filled", fill: true, fillColor: activeLayer.fillColor || "#FFFFFF", lineBreak: 0, strokeWidth: activeLayer.strokeWidth ?? 4 }
+                    : { borderStyle: opt.id, fill: false })}
                   style={{
                     border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
                     background: active ? C.paperDark : C.white,
