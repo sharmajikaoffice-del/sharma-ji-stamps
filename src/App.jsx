@@ -3903,10 +3903,22 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           position: "absolute", left: 0, right: 0, bottom: 8, zIndex: 5,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 5, whiteSpace: "nowrap",
         }}>
-          <button type="button" onClick={() => setPreviewZoom((z) => Math.max(0.6, Number((z - 0.1).toFixed(1))))} title="Zoom out" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>−</button>
-          <span style={{ minWidth: 46, textAlign: "center", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, background: "rgba(255,255,255,.9)", borderRadius: 6, padding: "4px 0" }}>{Math.round(previewZoom * 100)}%</span>
-          <button type="button" onClick={() => setPreviewZoom((z) => Math.min(3, Number((z + 0.1).toFixed(1))))} title="Zoom in" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>+</button>
-          <button type="button" onClick={() => setPreviewZoom(1)} title="Reset zoom" style={{ height: 28, padding: "0 8px", border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: STAMP_INK_BLUE, cursor: "pointer", fontSize: 10, fontWeight: 700, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>Reset</button>
+          <button type="button" onClick={undoLayers} title="Undo" aria-label="Undo" style={{
+            position: "absolute", left: 8, width: 34, height: 34, border: `1px solid ${C.line}`,
+            borderRadius: 8, background: C.white, color: C.ink, cursor: "pointer", display: "grid",
+            placeItems: "center", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)"
+          }}><Undo2 size={18} /></button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+            <button type="button" onClick={() => setPreviewZoom((z) => Math.max(0.6, Number((z - 0.1).toFixed(1))))} title="Zoom out" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>−</button>
+            <span style={{ minWidth: 46, textAlign: "center", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, background: "rgba(255,255,255,.9)", borderRadius: 6, padding: "4px 0" }}>{Math.round(previewZoom * 100)}%</span>
+            <button type="button" onClick={() => setPreviewZoom((z) => Math.min(3, Number((z + 0.1).toFixed(1))))} title="Zoom in" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>+</button>
+            <button type="button" onClick={() => setPreviewZoom(1)} title="Reset zoom" style={{ height: 28, padding: "0 8px", border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: STAMP_INK_BLUE, cursor: "pointer", fontSize: 10, fontWeight: 700, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>Reset</button>
+          </div>
+          <button type="button" onClick={redoLayers} title="Redo" aria-label="Redo" style={{
+            position: "absolute", right: 8, width: 34, height: 34, border: `1px solid ${C.line}`,
+            borderRadius: 8, background: C.white, color: C.ink, cursor: "pointer", display: "grid",
+            placeItems: "center", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)"
+          }}><Redo2 size={18} /></button>
         </div>
       </div>
     </Card>
