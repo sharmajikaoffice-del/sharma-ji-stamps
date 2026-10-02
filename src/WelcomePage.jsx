@@ -70,8 +70,8 @@ function WelcomePage() {
             <button onClick={() => scrollTo("about")}>About</button>
             <button onClick={() => scrollTo("products")}>Products</button>
             <button onClick={() => scrollTo("contact")}>Contact</button>
-            <a className="sjs-login" href="/login">Stamps Login</a>
-            <a className="sjs-login" href="https://sharmajikaoffice.vercel.app/">Office Login</a>
+            <a className="sjs-login" href="/login">Login</a>
+            <a className="sjs-login" href="/customer">Submit your design</a>
           </nav>
         </div>
       </header>
