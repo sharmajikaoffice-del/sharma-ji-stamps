@@ -387,3 +387,21 @@ tbody tr:hover { background:rgba(63,127,232,.035); }
     display:none!important;
   }
 }
+
+
+/* ===== Soft lilac theme: neumorphic, oval (pill) buttons ===== */
+html[data-app-theme="soft-lilac"] body { background: #E3D5EF; }
+html[data-app-theme="soft-lilac"] button:not(:has(div, img, canvas, table)) {
+  border-radius: 999px !important;
+  border: 0 !important;
+  box-shadow: 6px 6px 14px rgba(125, 107, 158, .38), -5px -5px 12px rgba(255, 255, 255, .85) !important;
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+html[data-app-theme="soft-lilac"] button:not(:has(div, img, canvas, table)):active:not(:disabled) {
+  box-shadow: inset 4px 4px 9px rgba(95, 79, 128, .40), inset -4px -4px 8px rgba(255, 255, 255, .55) !important;
+  transform: scale(.98);
+}
+html[data-app-theme="soft-lilac"] button:disabled {
+  box-shadow: none !important;
+  opacity: .55;
+}
