@@ -497,7 +497,8 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
           });
           const sides = [[points[0], points[1]], [points[1], points[2]], [points[2], points[0]]];
           const layoutSide = { rightRotated: 0, bottom: 1, leftRotated: 2 };
-          const sideIndex = layoutSide[layer.layout] ?? Math.max(0, Math.min(2, Number(layer.triangleSide ?? 1)));          const [a, b] = sides[sideIndex];
+          const sideIndex = layoutSide[layer.layout] ?? Math.max(0, Math.min(2, Number(layer.triangleSide ?? 1)));
+          const [a, b] = sides[sideIndex];
           const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
           const ex = b.x - a.x, ey = b.y - a.y;
           const len = Math.max(1, Math.hypot(ex, ey));
@@ -996,7 +997,8 @@ function TemplateThumb({ config, size = 140 }) {
 }
 
 function useFonts() {
-  useEffect(() => {    if (document.getElementById("sjs-fonts")) return;
+  useEffect(() => {
+    if (document.getElementById("sjs-fonts")) return;
     const link = document.createElement("link");
     link.id = "sjs-fonts";
     link.rel = "stylesheet";
@@ -1197,6 +1199,7 @@ function SharmaJiStampsAdmin() {
   })();
   STAMP_INK_BLUE = C.primary || "#3F7FE8";
   useEffect(() => {
+    document.documentElement.dataset.appTheme = theme;
     try { localStorage.setItem("sjs_theme_id", theme); localStorage.setItem("sjs_theme", theme === "grey-white-dark" ? "dark" : "light"); } catch {}
   }, [theme]);
   const toggleTheme = () => setTheme((v) => {
@@ -1427,6 +1430,7 @@ function CustomerDesigner() {
     } catch { return "green-olive"; }
   })();
   const customerTheme = THEME_PALETTES[customerThemeId] || THEME_PALETTES["green-olive"];
+  if (typeof document !== "undefined") document.documentElement.dataset.appTheme = customerThemeId;
   C = {
     paper: customerTheme.bg, paperDark: customerTheme.bg, ink: customerTheme.textPrimary, inkSoft: customerTheme.textSecondary,
     stamp: customerTheme.primary, stampDark: customerTheme.primaryHover, brass: customerTheme.accent, sage: customerTheme.primary,
@@ -1495,7 +1499,8 @@ function HomePage() {
             📞 {SHOP_PHONE_DISPLAY}
           </a>
           <a href="/login" style={{ background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 8, color: C.white, textDecoration: "none", fontFamily: font.body, fontWeight: 600, fontSize: 13, padding: "9px 16px" }}>
-            Staff Login          </a>
+            Staff Login
+          </a>
         </div>
       </div>
 
@@ -1995,6 +2000,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // stamp boundary inside it — small stamps get a smaller preview panel
   // instead of a small box floating inside a big empty grid.
   const mobileCanvasAreaHeight = Math.max(170, Math.min(330, Math.round(selectedStampPreviewHeight) + 90));
+
   const cleanLayersForHistory = (ls) => ls.map((l) => ({ ...l, imageObj: null }));
   const pushHistory = (snapshot = layers) => {
     if (historyLockRef.current) return;
@@ -2493,7 +2499,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     setSizePickerOpen(false);
     try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
     setAutoSaveStatus("");
-    setView("editor");  };
+    setView("editor");
+  };
 
   const startNew = () => {
     // Ask for the stamp size first (each option shown with its price) instead
@@ -2992,7 +2999,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </html>
       `);
       previewWindow.document.close();
-    } catch (err) {      console.error(err);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -3491,7 +3499,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 style={{ marginBottom: 0 }}
               />
             </div>
-            <div className="sjs-text-size-mobile">              <Label>Size</Label>
+            <div className="sjs-text-size-mobile">
+              <Label>Size</Label>
               <div className="sjs-text-size-mobile-row">
                 <button
                   type="button"
@@ -3990,7 +3999,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <div style={{
           position: "fixed", top: 0, left: SIDEBAR_W, right: 0, zIndex: 300,
           background: STAMP_INK_BLUE, borderBottom: `1px solid ${C.line}`,
-          boxShadow: "0 2px 12px rgba(38,50,65,.10)",        }}>
+          boxShadow: "0 2px 12px rgba(38,50,65,.10)",
+        }}>
           <div style={{ height: 62, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 18px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <div style={{ width: 38, height: 38, borderRadius: 9, background: C.white, color: STAMP_INK_BLUE, display: "grid", placeItems: "center", flexShrink: 0 }}><Stamp size={20} /></div>
@@ -4489,7 +4499,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                             type="button"
                             title={l.hidden ? "Show layer" : "Hide layer"}
                             onClick={(e) => { e.stopPropagation(); updateLayer(l.id, { hidden: !l.hidden }); setActiveLayerId(l.id); }}
-                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: C.inkSoft, flexShrink: 0 }}                          >
+                            style={{ border: "none", background: "transparent", cursor: "pointer", padding: 5, color: C.inkSoft, flexShrink: 0 }}
+                          >
                             {l.hidden ? <Eye size={16} /> : <EyeOff size={16} />}
                           </button>
                           <button
@@ -4988,7 +4999,8 @@ function RubberTab({ rubbers, refresh }) {
   const [editPhotoPreview, setEditPhotoPreview] = useState(null);
   const [editPhotoFile, setEditPhotoFile] = useState(null);
   const [editPhotoUrl, setEditPhotoUrl] = useState(null);
-  const [busy, setBusy] = useState(false);  const [errMsg, setErrMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
 
   const startEdit = (r) => {
     setEditId(r.id); setEditName(r.name); setEditCategory(r.category || "rubber");
@@ -5487,7 +5499,8 @@ function UsersTab({ users, refresh, currentUser }) {
     try {
       await dbInsert("users", { id: uid(), name: name.trim(), role, pin });
       setName(""); setPin(""); setErrMsg(""); await refresh();
-    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }  };
+    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
+  };
   const remove = async (id) => {
     if (id === currentUser.id) return;
     try { await dbDelete("users", id); await refresh(); }
