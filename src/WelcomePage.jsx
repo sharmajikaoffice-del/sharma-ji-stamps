@@ -57,7 +57,7 @@ function WelcomePage() {
         .sjs-contact{display:grid;grid-template-columns:1fr 1fr;gap:24px}.sjs-contact-card{background:#fff;border:1px solid #e3e6de;border-radius:20px;padding:30px}
         .sjs-contact-card h3{margin-top:0;font-size:24px}.sjs-contact-card p{color:#687068}.sjs-contact-row{margin:15px 0}.sjs-contact-row strong{display:block;font-size:13px;color:${green};text-transform:uppercase;letter-spacing:.07em}
         .sjs-footer{background:${dark};color:#fff;padding:50px 22px 24px}.sjs-footer-inner{max-width:1180px;margin:auto;display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap}.sjs-footer img{height:70px;background:#fff;border-radius:10px;padding:4px}.sjs-footer p{color:#c6cec7}.sjs-copyline{max-width:1180px;margin:35px auto 0;border-top:1px solid rgba(255,255,255,.15);padding-top:18px;color:#aeb7af;font-size:12px}
-        @media(max-width:850px){.sjs-links{display:none}.sjs-hero{grid-template-columns:1fr;padding-top:48px}.sjs-hero-card{min-height:360px}.sjs-hero-card img{min-height:360px}.sjs-products,.sjs-features,.sjs-contact,.sjs-about{grid-template-columns:1fr}.sjs-about-img{height:340px}.sjs-section{padding:64px 18px}}
+        @media(max-width:850px){.sjs-nav-inner{padding:10px 14px;gap:10px}.sjs-logo{height:40px}.sjs-links{gap:8px}.sjs-links button{display:none}.sjs-login{padding:9px 11px;font-size:12.5px;white-space:nowrap}.sjs-hero{grid-template-columns:1fr;padding-top:48px}.sjs-hero-card{min-height:360px}.sjs-hero-card img{min-height:360px}.sjs-products,.sjs-features,.sjs-contact,.sjs-about{grid-template-columns:1fr}.sjs-about-img{height:340px}.sjs-section{padding:64px 18px}}
       `}</style>
 
       <header className="sjs-nav">
