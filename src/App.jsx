@@ -1704,6 +1704,7 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
   const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
   const [date, setDate] = useState(todayISO());
   const [rubberId, setRubberId] = useState(rubberOnly[0]?.id || "");
+  const [rate, setRate] = useState(rubberOnly[0]?.rate ?? 0);
   const [mobile, setMobile] = useState("");
   const [discount, setDiscount] = useState(0);
   const [paymentMode, setPaymentMode] = useState("Cash");
@@ -1723,8 +1724,12 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
   }, [initialFill]);
 
   const rubber = rubbers.find((r) => r.id === rubberId);
-  const rate = rubber?.rate || 0;
-  const amount = Math.max(0, rate - Number(discount || 0));
+  // Fetch the default rate from Rate Master whenever the selected stamp changes,
+  // but keep the entry's rate editable after it has been populated.
+  useEffect(() => {
+    setRate(rubber?.rate ?? 0);
+  }, [rubberId, rubber?.rate]);
+  const amount = Math.max(0, Number(rate || 0) - Number(discount || 0));
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
 
@@ -1741,7 +1746,7 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
     try {
       let image_url = null;
       if (photoFile) image_url = await uploadPhoto(photoFile, "entries");
-      await dbInsert("stamp_entries", { id: uid(), date, rubber_id: rubberId, mobile, qty: 1, rate, discount: Number(discount || 0), amount, payment_mode: paymentMode, remarks, by_user: user.name, image_url });
+      await dbInsert("stamp_entries", { id: uid(), date, rubber_id: rubberId, mobile, qty: 1, rate: Number(rate || 0), discount: Number(discount || 0), amount, payment_mode: paymentMode, remarks, by_user: user.name, image_url });
       setMobile(""); setDiscount(0); setPaymentMode("Cash"); setRemarks(""); setPhotoFile(null); setPhotoPreview(null);
       setSavedMsg(`Saved — Stock −1, ${paymentMode} In ${inr(amount)}`);
       await refresh();
@@ -1790,7 +1795,7 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
             <Field type="tel" placeholder="98xxxxxxxx" value={mobile} onChange={(e) => setMobile(e.target.value)} />
             <div style={{ display: "flex", gap: 10 }}>
               <div style={{ flex: 1 }}><Label>Qty</Label><Field value="1" disabled style={{ background: C.paperDark, color: C.inkSoft }} /></div>
-              <div style={{ flex: 1 }}><Label>Rate (Auto)</Label><Field value={inr(rate)} disabled style={{ background: C.paperDark, color: C.inkSoft }} /></div>
+              <div style={{ flex: 1 }}><Label>Rate (Auto / Editable)</Label><Field type="number" min="0" step="0.01" value={rate} onChange={(e) => setRate(e.target.value)} /></div>
             </div>
             <Label>Discount (₹)</Label>
             <Field type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
