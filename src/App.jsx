@@ -4711,9 +4711,16 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               const canvas = canvasRef.current;
               if (!canvas) { window.print(); return; }
               const dataUrl = canvas.toDataURL("image/png");
+              const printWidthMm = Math.max(1, Number(selectedDimensions.widthMm) || 38);
+              const printHeightMm = Math.max(1, Number(selectedDimensions.heightMm) || 25);
               const printWindow = window.open("", "_blank");
               if (!printWindow) { window.print(); return; }
-              printWindow.document.write(`<!doctype html><html><head><title>Stamp PDF</title><style>@page{margin:12mm}body{margin:0;display:flex;align-items:center;justify-content:center;min-height:90vh}img{max-width:100%;max-height:90vh;object-fit:contain}@media print{body{min-height:0}}</style></head><body><img src="${dataUrl}" alt="Stamp"><script>window.onload=()=>{window.print();};<\/script></body></html>`);
+              printWindow.document.write(`<!doctype html><html><head><title>Stamp ${printWidthMm} x ${printHeightMm} mm</title><style>
+                @page{size:${printWidthMm}mm ${printHeightMm}mm;margin:0}
+                html,body{width:${printWidthMm}mm;height:${printHeightMm}mm;margin:0;padding:0;overflow:hidden}
+                body{display:flex;align-items:center;justify-content:center}
+                img{display:block;width:${printWidthMm}mm;height:${printHeightMm}mm;max-width:none;max-height:none;object-fit:fill}
+              </style></head><body><img src="${dataUrl}" alt="Stamp"><script>window.onload=()=>{window.print();};<\/script></body></html>`);
               printWindow.document.close();
             }} style={{ width: "100%", justifyContent: "center", marginBottom: 10, background: C.primary }}>
               <Printer size={16} /> Print / Save PDF
