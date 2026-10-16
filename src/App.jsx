@@ -4567,7 +4567,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 {activeLayer ? (
                   <>
                     <Label>Edit properties</Label>
-                    {textFields}
+                    {activeLayer.type === "centerText" || activeLayer.type === "circleText" ? textFields : (
+                      <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>
+                        {activeLayer.type === "image" ? "Image selected — use Layer tab for image controls." :
+                          activeLayer.type === "frame" ? "Shape selected — use Layer tab for shape controls." :
+                          activeLayer.type === "line" ? "Line selected — use Layer tab for line controls." :
+                          activeLayer.type === "symbol" ? "Symbol selected — use Layer tab for symbol controls." :
+                          "Select a text layer to edit text properties."}
+                      </div>
+                    )}
                     {layerPanel}
                   </>
                 ) : (
