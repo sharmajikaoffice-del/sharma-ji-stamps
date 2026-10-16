@@ -2310,11 +2310,19 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
   const handleLayerImageUpload = (e) => {
     const file = e.target.files[0];
-    if (!file || !activeLayer) return;
+    e.target.value = "";
+    if (!file) return;
+    pushHistory();
+    const num = layerCounter + 1;
+    const id = uid();
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
-      img.onload = () => updateLayer(activeLayer.id, { imageObj: img, imageDataUrl: ev.target.result });
+      img.onload = () => {
+        setLayers((ls) => [...ls, { id, type: "image", num, imageObj: img, imageDataUrl: ev.target.result, x: 50, y: 50, width: 28, height: 28, rotation: 0 }]);
+        setLayerCounter(num);
+        setActiveLayerId(id);
+      };
       img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
@@ -4097,7 +4105,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </button>
           <button
             type="button"
-            onClick={() => { addLayer("image"); setTimeout(() => layerImageInputRef.current?.click(), 0); }}
+            onClick={() => { layerImageInputRef.current?.click(); }}
             style={toolbarIconBtn}
           >
             <span style={toolbarIconBox}><ImageIcon size={18} /></span>
@@ -4691,6 +4699,17 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : (
           <Card id="mobile-stamp-submit" style={{ marginBottom: 24 }}>
             <div style={{ fontWeight: 750, fontSize: 17, marginBottom: 6 }}>Template</div>
+            {!customerMode && <Btn onClick={() => {
+              const canvas = canvasRef.current;
+              if (!canvas) { window.print(); return; }
+              const dataUrl = canvas.toDataURL("image/png");
+              const printWindow = window.open("", "_blank");
+              if (!printWindow) { window.print(); return; }
+              printWindow.document.write(`<!doctype html><html><head><title>Stamp PDF</title><style>@page{margin:12mm}body{margin:0;display:flex;align-items:center;justify-content:center;min-height:90vh}img{max-width:100%;max-height:90vh;object-fit:contain}@media print{body{min-height:0}}</style></head><body><img src="${dataUrl}" alt="Stamp"><script>window.onload=()=>{window.print();};<\/script></body></html>`);
+              printWindow.document.close();
+            }} style={{ width: "100%", justifyContent: "center", marginBottom: 10, background: C.primary }}>
+              <Printer size={16} /> Print / Save PDF
+            </Btn>}
             <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
               {editingTemplateId ? "Existing template ko update karein, ya naam badal kar Save Template se naya template banayein." : "Is design ko template ke roop mein save karein."}
             </div>
