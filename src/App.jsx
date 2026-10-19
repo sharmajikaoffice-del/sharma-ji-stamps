@@ -872,13 +872,18 @@ function BreakSliderControl({ value = 0, onChange }) {
   );
 }
 
-function SliderControl({ label, value, min, max, step = 0.1, onChange }) {
+function SliderControl({ label, value, min, max, step = 0.1, onChange, showNumberInput = false }) {
   const fmt = (n) => (Math.round(n * 10) / 10).toString();
   const clamp = (n) => Math.min(max, Math.max(min, n));
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontFamily: font.body, fontSize: 13, color: C.ink, marginBottom: 6 }}>
-        {label} <span style={{ color: C.brass, fontFamily: font.mono, fontSize: 12 }}>[ {fmt(value)} ]</span>
+      <div style={{ fontFamily: font.body, fontSize: 13, color: C.ink, marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span>{label} <span style={{ color: C.brass, fontFamily: font.mono, fontSize: 12 }}>[ {fmt(value)} ]</span></span>
+        {showNumberInput && <input aria-label={label + " value"} type="number" min={min} max={max} step={step} value={value} onChange={(e) => {
+          if (e.target.value === "") return;
+          const n = Number(e.target.value);
+          if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
+        }} onBlur={(e) => { if (e.target.value === "") onChange(min); }} style={{ width: 76, boxSizing: "border-box", padding: "5px 7px", border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, font: `12px ${font.mono}` }} />}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button
@@ -3715,10 +3720,10 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </>
       ) : activeLayer.type === "centerText" ? (
         <>
-          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
-          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
+          <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} showNumberInput={isDesktop} />
+          <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} showNumberInput={isDesktop} />
           {activeLayer.layout !== "triangleSide" && !["bottom", "rightRotated", "leftRotated"].includes(activeLayer.layout) && (
-            <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
+            <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} showNumberInput={isDesktop} />
           )}
         </>
       ) : activeLayer.type === "frame" ? (
