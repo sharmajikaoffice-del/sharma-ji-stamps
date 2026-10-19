@@ -2319,7 +2319,56 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        setLayers((ls) => [...ls, { id, type: "image", num, imageObj: img, imageDataUrl: ev.target.result, x: 50, y: 50, width: 28, height: 28, rotation: 0 }]);
+        // Trim empty/white margins around inserted artwork so the Width slider
+        // controls the visible logo/stamp, not the blank padding in the source file.
+        let imageObj = img;
+        let imageDataUrl = ev.target.result;
+        try {
+          const sourceW = img.naturalWidth || img.width;
+          const sourceH = img.naturalHeight || img.height;
+          if (sourceW > 0 && sourceH > 0 && sourceW * sourceH <= 16000000) {
+            const trimCanvas = document.createElement("canvas");
+            trimCanvas.width = sourceW;
+            trimCanvas.height = sourceH;
+            const trimCtx = trimCanvas.getContext("2d", { willReadFrequently: true });
+            trimCtx.drawImage(img, 0, 0);
+            const pixels = trimCtx.getImageData(0, 0, sourceW, sourceH).data;
+            let minX = sourceW, minY = sourceH, maxX = -1, maxY = -1;
+            // Ignore near-white backgrounds and transparent padding.
+            for (let y = 0; y < sourceH; y++) {
+              for (let x = 0; x < sourceW; x++) {
+                const p = (y * sourceW + x) * 4;
+                if (pixels[p + 3] > 20 && (pixels[p] < 245 || pixels[p + 1] < 245 || pixels[p + 2] < 245)) {
+                  if (x < minX) minX = x;
+                  if (x > maxX) maxX = x;
+                  if (y < minY) minY = y;
+                  if (y > maxY) maxY = y;
+                }
+              }
+            }
+            const cropW = maxX - minX + 1;
+            const cropH = maxY - minY + 1;
+            // Only crop if meaningful blank margins were found; keep at least 2px.
+            if (cropW >= 2 && cropH >= 2 && (cropW < sourceW * 0.96 || cropH < sourceH * 0.96)) {
+              const cropped = document.createElement("canvas");
+              cropped.width = cropW;
+              cropped.height = cropH;
+              cropped.getContext("2d").drawImage(trimCanvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+              imageDataUrl = cropped.toDataURL("image/png");
+              imageObj = new Image();
+              imageObj.onload = () => {
+                setLayers((ls) => [...ls, { id, type: "image", num, imageObj, imageDataUrl, x: 50, y: 50, width: 75, height: 75, rotation: 0 }]);
+                setLayerCounter(num);
+                setActiveLayerId(id);
+              };
+              imageObj.src = imageDataUrl;
+              return;
+            }
+          }
+        } catch (err) {
+          // If trimming is unsupported (e.g. unusual image format), use the original.
+        }
+        setLayers((ls) => [...ls, { id, type: "image", num, imageObj, imageDataUrl, x: 50, y: 50, width: 75, height: 75, rotation: 0 }]);
         setLayerCounter(num);
         setActiveLayerId(id);
       };
@@ -3785,7 +3834,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </>
       ) : (
         <>
-          <SliderControl label="Width" value={activeLayer.width ?? activeLayer.size ?? 15} min={5} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
+          <SliderControl label="Image size" value={activeLayer.width ?? activeLayer.size ?? 75} min={5} max={200} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
           <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
