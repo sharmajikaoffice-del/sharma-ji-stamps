@@ -2876,7 +2876,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       return { layer, score };
     }).filter((x) => Number.isFinite(x.score)).sort((a, b) => a.score - b.score);
 
-    if (candidates[0]) setActiveLayerId(candidates[0].layer.id);
+    if (candidates[0]) {
+      const pickedLayer = candidates[0].layer;
+      const isTextLayer = pickedLayer.type === "centerText" || pickedLayer.type === "circleText";
+      // On mobile, tapping text directly on the canvas should only select it,
+      // not activate its input and summon the keyboard. Open the text editor
+      // deliberately from the Layers tab instead.
+      if (!isDesktop && isTextLayer) return;
+      setActiveLayerId(pickedLayer.id);
+    }
   };
 
   // Shared helper: renders the current stamp design to a print-accurate PNG data URL
