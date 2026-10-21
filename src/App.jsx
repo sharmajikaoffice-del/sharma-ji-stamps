@@ -878,7 +878,7 @@ function SliderControl({ label, value, min, max, step = 0.1, onChange, showNumbe
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontFamily: font.body, fontSize: 13, color: C.ink, marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span>{label} <span style={{ color: C.brass, fontFamily: font.mono, fontSize: 12 }}>[ {fmt(value)} ]</span></span>
+        <span>{label}{!showNumberInput && <> <span style={{ color: C.brass, fontFamily: font.mono, fontSize: 12 }}>[ {fmt(value)} ]</span></>}</span>
         {showNumberInput && <input aria-label={label + " value"} type="number" min={min} max={max} step={step} value={value} onChange={(e) => {
           if (e.target.value === "") return;
           const n = Number(e.target.value);
@@ -2237,10 +2237,39 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     });
   };
 
+  // Left / Center / Right for text: text is drawn centred on x, so a plain
+  // x=10 / x=90 pushes half the text outside the border. Instead measure the
+  // text and place it so its edge touches the inside of the rectangle frame
+  // (or the canvas, if there is no frame).
+  const alignTextX = (layer, value) => {
+    const S = STAMP_CANVAS_SIZE;
+    const frame = layers.find((l) => l.type === "frame" && !l.hidden && l.shape === "square");
+    let cxPx = S / 2, innerHalf = S * 0.45;
+    if (frame) {
+      const fw = ((frame.width ?? 45) / 100) * S;
+      const sw = frame.strokeWidth ?? 4;
+      cxPx = ((frame.x ?? 50) / 100) * S;
+      innerHalf = Math.max(4, fw / 2 - sw - 6);
+    }
+    if (value === 50) return (cxPx / S) * 100;
+    const fsz = layer.fontSize ?? layer.size ?? 16;
+    const c = document.createElement("canvas").getContext("2d");
+    c.font = `${layer.fontStyle === "italic" ? "italic " : ""}${layer.bold ? 700 : 400} ${fsz}px ${layer.fontFamily || "Arial"}`;
+    let tw = c.measureText(layer.text || "").width;
+    if (layer.invert) tw += fsz * 0.64;
+    const half = tw / 2;
+    // If the text is wider than the frame, keep it centred instead of overflowing one side.
+    const offset = Math.max(0, innerHalf - half);
+    const x = value < 50 ? cxPx - offset : cxPx + offset;
+    return Math.max(0, Math.min(100, (x / S) * 100));
+  };
+
   const alignLayer = (id, axis, value) => {
-    if (!layers.some((l) => l.id === id)) return;
+    const target = layers.find((l) => l.id === id);
+    if (!target) return;
     pushHistory();
-    setLayers((ls) => ls.map((l) => l.id === id ? { ...l, [axis]: value } : l));
+    const v = axis === "x" && target.type === "centerText" ? Math.round(alignTextX(target, value) * 10) / 10 : value;
+    setLayers((ls) => ls.map((l) => l.id === id ? { ...l, [axis]: v } : l));
   };
 
   const toggleLayerLock = (id) => {
