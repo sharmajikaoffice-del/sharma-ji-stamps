@@ -2264,11 +2264,30 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     return Math.max(0, Math.min(100, (x / S) * 100));
   };
 
+  const alignTextY = (layer, value) => {
+    const S = STAMP_CANVAS_SIZE;
+    const frame = layers.find((l) => l.type === "frame" && !l.hidden && l.shape === "square");
+    // Canvas height is not known here, so work in percentages of the frame.
+    const fh = frame ? (frame.height ?? 45) : 90;
+    const cy = frame ? (frame.y ?? 50) : 50;
+    if (value === 50) return cy;
+    const fsz = layer.fontSize ?? layer.size ?? 16;
+    const sw = frame ? (frame.strokeWidth ?? 4) : 0;
+    const H = Math.max(40, STAMP_CANVAS_SIZE * (Number(editorHeight) / Math.max(1, Number(editorWidth))));
+    const textH = fsz * (layer.tall ? 1.35 : 1.0) * (layer.invert ? 1.3 : 1.0);
+    const innerHalf = Math.max(2, ((fh / 100) * H) / 2 - sw - 6);
+    const offset = Math.max(0, innerHalf - textH / 2);
+    const y = (cy / 100) * H + (value < 50 ? -offset : offset);
+    return Math.max(0, Math.min(100, (y / H) * 100));
+  };
+
   const alignLayer = (id, axis, value) => {
     const target = layers.find((l) => l.id === id);
     if (!target) return;
     pushHistory();
-    const v = axis === "x" && target.type === "centerText" ? Math.round(alignTextX(target, value) * 10) / 10 : value;
+    const v = target.type === "centerText"
+      ? Math.round((axis === "x" ? alignTextX(target, value) : alignTextY(target, value)) * 10) / 10
+      : value;
     setLayers((ls) => ls.map((l) => l.id === id ? { ...l, [axis]: v } : l));
   };
 
@@ -3657,6 +3676,21 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           </div>
         </div>
 
+        {layer.type === "centerText" && layers.filter((l) => l.type === "centerText" && !l.locked).length > 1 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
+            {[
+              { label: "All text −1", run: (l) => Math.max(5, Number(l.fontSize ?? l.size ?? 16) - 1) },
+              { label: "All text +1", run: (l) => Math.min(100, Number(l.fontSize ?? l.size ?? 16) + 1) },
+              { label: "Same size for all", run: () => Number(layer.fontSize ?? layer.size ?? 16) },
+            ].map((b) => (
+              <button key={b.label} type="button" onClick={() => {
+                pushHistory();
+                setLayers((ls) => ls.map((l) => (l.type === "centerText" && !l.locked) ? { ...l, fontSize: b.run(l), size: b.run(l) } : l));
+              }} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>{b.label}</button>
+            ))}
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <button type="button" onClick={() => updateLayer(layer.id, { bold: !layer.bold })} title="Bold"
             style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 8, background: layer.bold ? STAMP_INK_BLUE : C.white, color: layer.bold ? C.white : C.ink, fontWeight: 700, padding: "9px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -3718,23 +3752,26 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${C.line}` }}>
       {activeLayer.type === "centerText" && activeLayer.layout !== "triangleSide" && !["bottom", "rightRotated", "leftRotated"].includes(activeLayer.layout) && (
         <>
-          <div className="sjs-mobile-hidden-text-alignment">
-            <Label>Quick align</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-              <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Left</button>
-              <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Center</button>
-              <button type="button" onClick={() => alignLayer(activeLayer.id, "x", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Right</button>
-            </div>
-          </div>
-          {activeLayer.source !== "addText" && (
-            <div className="sjs-mobile-hidden-text-alignment">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 12 }}>
-                <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 10)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Top</button>
-                <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 50)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Middle</button>
-                <button type="button" onClick={() => alignLayer(activeLayer.id, "y", 90)} style={{ padding: "7px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 10 }}>Bottom</button>
+          {(() => {
+            const near = (a, b) => Math.abs(Number(a) - Number(b)) < 0.8;
+            const hs = [["Left", 10], ["Center", 50], ["Right", 90]];
+            const vs = [["Up", 10], ["Center", 50], ["Down", 90]];
+            const curH = hs.findIndex(([, v]) => near(activeLayer.x ?? 50, alignTextX(activeLayer, v)));
+            const curV = vs.findIndex(([, v]) => near(activeLayer.y ?? 50, alignTextY(activeLayer, v)));
+            return (
+              <div className="sjs-mobile-hidden-text-alignment">
+                <Label>Alignment (tap to change)</Label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+                  <button type="button" title="Horizontal: Left → Center → Right" onClick={() => alignLayer(activeLayer.id, "x", hs[(curH + 1) % 3][1])} style={{ padding: "9px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                    ↔ {curH >= 0 ? hs[curH][0] : "Left / Center / Right"}
+                  </button>
+                  <button type="button" title="Vertical: Up → Center → Down" onClick={() => alignLayer(activeLayer.id, "y", vs[(curV + 1) % 3][1])} style={{ padding: "9px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                    ↕ {curV >= 0 ? vs[curV][0] : "Up / Center / Down"}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </>
       )}
       {(activeLayer.type === "circleText" || activeLayer.type === "centerText") && (
