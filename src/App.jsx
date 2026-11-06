@@ -1152,11 +1152,7 @@ function SharmaJiStampsAdmin() {
   const logout = async () => {
     try { await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "logout" }) }); } catch {}
     setUser(null);
-    setUsers([]);
-    setRubbers([]);
-    setPurchases([]);
-    setEntries([]);
-    setCashManual([]);
+    await refreshAll();
   };
   const [tab, setTab] = useState(() => {
     try { return localStorage.getItem("sjs_active_tab") || "dashboard"; } catch { return "dashboard"; }
