@@ -20,21 +20,6 @@ const PRELOADED_SYMBOLS = [
   { id: "leaf", label: "Leaf", src: symbolLeaf },
 ];
 
-/* =====================================================================
-   1) PASTE YOUR SUPABASE PROJECT DETAILS HERE (Settings → API in Supabase)
-   ===================================================================== */
-const SUPABASE_URL_RAW = "https://dqfaskpnssdosgnluuji.supabase.co/rest/v1/";
-const SUPABASE_KEY = "sb_publishable_p7MrqZjsOf5pfZi9aygTWg_gBg-kCl_";
-/* ===================================================================== */
-// Normalizes the URL whether you pasted the base project URL or included /rest/v1/
-const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
-
-const HEADERS = {
-  apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
-  "Content-Type": "application/json",
-};
-
 async function apiRequest(url, options = {}) {
   const res = await fetch(url, {
     credentials: "same-origin",
@@ -60,18 +45,15 @@ async function dbDelete(table, id) {
   return apiRequest(`/api/data?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 async function uploadPhoto(file, folder) {
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const path = `${folder}/${uid()}.${ext}`;
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/rubber-photos/${path}`, {
+  const res = await fetch(`/api/upload?folder=${encodeURIComponent(folder)}`, {
     method: "POST",
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type },
+    credentials: "same-origin",
+    headers: { "Content-Type": file.type },
     body: file,
   });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Photo upload failed${detail ? ` — ${detail}` : ""}. Check the "rubber-photos" storage bucket exists in Supabase and is public.`);
-  }
-  return `${SUPABASE_URL}/storage/v1/object/public/rubber-photos/${path}`;
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result.error || "Photo upload failed.");
+  return result.url;
 }
 
 /* ---------- design tokens ---------- */
