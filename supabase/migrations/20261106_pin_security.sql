@@ -17,7 +17,7 @@ create index if not exists sjs_login_attempts_lookup
   on public.sjs_login_attempts (user_id, ip_hash, attempted_at desc)
   where successful = false;
 
-do $
+do $sjs$
 declare t text;
 begin
   foreach t in array array['users','rubbers','purchases','stamp_entries','cash_manual','stamp_templates','customer_designs','sjs_login_attempts']
@@ -27,7 +27,7 @@ begin
       execute format('revoke all on table public.%I from anon, authenticated', t);
     end if;
   end loop;
-end $$;
+end $sjs$;
 
 -- Do not add anon/authenticated policies to these application tables.
 -- The Vercel API accesses them with SUPABASE_SERVICE_ROLE_KEY, which bypasses RLS.
