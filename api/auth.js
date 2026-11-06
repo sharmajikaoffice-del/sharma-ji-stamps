@@ -104,6 +104,18 @@ export default async function handler(req, res) {
       const pin = String(body.pin || "");
       if (!userId || !validPin(pin)) return send(res, 400, { error: "Enter a valid 4–6 digit PIN." });
 
+      const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
+      const ipHash = createHmac("sha256", SESSION_SECRET).update(ip).digest("hex");
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const recentFailures = await db(`sjs_login_attempts?select=id&user_id=eq.${encodeURIComponent(userId)}&ip_hash=eq.${ipHash}&successful=eq.false&attempted_at=gte.${encodeURIComponent(cutoff)}`);
+      if ((recentFailures || []).length >= 5) return send(res, 429, { error: "Too many incorrect attempts. Wait 10 minutes and try again." });
+      const attemptRows = await db("sjs_login_attempts?select=id", {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ user_id: userId, ip_hash: ipHash }),
+      });
+      const attemptId = attemptRows?.[0]?.id;
+
       const rows = await db(`users?select=id,name,role,pin,pin_hash,pin_salt&id=eq.${encodeURIComponent(userId)}&limit=1`);
       const record = rows?.[0];
       if (!record || !["admin", "staff"].includes(record.role)) return send(res, 401, { error: "Incorrect PIN." });
@@ -126,6 +138,13 @@ export default async function handler(req, res) {
       }
       if (!verified) return send(res, 401, { error: "Incorrect PIN." });
 
+      if (attemptId) {
+        await db(`sjs_login_attempts?id=eq.${encodeURIComponent(attemptId)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ successful: true }),
+        });
+      }
       const user = { id: record.id, name: record.name, role: record.role };
       setSessionCookie(res, makeSession(user));
       return send(res, 200, { ok: true, user });
