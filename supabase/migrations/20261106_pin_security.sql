@@ -16,6 +16,7 @@ create table if not exists public.sjs_login_attempts (
 create index if not exists sjs_login_attempts_lookup
   on public.sjs_login_attempts (user_id, ip_hash, attempted_at desc)
   where successful = false;
+grant all on table public.sjs_login_attempts to service_role;
 
 do $sjs$
 declare t text;
