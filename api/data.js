@@ -53,12 +53,11 @@ export default async function handler(req, res) {
     if (!user && !publicRubbersRead) return send(res, 401, { error: "Please log in." });
     if (user && !["admin", "staff"].includes(user.role)) return send(res, 403, { error: "Access denied." });
 
-    const adminOnly = ["purchases", "cash_manual", "customer_designs"];
+    const adminOnly = ["purchases", "cash_manual"];
     if (user?.role === "staff" && adminOnly.includes(table)) {
       if (req.method !== "GET") return send(res, 403, { error: "Admin access required." });
     }
     if (user?.role === "staff" && table === "rubbers" && req.method !== "GET") return send(res, 403, { error: "Admin access required." });
-    if (user?.role === "staff" && table === "customer_designs") return send(res, 403, { error: "Admin access required." });
 
     if (req.method === "GET") {
       const select = publicRubbersRead ? "id,name,size,rate,category" : "*";
