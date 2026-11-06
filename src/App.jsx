@@ -20,65 +20,40 @@ const PRELOADED_SYMBOLS = [
   { id: "leaf", label: "Leaf", src: symbolLeaf },
 ];
 
-/* =====================================================================
-   1) PASTE YOUR SUPABASE PROJECT DETAILS HERE (Settings → API in Supabase)
-   ===================================================================== */
-const SUPABASE_URL_RAW = "https://dqfaskpnssdosgnluuji.supabase.co/rest/v1/";
-const SUPABASE_KEY = "sb_publishable_p7MrqZjsOf5pfZi9aygTWg_gBg-kCl_";
-/* ===================================================================== */
-// Normalizes the URL whether you pasted the base project URL or included /rest/v1/
-const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
-
-const HEADERS = {
-  apikey: SUPABASE_KEY,
-  Authorization: `Bearer ${SUPABASE_KEY}`,
-  "Content-Type": "application/json",
-};
-
+async function apiRequest(url, options = {}) {
+  const res = await fetch(url, {
+    credentials: "same-origin",
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+  if (!res.ok) throw new Error(data?.error || "Request failed. Please try again.");
+  return data;
+}
 async function dbGet(table) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.desc`, { headers: HEADERS });
-  if (!res.ok) throw new Error(`GET ${table} failed`);
-  return res.json();
+  return apiRequest(`/api/data?table=${encodeURIComponent(table)}`);
 }
 async function dbInsert(table, row) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: "POST",
-    headers: { ...HEADERS, Prefer: "return=representation" },
-    body: JSON.stringify(row),
-  });
-  if (!res.ok) throw new Error(`INSERT ${table} failed`);
-  return res.json();
+  return apiRequest(`/api/data?table=${encodeURIComponent(table)}`, { method: "POST", body: JSON.stringify(row) });
 }
 async function dbUpdate(table, id, patch) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
-    method: "PATCH",
-    headers: { ...HEADERS, Prefer: "return=representation" },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) {
-    const detail = await res.text();
-    console.error(`UPDATE ${table} failed:`, detail);
-    throw new Error(`UPDATE ${table} failed: ${detail}`);
-  }
-  return res.json();
+  return apiRequest(`/api/data?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 async function dbDelete(table, id) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, { method: "DELETE", headers: HEADERS });
-  if (!res.ok) throw new Error(`DELETE ${table} failed`);
+  return apiRequest(`/api/data?table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 async function uploadPhoto(file, folder) {
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const path = `${folder}/${uid()}.${ext}`;
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/rubber-photos/${path}`, {
+  const res = await fetch(`/api/upload?folder=${encodeURIComponent(folder)}`, {
     method: "POST",
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": file.type },
+    credentials: "same-origin",
+    headers: { "Content-Type": file.type },
     body: file,
   });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Photo upload failed${detail ? ` — ${detail}` : ""}. Check the "rubber-photos" storage bucket exists in Supabase and is public.`);
-  }
-  return `${SUPABASE_URL}/storage/v1/object/public/rubber-photos/${path}`;
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result.error || "Photo upload failed.");
+  return result.url;
 }
 
 /* ---------- design tokens ---------- */
@@ -1055,26 +1030,30 @@ function Login({ users, onLogin }) {
   const [selected, setSelected] = useState(null);
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const press = (d) => {
-    if (!selected) return;
+    if (!selected || busy) return;
     setError("");
     if (d === "back") return setPin((p) => p.slice(0, -1));
     if (pin.length >= 6) return;
-    const next = pin + d;
-    setPin(next);
-    const u = users.find((u) => u.id === selected);
-    if (u && next.length === u.pin.length) {
-      if (next === u.pin) setTimeout(() => onLogin(u), 150);
-      else { setError("Wrong PIN"); setTimeout(() => setPin(""), 400); }
-    }
+    setPin((p) => p + d);
+  };
+  const submit = async () => {
+    if (!selected || pin.length < 4 || busy) return;
+    setBusy(true);
+    setError("");
+    try { await onLogin(selected, pin); }
+    catch (err) { setError(err.message || "Incorrect PIN."); setPin(""); }
+    finally { setBusy(false); }
   };
 
   // Keyboard support so desktop users can type their PIN, not just click with the mouse.
   useEffect(() => {
     const onKeyDown = (ev) => {
-      if (!selected) return;
+      if (!selected || busy) return;
       if (ev.key >= "0" && ev.key <= "9") { press(ev.key); return; }
       if (ev.key === "Backspace") { press("back"); return; }
+      if (ev.key === "Enter") { submit(); return; }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -1108,9 +1087,10 @@ function Login({ users, onLogin }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: 220 }}>
             {["1","2","3","4","5","6","7","8","9","","0","back"].map((k, i) => (
               k === "" ? <div key={i} /> :
-              <button key={i} onClick={() => press(k)} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 0", fontFamily: font.mono, fontSize: 16, color: C.ink, cursor: "pointer" }}>{k === "back" ? "⌫" : k}</button>
+              <button key={i} disabled={busy} onClick={() => press(k)} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 0", fontFamily: font.mono, fontSize: 16, color: C.ink, cursor: busy ? "wait" : "pointer" }}>{k === "back" ? "⌫" : k}</button>
             ))}
           </div>
+          <button type="button" disabled={busy || pin.length < 4} onClick={submit} style={{ width: 220, marginTop: 12, padding: "12px", border: "none", borderRadius: 9, background: C.headerGreen, color: "#fff", fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: pin.length < 4 ? .5 : 1 }}>{busy ? "Verifying…" : "Login"}</button>
         </>
       )}
     </div>
@@ -1163,21 +1143,20 @@ function SharmaJiStampsAdmin() {
   const isDesktop = useIsDesktop();
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState("");
-  const [user, setUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem("sjs_user");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
-  const login = (u) => {
-    setUser(u);
-    try { localStorage.setItem("sjs_user", JSON.stringify(u)); } catch {}
+  const [user, setUser] = useState(null);
+  const login = async (userId, pin) => {
+    const result = await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "login", userId, pin }) });
+    setUser(result.user);
+    await refreshAll();
   };
-  const logout = () => {
+  const logout = async () => {
+    try { await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "logout" }) }); } catch {}
     setUser(null);
-    try { localStorage.removeItem("sjs_user"); } catch {}
+    setUsers([]);
+    setRubbers([]);
+    setPurchases([]);
+    setEntries([]);
+    setCashManual([]);
   };
   const [tab, setTab] = useState(() => {
     try { return localStorage.getItem("sjs_active_tab") || "dashboard"; } catch { return "dashboard"; }
@@ -1265,14 +1244,23 @@ function SharmaJiStampsAdmin() {
   const refreshAll = async () => {
     const mySeq = ++refreshSeqRef.current;
     try {
-      const [u, r, p, e, c] = await Promise.all([
-        dbGet("users"), dbGet("rubbers"), dbGet("purchases"), dbGet("stamp_entries"), dbGet("cash_manual"),
+      const auth = await apiRequest("/api/auth");
+      if (mySeq !== refreshSeqRef.current) return;
+      setUsers(Array.isArray(auth.users) ? auth.users : []);
+      setUser(auth.user || null);
+      if (!auth.user) {
+        setRubbers([]); setPurchases([]); setEntries([]); setCashManual([]);
+        setDbError("");
+        return;
+      }
+      const [r, p, e, c] = await Promise.all([
+        dbGet("rubbers"), dbGet("purchases"), dbGet("stamp_entries"), dbGet("cash_manual"),
       ]);
       if (mySeq !== refreshSeqRef.current) return; // a newer refresh has since started — ignore this stale result
-      setUsers(u); setRubbers(r); setPurchases(p); setEntries(e); setCashManual(c);
+      setRubbers(r); setPurchases(p); setEntries(e); setCashManual(c);
       setDbError("");
     } catch (e) {
-      if (mySeq === refreshSeqRef.current) setDbError("Could not connect to the database. Check SUPABASE_URL / SUPABASE_KEY at the top of the file, and that the SQL schema has been run.");
+      if (mySeq === refreshSeqRef.current) setDbError("Could not connect to the secure database service. Check the Vercel server environment variables and Supabase migration.");
     } finally {
       if (mySeq === refreshSeqRef.current) setLoading(false);
     }
@@ -3083,13 +3071,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     if (!/^[0-9+ ()-]{8,20}$/.test(mobile)) return setCustomerSubmitStatus("Please enter a valid mobile number.");
     setCustomerSubmitStatus("Submitting…");
     try {
-      await dbInsert("customer_designs", {
-        id: uid(),
-        customer_name: name,
-        customer_mobile: mobile,
-        design_name: `Stamp ${selectedDimensions.widthMm}x${selectedDimensions.heightMm}mm`,
-        config: buildConfig(),
-        status: "new",
+      await apiRequest("/api/customer-designs", {
+        method: "POST",
+        body: JSON.stringify({
+          customer_name: name,
+          customer_mobile: mobile,
+          design_name: `Stamp ${selectedDimensions.widthMm}x${selectedDimensions.heightMm}mm`,
+          config: buildConfig(),
+        }),
       });
       setCustomerSubmitStatus("Design submitted successfully. Sharma Ji Stamps will contact you shortly.");
     } catch (err) {
@@ -5664,19 +5653,19 @@ function UsersTab({ users, refresh, currentUser }) {
   const add = async () => {
     if (!name.trim() || pin.length < 4) return;
     try {
-      await dbInsert("users", { id: uid(), name: name.trim(), role, pin });
+      await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "create-user", name: name.trim(), role, pin }) });
       setName(""); setPin(""); setErrMsg(""); await refresh();
     } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
   };
   const remove = async (id) => {
     if (id === currentUser.id) return;
-    try { await dbDelete("users", id); await refresh(); }
+    try { await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "delete-user", userId: id }) }); await refresh(); }
     catch (err) { setErrMsg(err.message || "Delete failed — check connection."); }
   };
   const applyReset = async (id) => {
     if (newPin.length < 4) return;
     try {
-      await dbUpdate("users", id, { pin: newPin });
+      await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "reset-pin", userId: id, pin: newPin }) });
       setResetId(null); setNewPin(""); await refresh();
     } catch (err) { setErrMsg(err.message || "PIN reset failed — check connection."); }
   };
