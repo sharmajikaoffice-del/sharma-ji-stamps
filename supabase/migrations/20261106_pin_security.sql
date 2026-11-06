@@ -6,10 +6,21 @@ alter table if exists public.users add column if not exists pin_hash text;
 alter table if exists public.users add column if not exists pin_salt text;
 alter table if exists public.users alter column pin drop not null;
 
-do $$
+create table if not exists public.sjs_login_attempts (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  ip_hash text not null,
+  attempted_at timestamptz not null default now(),
+  successful boolean not null default false
+);
+create index if not exists sjs_login_attempts_lookup
+  on public.sjs_login_attempts (user_id, ip_hash, attempted_at desc)
+  where successful = false;
+
+do $
 declare t text;
 begin
-  foreach t in array array['users','rubbers','purchases','stamp_entries','cash_manual','stamp_templates','customer_designs']
+  foreach t in array array['users','rubbers','purchases','stamp_entries','cash_manual','stamp_templates','customer_designs','sjs_login_attempts']
   loop
     if to_regclass('public.' || t) is not null then
       execute format('alter table public.%I enable row level security', t);
