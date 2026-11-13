@@ -1060,12 +1060,12 @@ function Login({ users, onLogin }) {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: C.paper, display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px" }}>
-      <StampMark size={110} />
-      <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 28, marginTop: 12 }}>Sharma Ji Stamps</div>
-      <div style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 2, color: C.inkSoft, marginTop: 4, marginBottom: 28 }}>RUBBER STAMP RECORD BOOK</div>
+    <div style={{ minHeight: "100vh", minHeight: "100dvh", background: C.paper, display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 16px 22px" }}>
+      <StampMark size={88} />
+      <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 26, lineHeight: 1.15, marginTop: 5 }}>Sharma Ji Stamps</div>
+      <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.7, color: C.inkSoft, marginTop: 5, marginBottom: 16, lineHeight: 1.2 }}>RUBBER STAMP RECORD BOOK</div>
       <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 2, color: C.inkSoft, marginBottom: 10 }}>SELECT USER</div>
-      <div style={{ display: "flex", gap: 14, marginBottom: 26, flexWrap: "wrap", justifyContent: "center" }}>
+      <div style={{ display: "flex", gap: 14, marginBottom: 16, flexWrap: "wrap", justifyContent: "center" }}>
         {users.map((u) => (
           <div key={u.id} onClick={() => { setSelected(u.id); setPin(""); setError(""); }} style={{ textAlign: "center", cursor: "pointer" }}>
             <div style={{ width: 52, height: 52, borderRadius: 12, background: C.paperDark, border: `2px solid ${selected === u.id ? C.stamp : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.display, fontWeight: 600, color: C.brass, fontSize: 16 }}>
@@ -1083,14 +1083,14 @@ function Login({ users, onLogin }) {
               <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", border: `1.5px solid ${C.stamp}`, background: i < pin.length ? C.stamp : "transparent" }} />
             ))}
           </div>
-          <div style={{ height: 18, color: C.stamp, fontFamily: font.mono, fontSize: 11, marginBottom: 6 }}>{error}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: 220 }}>
+          <div style={{ height: 12, color: C.stamp, fontFamily: font.mono, fontSize: 10, marginBottom: 3 }}>{error}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, width: 220 }}>
             {["1","2","3","4","5","6","7","8","9","","0","back"].map((k, i) => (
               k === "" ? <div key={i} /> :
-              <button key={i} disabled={busy} onClick={() => press(k)} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "14px 0", fontFamily: font.mono, fontSize: 16, color: C.ink, cursor: busy ? "wait" : "pointer" }}>{k === "back" ? "⌫" : k}</button>
+              <button key={i} disabled={busy} onClick={() => press(k)} style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, padding: "11px 0", fontFamily: font.mono, fontSize: 16, color: C.ink, cursor: busy ? "wait" : "pointer" }}>{k === "back" ? "⌫" : k}</button>
             ))}
           </div>
-          <button type="button" disabled={busy || pin.length < 4} onClick={submit} style={{ width: 220, marginTop: 12, padding: "12px", border: "none", borderRadius: 9, background: C.headerGreen, color: "#fff", fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: pin.length < 4 ? .5 : 1 }}>{busy ? "Verifying…" : "Login"}</button>
+          <button type="button" disabled={busy || pin.length < 4} onClick={submit} style={{ width: 220, marginTop: 8, padding: "10px", border: "none", borderRadius: 9, background: C.headerGreen, color: "#fff", fontWeight: 700, cursor: busy ? "wait" : "pointer", opacity: pin.length < 4 ? .5 : 1 }}>{busy ? "Verifying…" : "Login"}</button>
         </>
       )}
     </div>
