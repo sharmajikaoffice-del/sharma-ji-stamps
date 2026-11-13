@@ -1070,8 +1070,8 @@ function Login({ users, onLogin }) {
       <div style={{ display: "flex", gap: 14, marginBottom: 16, flexWrap: "wrap", justifyContent: "center" }}>
         {users.map((u) => (
           <div key={u.id} onClick={() => { setSelected(u.id); setPin(""); setError(""); }} style={{ textAlign: "center", cursor: "pointer" }}>
-            <div style={{ width: 52, height: 52, borderRadius: 12, background: C.paperDark, border: `2px solid ${selected === u.id ? C.stamp : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.display, fontWeight: 600, color: C.brass, fontSize: 16 }}>
-              {u.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+            <div style={{ width: 58, height: 58, borderRadius: "50%", overflow: "hidden", background: C.paperDark, border: `2px solid ${selected === u.id ? C.stamp : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.display, fontWeight: 600, color: C.brass, fontSize: 16 }}>
+              {u.avatar_url ? <img src={u.avatar_url} alt={u.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : u.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
             </div>
             <div style={{ fontSize: 11, marginTop: 5, color: C.ink }}>{u.name.split(" ")[0]}</div>
           </div>
@@ -5644,6 +5644,8 @@ function UsersTab({ users, refresh, currentUser }) {
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [role, setRole] = useState("staff");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarError, setAvatarError] = useState("");
   const [resetId, setResetId] = useState(null);
   const [newPin, setNewPin] = useState("");
   const [errMsg, setErrMsg] = useState("");
@@ -5651,8 +5653,8 @@ function UsersTab({ users, refresh, currentUser }) {
   const add = async () => {
     if (!name.trim() || pin.length < 4) return;
     try {
-      await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "create-user", name: name.trim(), role, pin }) });
-      setName(""); setPin(""); setErrMsg(""); await refresh();
+      await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "create-user", name: name.trim(), role, pin, avatar_url: avatarUrl }) });
+      setName(""); setPin(""); setAvatarUrl(""); setAvatarError(""); setErrMsg(""); await refresh();
     } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
   };
   const remove = async (id) => {
@@ -5677,20 +5679,49 @@ function UsersTab({ users, refresh, currentUser }) {
         <Field value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
         <Label>Role</Label>
         <Select value={role} onChange={(e) => setRole(e.target.value)}><option value="staff">Staff</option><option value="admin">Admin</option></Select>
+        <Label>Profile Photo (DP)</Label>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <div style={{ width: 52, height: 52, borderRadius: "50%", overflow: "hidden", background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", color: C.brass, fontFamily: font.display, fontWeight: 700 }}>
+            {avatarUrl ? <img src={avatarUrl} alt="Profile preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : (name.trim()[0] || "?").toUpperCase()}
+          </div>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={async (e) => {
+            const file = e.target.files?.[0]; if (!file) return;
+            setAvatarError("");
+            if (!["image/png","image/jpeg","image/webp"].includes(file.type) || file.size > 500 * 1024) { setAvatarError("PNG/JPG/WebP photo 500 KB se chhoti honi chahiye."); e.target.value = ""; return; }
+            const reader = new FileReader();
+            reader.onload = () => setAvatarUrl(String(reader.result || ""));
+            reader.onerror = () => setAvatarError("Photo read nahi ho paayi.");
+            reader.readAsDataURL(file);
+          }} style={{ maxWidth: "100%", fontSize: 12 }} />
+        </div>
+        {avatarError && <div style={{ color: C.stamp, fontSize: 11, marginBottom: 8 }}>{avatarError}</div>}
         <Label>PIN (4–6 digits)</Label>
         <Field value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} maxLength={6} />
-        <Btn onClick={add} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add User</Btn>
+        <Btn onClick={add} disabled={!name.trim() || pin.length < 4 || !!avatarError} style={{ width: "100%", justifyContent: "center" }}><Plus size={16} /> Add User</Btn>
       </Card>
       {users.map((u) => (
         <Card key={u.id}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <div style={{ width: 38, height: 38, borderRadius: 8, background: C.paperDark, border: `1px solid ${u.role === "admin" ? C.stamp : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.display, fontWeight: 600, color: C.brass, fontSize: 14 }}>
-                {u.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+              <div style={{ width: 42, height: 42, borderRadius: "50%", overflow: "hidden", background: C.paperDark, border: `1px solid ${u.role === "admin" ? C.stamp : C.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font.display, fontWeight: 600, color: C.brass, fontSize: 14 }}>
+                {u.avatar_url ? <img src={u.avatar_url} alt={u.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : u.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
               </div>
               <div><div style={{ fontWeight: 600, fontSize: 13 }}>{u.name}</div><Tag tone={u.role === "admin" ? "in" : "out"}>{u.role}</Tag></div>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <label style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 9px", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}>DP
+                <input type="file" accept="image/png,image/jpeg,image/webp" aria-label={`Change ${u.name} profile photo`} onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file) return;
+                  if (!["image/png","image/jpeg","image/webp"].includes(file.type) || file.size > 500 * 1024) { setErrMsg("PNG/JPG/WebP photo 500 KB se chhoti honi chahiye."); e.target.value = ""; return; }
+                  const reader = new FileReader();
+                  reader.onload = async () => {
+                    try { await apiRequest("/api/auth", { method: "POST", body: JSON.stringify({ action: "update-avatar", userId: u.id, avatar_url: String(reader.result || "") }) }); await refresh(); }
+                    catch (err) { setErrMsg(err.message || "Photo update failed."); }
+                  };
+                  reader.onerror = () => setErrMsg("Photo read nahi ho paayi.");
+                  reader.readAsDataURL(file); e.target.value = "";
+                }} style={{ display: "none" }} />
+              </label>
               <Btn variant="ghost" onClick={() => { setResetId(resetId === u.id ? null : u.id); setNewPin(""); }} style={{ padding: "6px 10px", fontSize: 11 }}><RotateCcw size={13} /> PIN</Btn>
               {u.id !== currentUser.id && <button onClick={() => remove(u.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={16} /></button>}
             </div>
