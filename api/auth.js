@@ -153,7 +153,7 @@ export default async function handler(req, res) {
     const user = await currentUser(req);
     if (!user) return send(res, 401, { error: "Please log in again." });
 
-    if (body.action === "create-user" || body.action === "reset-pin" || body.action === "delete-user") {
+    if (body.action === "create-user" || body.action === "reset-pin" || body.action === "delete-user" || body.action === "update-avatar") {
       if (!requireAdmin(user)) return send(res, 403, { error: "Admin access required." });
       if (body.action === "create-user") {
         const name = String(body.name || "").trim();
