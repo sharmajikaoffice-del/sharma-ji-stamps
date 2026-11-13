@@ -3898,7 +3898,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </>
       ) : (
         <>
-          <SliderControl label="Image size" value={activeLayer.width ?? activeLayer.size ?? 75} min={5} max={200} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
+          <SliderControl label="Image size" value={activeLayer.width ?? activeLayer.size ?? 75} min={5} max={250} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
           <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
           <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
@@ -4041,7 +4041,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
             <button type="button" onClick={() => setPreviewZoom((z) => Math.max(0.6, Number((z - 0.1).toFixed(1))))} title="Zoom out" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>−</button>
             <span style={{ minWidth: 46, textAlign: "center", fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft, background: "rgba(255,255,255,.9)", borderRadius: 6, padding: "4px 0" }}>{Math.round(previewZoom * 100)}%</span>
-            <button type="button" onClick={() => setPreviewZoom((z) => Math.min(2.5, Number((z + 0.1).toFixed(1))))} title="Zoom in" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>+</button>
+            <button type="button" onClick={() => setPreviewZoom((z) => Math.min(3, Number((z + 0.1).toFixed(1))))} title="Zoom in" style={{ width: 28, height: 28, border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: C.ink, cursor: "pointer", fontWeight: 800, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>+</button>
             <button type="button" onClick={() => setPreviewZoom(1)} title="Reset zoom" style={{ height: 28, padding: "0 8px", border: `1px solid ${C.line}`, borderRadius: 6, background: C.white, color: STAMP_INK_BLUE, cursor: "pointer", fontSize: 10, fontWeight: 700, boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>Reset</button>
           </div>
           <button type="button" onClick={redoLayers} title="Redo" aria-label="Redo" style={{
