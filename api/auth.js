@@ -71,7 +71,7 @@ function verifyHash(pin, salt, stored) {
 async function currentUser(req) {
   const session = readSession(req);
   if (!session) return null;
-  const rows = await db(`users?select=id,name,role&id=eq.${encodeURIComponent(session.id)}&limit=1`);
+  const rows = await db(`users?select=id,name,role,avatar_url&id=eq.${encodeURIComponent(session.id)}&limit=1`);
   const user = rows?.[0];
   if (!user || !["admin", "staff"].includes(user.role)) return null;
   return user;
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const user = await currentUser(req);
-      const users = await db("users?select=id,name,role&order=created_at.asc");
+      const users = await db("users?select=id,name,role,avatar_url&order=created_at.asc");
       return send(res, 200, { user, users: users || [] });
     }
 
@@ -116,7 +116,7 @@ export default async function handler(req, res) {
       });
       const attemptId = attemptRows?.[0]?.id;
 
-      const rows = await db(`users?select=id,name,role,pin,pin_hash,pin_salt&id=eq.${encodeURIComponent(userId)}&limit=1`);
+      const rows = await db(`users?select=id,name,role,avatar_url,pin,pin_hash,pin_salt&id=eq.${encodeURIComponent(userId)}&limit=1`);
       const record = rows?.[0];
       if (!record || !["admin", "staff"].includes(record.role)) return send(res, 401, { error: "Incorrect PIN." });
 
@@ -145,7 +145,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({ successful: true }),
         });
       }
-      const user = { id: record.id, name: record.name, role: record.role };
+      const user = { id: record.id, name: record.name, role: record.role, avatar_url: record.avatar_url || null };
       setSessionCookie(res, makeSession(user));
       return send(res, 200, { ok: true, user });
     }
@@ -159,11 +159,23 @@ export default async function handler(req, res) {
         const name = String(body.name || "").trim();
         const pin = String(body.pin || "");
         const role = body.role === "admin" ? "admin" : "staff";
+        const avatar_url = String(body.avatar_url || "");
         if (name.length < 2 || name.length > 80 || !validPin(pin)) return send(res, 400, { error: "Enter a name and a 4–6 digit PIN." });
+        if (avatar_url && (!/^data:image\/(png|jpeg|webp);base64,/.test(avatar_url) || avatar_url.length > 700000)) return send(res, 400, { error: "Choose a PNG, JPG or WebP photo under 500 KB." });
         const salt = randomBytes(16).toString("hex");
         const id = randomBytes(12).toString("hex");
-        await db("users", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id, name, role, pin: null, pin_salt: salt, pin_hash: hashPin(pin, salt) }) });
+        await db("users", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id, name, role, avatar_url: avatar_url || null, pin: null, pin_salt: salt, pin_hash: hashPin(pin, salt) }) });
         return send(res, 201, { ok: true });
+      }
+      if (body.action === "update-avatar") {
+        const targetId = String(body.userId || "");
+        const avatar_url = String(body.avatar_url || "");
+        if (!targetId || !/^data:image\/(png|jpeg|webp);base64,/.test(avatar_url) || avatar_url.length > 700000) return send(res, 400, { error: "Choose a PNG, JPG or WebP photo under 500 KB." });
+        await db(`users?id=eq.${encodeURIComponent(targetId)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ avatar_url }),
+        });
+        return send(res, 200, { ok: true });
       }
       if (body.action === "reset-pin") {
         const targetId = String(body.userId || "");
