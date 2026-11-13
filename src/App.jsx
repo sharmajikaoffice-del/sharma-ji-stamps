@@ -1061,12 +1061,12 @@ function Login({ users, onLogin }) {
 
   return (
     <div style={{ minHeight: "100vh", minHeight: "100dvh", background: C.paper, display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 16px 22px" }}>
-      <StampMark size={76} />
+      <StampMark size={100} />
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, marginBottom: 16 }}>
         <div style={{ fontFamily: font.display, fontWeight: 700, fontSize: 26, lineHeight: 1.15, margin: 0 }}>Sharma Ji Stamps</div>
         <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1.7, color: C.inkSoft, lineHeight: 1.2, margin: 0 }}>RUBBER STAMP RECORD BOOK</div>
       </div>
-      <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 2, color: C.inkSoft, marginTop: -76, marginBottom: 10 }}>SELECT USER</div>
+      <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 2, color: C.inkSoft, marginTop: -100, marginBottom: 10 }}>SELECT USER</div>
       <div style={{ display: "flex", gap: 14, marginBottom: 16, flexWrap: "wrap", justifyContent: "center" }}>
         {users.map((u) => (
           <div key={u.id} onClick={() => { setSelected(u.id); setPin(""); setError(""); }} style={{ textAlign: "center", cursor: "pointer" }}>
