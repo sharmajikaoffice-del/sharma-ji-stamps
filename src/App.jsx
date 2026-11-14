@@ -1121,7 +1121,7 @@ const TABS_ADMIN = [
   { id: "stock", label: "Stock", icon: Package },
   { id: "rubber", label: "Rubber", icon: Stamp },
   { id: "purchase", label: "Purchase", icon: ShoppingCart },
-  { id: "ledger", label: "Cash Register", icon: Wallet },
+  { id: "ledger", label: "Bank & Cash", icon: Wallet },
   { id: "users", label: "Users", icon: Users },
   
 ];
@@ -1132,7 +1132,7 @@ const TABS_STAFF = [
   { id: "orders", label: "Orders", icon: Inbox },
   { id: "register", label: "Register", icon: BookOpen },
   { id: "stock", label: "Stock", icon: Package },
-  { id: "ledger", label: "Cash Register", icon: Wallet },
+  { id: "ledger", label: "Bank & Cash", icon: Wallet },
   
 ];
 
@@ -5105,7 +5105,13 @@ function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
   const itemMovements = selectedItem ? [
     ...purchases.filter(p => p.rubber_id === selectedItem.id).map(p => ({ id: `purchase-${p.id}`, date: p.date, direction: "IN", qty: Number(p.qty || 0), detail: "Purchase", amount: Number(p.total ?? p.amount ?? 0), payment: p.payment_mode || "Cash" })),
     ...entries.filter(e => e.rubber_id === selectedItem.id).map(e => ({ id: `sale-${e.id}`, date: e.date, direction: "OUT", qty: 1, detail: "Sale / Used", amount: Number(e.amount || 0), payment: e.payment_mode || "Cash" }))
-  ].sort((a,b) => String(b.date).localeCompare(String(a.date))) : [];
+  ].sort((a,b) => String(a.date).localeCompare(String(b.date)) || (a.direction === "IN" ? -1 : 1)) : [];
+  let runStock = selectedItem ? Number(selectedItem.opening_stock || 0) : 0;
+  const itemMovementsWithBal = itemMovements.map(m => { runStock += m.direction === "IN" ? m.qty : -m.qty; return { ...m, balance: runStock }; });
+  const exportItemRegister = () => selectedItem && exportToCSV(`stock-register-${selectedItem.name}-${todayISO()}.csv`, [
+    { Date: "", Type: "OPENING", Details: "Opening Stock", IN: "", OUT: "", Balance: Number(selectedItem.opening_stock || 0) },
+    ...itemMovementsWithBal.map(m => ({ Date: fmtDate(m.date), Type: m.direction, Details: m.detail, IN: m.direction === "IN" ? m.qty : "", OUT: m.direction === "OUT" ? m.qty : "", Balance: m.balance }))
+  ]);
   return (
     <div>
       <SectionTitle icon={Package} title="Stock Report" />
@@ -5139,20 +5145,21 @@ function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
       {selectedItem && <Card style={{marginTop:14}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
           <div><div style={{fontWeight:800,fontSize:15}}>{selectedItem.name} — Item Register</div><div style={{fontSize:11,color:C.inkSoft}}>Opening: {Number(selectedItem.opening_stock || 0)} · Current stock: {(stockByRubber[selectedItem.id] || {}).balance ?? 0}</div></div>
-          <Btn variant="ghost" onClick={()=>setSelectedItemId(null)}>Close</Btn>
+          <div style={{display:"flex",gap:6}}><Btn variant="ghost" onClick={exportItemRegister} style={{padding:"6px 10px",fontSize:11.5}}><Download size={13}/> Export</Btn><Btn variant="ghost" onClick={()=>setSelectedItemId(null)}>Close</Btn></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:10}}>
+          <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>OPENING STOCK</div><div style={{fontWeight:800,fontSize:18}}>{Number(selectedItem.opening_stock || 0)}</div></div>
           <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>TOTAL IN</div><div style={{fontWeight:800,fontSize:18,color:C.sage}}>{(stockByRubber[selectedItem.id] || {}).purchased || 0}</div></div>
           <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>TOTAL OUT</div><div style={{fontWeight:800,fontSize:18,color:C.stamp}}>{(stockByRubber[selectedItem.id] || {}).used || 0}</div></div>
-          <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>CLOSING</div><div style={{fontWeight:800,fontSize:18}}>{(stockByRubber[selectedItem.id] || {}).balance || 0}</div></div>
+          <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>CLOSING STOCK</div><div style={{fontWeight:800,fontSize:18}}>{(stockByRubber[selectedItem.id] || {}).balance || 0}</div></div>
         </div>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",minWidth:480}}>
-            <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Type</th><th style={{...thStyle,textAlign:"right"}}>Qty</th><th style={thStyle}>Details</th><th style={{...thStyle,textAlign:"right"}}>Amount</th><th style={thStyle}>Mode</th></tr></thead>
+            <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Type</th><th style={{...thStyle,textAlign:"right"}}>Qty</th><th style={thStyle}>Details</th><th style={{...thStyle,textAlign:"right"}}>Amount</th><th style={thStyle}>Mode</th><th style={{...thStyle,textAlign:"right"}}>Balance</th></tr></thead>
             <tbody>
-              <tr><td style={tdStyle}>—</td><td style={{...tdStyle,color:C.brass}}>OPENING</td><td style={{...tdStyle,textAlign:"right"}}>{Number(selectedItem.opening_stock || 0)}</td><td style={tdStyle}>Opening Stock</td><td style={{...tdStyle,textAlign:"right"}}>—</td><td style={tdStyle}>—</td></tr>
-              {itemMovements.map(m=><tr key={m.id}><td style={tdStyle}>{fmtDate(m.date)}</td><td style={{...tdStyle,color:m.direction==="IN"?C.sage:C.stamp,fontWeight:800}}>{m.direction}</td><td style={{...tdStyle,textAlign:"right"}}>{m.qty}</td><td style={tdStyle}>{m.detail}</td><td style={{...tdStyle,textAlign:"right"}}>{inr(m.amount)}</td><td style={tdStyle}>{m.payment}</td></tr>)}
-              {itemMovements.length===0 && <tr><td colSpan={6} style={{...tdStyle,textAlign:"center",padding:16}}>No purchase or sale movements found.</td></tr>}
+              <tr><td style={tdStyle}>—</td><td style={{...tdStyle,color:C.brass}}>OPENING</td><td style={{...tdStyle,textAlign:"right"}}>{Number(selectedItem.opening_stock || 0)}</td><td style={tdStyle}>Opening Stock</td><td style={{...tdStyle,textAlign:"right"}}>—</td><td style={tdStyle}>—</td><td style={{...tdStyle,textAlign:"right",fontWeight:800}}>{Number(selectedItem.opening_stock || 0)}</td></tr>
+              {itemMovementsWithBal.map(m=><tr key={m.id}><td style={tdStyle}>{fmtDate(m.date)}</td><td style={{...tdStyle,color:m.direction==="IN"?C.sage:C.stamp,fontWeight:800}}>{m.direction}</td><td style={{...tdStyle,textAlign:"right"}}>{m.qty}</td><td style={tdStyle}>{m.detail}</td><td style={{...tdStyle,textAlign:"right"}}>{inr(m.amount)}</td><td style={tdStyle}>{m.payment}</td><td style={{...tdStyle,textAlign:"right",fontWeight:800}}>{m.balance}</td></tr>)}
+              {itemMovements.length===0 && <tr><td colSpan={7} style={{...tdStyle,textAlign:"center",padding:16}}>No purchase or sale movements found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -5315,6 +5322,9 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState(todayISO());
   const [txnFilter, setTxnFilter] = useState("All");
+  const [modalOpen, setModalOpen] = useState(false);
+  const isDesktop = useIsDesktop();
+  useEffect(() => { if (!modalOpen) return; const h = (e) => { if (e.key === "Escape") resetManualForm(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [modalOpen]);
   const [reportMonth, setReportMonth] = useState(todayISO().slice(0, 7));
   const [errMsg, setErrMsg] = useState("");
 
@@ -5364,13 +5374,16 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
     ...cashManual.map(c => ({id:`manual-${c.id}`,manualId:c.id,date:c.date,label:c.type === "out" ? expenseHead(c) : (c.category || "Other Receipt"),type:c.type,amount:Number(c.amount||0),note:c.note||"",payment_mode:c.payment_mode || "Cash"}))
   ].sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
 
-  let runningCash=0, runningBank=0;
+  let runningCash=0, runningBank=0, runningAll=0;
   const txnsWithBalance=allTxns.map(t=>{
     const isBank = t.payment_mode === "Bank";
-    if (isBank) runningBank += t.type === "in" ? t.amount : -t.amount;
-    else runningCash += t.type === "in" ? t.amount : -t.amount;
-    return {...t,balanceAfter:isBank?runningBank:runningCash};
+    const delta = t.type === "in" ? t.amount : -t.amount;
+    if (isBank) runningBank += delta; else runningCash += delta;
+    runningAll += delta;
+    return {...t,balanceAfter:isBank?runningBank:runningCash,balanceAll:runningAll};
   });
+  // Balance shown for a row depends on the active filter: All = combined, Cash/Bank = that register only.
+  const rowBalance=(t)=>txnFilter==="All"?t.balanceAll:t.balanceAfter;
   const currentCashBalance=runningCash;
   const currentBankBalance=runningBank;
   const dateTxns=txnsWithBalance.filter(t=>inRange(t.date));
@@ -5385,7 +5398,8 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const cashTotalIn=txnsWithBalance.filter(t=>t.payment_mode!=="Bank"&&t.type==="in").reduce((a,t)=>a+t.amount,0);
   const cashTotalOut=txnsWithBalance.filter(t=>t.payment_mode!=="Bank"&&t.type==="out").reduce((a,t)=>a+t.amount,0);
 
-  const resetManualForm = () => { setEditingExpenseId(null); setType("in"); setCategory("Other Receipt"); setAmount(0); setNote(""); setPaymentMode("Cash"); setEntryDate(todayISO()); };
+  const resetManualForm = () => { setEditingExpenseId(null); setType("in"); setCategory("Other Receipt"); setAmount(""); setNote(""); setPaymentMode("Cash"); setEntryDate(todayISO()); setModalOpen(false); };
+  const openAdd = (t) => { setEditingExpenseId(null); setType(t); setCategory(t === "in" ? "Other Receipt" : "Rent"); setAmount(""); setNote(""); setPaymentMode("Cash"); setEntryDate(todayISO()); setErrMsg(""); setModalOpen(true); };
   const addManual = async () => {
     if (!amount || Number(amount) <= 0 || !entryDate) { setErrMsg("Date aur valid amount enter karein."); return; }
     try {
@@ -5397,51 +5411,123 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   };
   const startEditExpense = (txn) => {
     const row = cashManual.find(c => c.id === txn.manualId);
-    if (!row || row.type !== "out") return;
-    setEditingExpenseId(row.id); setType("out"); setCategory(expenseHead(row) === "Other Expense" ? "Rent" : expenseHead(row));
+    if (!row) return;
+    setEditingExpenseId(row.id); setType(row.type === "out" ? "out" : "in");
+    setCategory(row.type === "out" ? (expenseHead(row) === "Other Expense" ? "Rent" : expenseHead(row)) : "Other Receipt");
     setAmount(String(row.amount ?? "")); setNote(row.note || ""); setPaymentMode(row.payment_mode || "Cash"); setEntryDate(row.date || todayISO());
-    setErrMsg("");
-    document.getElementById("cash-expense-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setErrMsg(""); setModalOpen(true);
   };
-  const exportCSV=()=>exportToCSV(`cash-bank-register-${todayISO()}.csv`,shown.map(t=>({Date:fmtDate(t.date),Mode:t.payment_mode||"Cash",Description:t.label,Credit:t.type==="in"?t.amount:"",Debit:t.type==="out"?t.amount:"",RunningBalance:t.balanceAfter})));
+  const exportCSV=()=>exportToCSV(`transactions-${txnFilter.toLowerCase()}-${todayISO()}.csv`,[...shown].reverse().map(t=>({Date:fmtDate(t.date),"Payment Mode":t.payment_mode||"Cash",Description:t.label,Note:t.note||"",Credit:t.type==="in"?t.amount:"",Debit:t.type==="out"?t.amount:"",Balance:rowBalance(t)})));
 
+  const seg = (value, onChange, options, small) => <div style={{ display: "inline-flex", border: `1.5px solid ${C.line}`, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>{options.map(([val, label]) => <button key={val} type="button" onClick={() => onChange(val)} style={{ padding: small ? "7px 12px" : "8px 18px", border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 700, fontFamily: font.body, background: value === val ? C.headerGreen : C.white, color: value === val ? C.white : C.ink }}>{label}</button>)}</div>;
+  const periodIn = shown.filter(t => t.type === "in").reduce((a, t) => a + t.amount, 0);
+  const periodOut = shown.filter(t => t.type === "out").reduce((a, t) => a + t.amount, 0);
+  const compactField = { marginBottom: 0, padding: "8px 10px", fontSize: 13 };
+  const registerCard = (title, icon, balance, tin, tout, mode, accent) => <div onClick={() => setTxnFilter(mode)} style={{ cursor: "pointer", background: C.white, border: `1.5px solid ${txnFilter === mode ? accent : C.line}`, borderLeft: `5px solid ${accent}`, borderRadius: 10, padding: "12px 16px" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ fontWeight: 800, fontSize: 13.5 }}>{icon} {title}</div><div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>BALANCE</div></div>
+    <div style={{ fontFamily: font.display, fontWeight: 800, fontSize: 28, color: balance < 0 ? C.stamp : C.ink, margin: "4px 0 6px" }}>{inr(balance)}</div>
+    <div style={{ display: "flex", gap: 14, fontFamily: font.mono, fontSize: 11 }}><span style={{ color: C.sage }}>↓ आया {inr(tin)}</span><span style={{ color: C.stamp }}>↑ गया {inr(tout)}</span></div>
+  </div>;
   return <div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,paddingBottom:10,borderBottom:`2px solid ${C.headerGreen}`,gap:8}}><SectionTitle icon={Wallet} title="Cash Register" bare/><Btn variant="ghost" onClick={exportCSV} style={{padding:"6px 10px",fontSize:11.5}}><Download size={13}/> Export</Btn></div>
-    <Card style={{marginBottom:12}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:12}}>
-        <div style={{fontWeight:800,fontSize:15}}>Monthly Sale & Expense Summary</div>
-        <div style={{minWidth:170}}><Label>Report Month</Label><Field type="month" value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{marginBottom:0}}/></div>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8, flexWrap: "wrap" }}>
+      <SectionTitle icon={Wallet} title="Bank & Cash" bare />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Btn onClick={() => openAdd("in")} style={{ padding: "8px 14px", fontSize: 12.5, background: C.sage }}><Plus size={14} /> Cash In</Btn>
+        <Btn onClick={() => openAdd("out")} style={{ padding: "8px 14px", fontSize: 12.5, background: C.stamp }}><Plus size={14} /> Cash Out</Btn>
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "7px 12px", fontSize: 12.5 }}><Download size={13} /> Export</Btn>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:8}}>
-        <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>CASH SALE</div><div style={{fontSize:20,fontWeight:800,marginTop:4}}>{inr(monthlyCashSale)}</div></div>
-        <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>BANK SALE</div><div style={{fontSize:20,fontWeight:800,marginTop:4}}>{inr(monthlyBankSale)}</div></div>
-        <div style={{background:C.ink,color:C.white,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:"#DCE9FF"}}>TOTAL SALE</div><div style={{fontSize:20,fontWeight:800,marginTop:4}}>{inr(monthlyTotalSale)}</div></div>
-      </div>
-      <div style={{marginTop:12,borderTop:`1px solid ${C.line}`,paddingTop:10}}>
-        <div style={{fontWeight:750,fontSize:13,marginBottom:8}}>Expenses</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:8}}>
-          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>PURCHASE</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyPurchase)}</div></div>
-          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>RENT</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyRent)}</div></div>
-          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>ELECTRICITY</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyElectricity)}</div></div>
-          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>TOTAL EXPENSE</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyTotalExpense)}</div></div>
+    </div>
+
+    <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(3, minmax(0,1fr))" : "1fr", gap: 12, marginBottom: 14 }}>
+      {registerCard("Cash Register", "💵", currentCashBalance, cashTotalIn, cashTotalOut, "Cash", C.brass)}
+      {registerCard("Bank Register", "🏦", currentBankBalance, bankTotalIn, bankTotalOut, "Bank", "#246B32")}
+      {registerCard("Total (Cash + Bank)", "💰", currentCashBalance + currentBankBalance, cashTotalIn + bankTotalIn, cashTotalOut + bankTotalOut, "All", C.headerGreen)}
+    </div>
+
+    <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "minmax(0,1fr) 330px" : "1fr", gap: 14, alignItems: "start" }}>
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden", order: isDesktop ? 0 : 1 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "12px 14px", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginRight: 4 }}>Transactions</div>
+          {seg(txnFilter, setTxnFilter, [["All", "All"], ["Cash", "Cash"], ["Bank", "Bank"]], true)}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>FROM</span><Field type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={{ ...compactField, width: 138 }} />
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>TO</span><Field type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={{ ...compactField, width: 138 }} />
+            <Btn variant="ghost" onClick={() => { setFromDate(""); setToDate(todayISO()); }} style={{ padding: "7px 10px", fontSize: 12 }}>Reset</Btn>
+          </div>
+        </div>
+        <div style={{ overflow: "auto", maxHeight: isDesktop ? "calc(100vh - 340px)" : "none", minHeight: isDesktop ? 240 : 0 }}>
+          <table style={{ width: "100%", minWidth: 700, borderCollapse: "collapse" }}>
+            <thead><tr>
+              {["Date", "Mode", "Details"].map(h => <th key={h} style={{ ...thStyle, position: "sticky", top: 0, zIndex: 1, padding: "9px 10px" }}>{h}</th>)}
+              {["Credit", "Debit", "Balance"].map(h => <th key={h} style={{ ...thStyle, textAlign: "right", position: "sticky", top: 0, zIndex: 1, padding: "9px 10px" }}>{h}</th>)}
+              <th style={{ ...thStyle, position: "sticky", top: 0, zIndex: 1, width: 56 }} />
+            </tr></thead>
+            <tbody>
+              {shown.slice(0, 200).map(t => <tr key={t.id}>
+                <td style={{ ...tdStyle, padding: "9px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.date)}</td>
+                <td style={{ ...tdStyle, padding: "9px 10px" }}><span style={{ fontSize: 9.5, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: t.payment_mode === "Bank" ? "#E3F1E6" : C.paperDark, color: t.payment_mode === "Bank" ? "#246B32" : C.brass }}>{t.payment_mode || "Cash"}</span></td>
+                <td style={{ ...tdStyle, padding: "9px 10px", fontFamily: font.body, fontSize: 12.5 }}><div style={{ fontWeight: 650 }}>{t.label}</div>{t.note && <div style={{ fontSize: 10.5, color: C.inkSoft, marginTop: 2 }}>{t.note}</div>}</td>
+                <td style={{ ...tdStyle, padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.sage }}>{t.type === "in" ? inr(t.amount) : "—"}</td>
+                <td style={{ ...tdStyle, padding: "9px 10px", textAlign: "right", fontWeight: 700, color: C.stamp }}>{t.type === "out" ? inr(t.amount) : "—"}</td>
+                <td style={{ ...tdStyle, padding: "9px 10px", textAlign: "right", fontWeight: 800 }}>{inr(rowBalance(t))}</td>
+                <td style={{ ...tdStyle, padding: "9px 6px", textAlign: "center" }}>{t.manualId && <button title="Edit entry" aria-label="Edit entry" onClick={() => startEditExpense(t)} style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color: C.brass, cursor: "pointer", padding: "3px 8px", fontSize: 11, fontWeight: 700 }}>Edit</button>}</td>
+              </tr>)}
+              {shown.length === 0 && <tr><td colSpan={7} style={{ ...tdStyle, textAlign: "center", padding: 26 }}>No transactions for the selected dates and filter.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, padding: "10px 14px", borderTop: `1px solid ${C.line}`, background: C.paperDark, fontFamily: font.mono, fontSize: 11.5 }}>
+          <span>{shown.length} entries · {txnFilter}</span>
+          <span><span style={{ color: C.sage, fontWeight: 700 }}>Credit {inr(periodIn)}</span> &nbsp;·&nbsp; <span style={{ color: C.stamp, fontWeight: 700 }}>Debit {inr(periodOut)}</span></span>
         </div>
       </div>
-      <div style={{marginTop:10,padding:"12px 14px",borderRadius:9,background:monthlyNet>=0?"#EAF4E8":"#FBEAE7",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-        <div style={{fontWeight:800,fontSize:13}}>SALE − PURCHASE − RENT − ELECTRICITY</div><div style={{fontWeight:900,fontSize:21,color:monthlyNet>=0?"#2D7A35":"#B42318"}}>{inr(monthlyNet)}</div>
+
+      <div style={{ position: isDesktop ? "sticky" : "static", top: 14, order: isDesktop ? 1 : 0 }}>
+        <Card style={{ marginBottom: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ fontWeight: 800, fontSize: 14 }}>Monthly Summary</div>
+            <Field type="month" value={reportMonth} onChange={e => setReportMonth(e.target.value)} style={{ ...compactField, width: 150 }} />
+          </div>
+          <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1, color: C.inkSoft, marginBottom: 4 }}>SALE</div>
+          <Row label="Cash Sale" value={inr(monthlyCashSale)} />
+          <Row label="Bank Sale" value={inr(monthlyBankSale)} />
+          <div style={{ borderTop: `1px solid ${C.line}`, margin: "6px 0" }} />
+          <Row label="Total Sale" value={inr(monthlyTotalSale)} bold />
+          <div style={{ fontFamily: font.mono, fontSize: 10, letterSpacing: 1, color: C.inkSoft, margin: "12px 0 4px" }}>EXPENSE</div>
+          <Row label="Purchase" value={inr(monthlyPurchase)} />
+          <Row label="Rent" value={inr(monthlyRent)} />
+          <Row label="Electricity" value={inr(monthlyElectricity)} />
+          <div style={{ borderTop: `1px solid ${C.line}`, margin: "6px 0" }} />
+          <Row label="Total Expense" value={inr(monthlyTotalExpense)} bold />
+          <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 9, background: monthlyNet >= 0 ? "#EAF4E8" : "#FBEAE7" }}>
+            <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>NET = SALE − PURCHASE − RENT − ELECTRICITY</div>
+            <div style={{ fontWeight: 900, fontSize: 24, marginTop: 2, color: monthlyNet >= 0 ? "#2D7A35" : "#B42318" }}>{inr(monthlyNet)}</div>
+          </div>
+        </Card>
       </div>
-    </Card>
-    <Card style={{marginBottom:12}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:10,alignItems:"end"}}><div><Label>From Date</Label><Field type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={{marginBottom:0}}/></div><div><Label>To Date</Label><Field type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={{marginBottom:0}}/></div><Btn variant="ghost" onClick={()=>{setFromDate("");setToDate(todayISO())}}>Reset</Btn></div></Card>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10,marginBottom:12}}>
-      <Card style={{background:C.ink,color:C.white}}><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:"#DCE9FF"}}>CASH REGISTER BALANCE</div><div style={{fontFamily:font.display,fontWeight:700,fontSize:27,marginTop:4}}>{inr(currentCashBalance)}</div><div style={{fontSize:10,marginTop:5,color:"#DCE9FF"}}>Credit {inr(cashTotalIn)} · Debit {inr(cashTotalOut)}</div></Card>
-      <Card style={{background:"#EAF4E8"}}><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>BANK REGISTER BALANCE</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:27,marginTop:4,color:"#246B32"}}>{inr(currentBankBalance)}</div><div style={{fontSize:10,marginTop:5,color:C.inkSoft}}>Credit {inr(bankTotalIn)} · Debit {inr(bankTotalOut)}</div></Card>
-      <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED PERIOD · CASH</div><div style={{fontSize:13,fontWeight:750,marginTop:5}}>Credit {inr(selectedCashIn)}</div><div style={{fontSize:13,fontWeight:750,marginTop:3}}>Debit {inr(selectedCashOut)}</div></Card>
-      <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED PERIOD · BANK</div><div style={{fontSize:13,fontWeight:750,marginTop:5}}>Credit {inr(selectedBankIn)}</div><div style={{fontSize:13,fontWeight:750,marginTop:3}}>Debit {inr(selectedBankOut)}</div></Card>
     </div>
-    <Card><div id="cash-expense-form" style={{fontWeight:800,marginBottom:10}}>{editingExpenseId ? "Edit Expense" : "Add Cash Entry"}</div>{errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}<div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>{if(editingExpenseId)return;setType("in");setCategory("Other Receipt");}} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>{if(editingExpenseId)return;setType("out");setCategory("Rent");}} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>{type==="out"?"Expense Head":"Category"}</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<><option>Rent</option><option>Electricity</option></>}</Select><Label>Payment Mode</Label><Select value={paymentMode} onChange={e=>setPaymentMode(e.target.value)}><option value="Cash">Cash</option><option value="Bank">Bank</option></Select><Label>Date</Label><Field type="date" value={entryDate} onChange={e=>setEntryDate(e.target.value)}/><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><div style={{display:"flex",gap:8}}><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}>{editingExpenseId?<Save size={16}/>:<Plus size={16}/>} {editingExpenseId?"Update Expense":"Add Entry"}</Btn>{editingExpenseId&&<Btn variant="ghost" onClick={resetManualForm}>Cancel</Btn>}</div></Card>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",margin:"16px 0 8px"}}><Label>Transactions</Label><div style={{minWidth:180}}><Label>Show</Label><Select value={txnFilter} onChange={e=>setTxnFilter(e.target.value)}><option value="All">All Transactions</option><option value="Cash">Cash Only</option><option value="Bank">Bank Only</option></Select></div></div>
-    <div style={{display:"grid",gridTemplateColumns:"70px minmax(0,1fr) 105px 105px 115px",gap:6,padding:"9px 10px",background:C.paperDark,borderRadius:"9px 9px 0 0",fontFamily:font.mono,fontSize:9.5,fontWeight:800,color:C.inkSoft}}><span>MODE</span><span>DETAILS</span><span style={{textAlign:"right"}}>CREDIT</span><span style={{textAlign:"right"}}>DEBIT</span><span style={{textAlign:"right"}}>RUNNING BAL.</span></div>
-    {(() => { const groups=[]; shown.slice(0,150).forEach(t=>{const last=groups[groups.length-1];if(last&&last.date===t.date)last.items.push(t);else groups.push({date:t.date,items:[t]});}); return groups.map(g=><div key={g.date}><div style={{fontFamily:font.mono,fontSize:10.5,fontWeight:700,color:C.brass,textTransform:"uppercase",letterSpacing:1,margin:"12px 0 6px"}}>{fmtDate(g.date)}</div>{g.items.map(t=><div key={t.id} style={{display:"grid",gridTemplateColumns:"70px minmax(0,1fr) 105px 105px 115px",gap:6,alignItems:"center",padding:"12px 10px",marginBottom:5,background:C.white,border:`1px solid ${C.line}`,borderRadius:9,fontSize:11.5}}><span style={{fontSize:9,fontWeight:800,color:t.payment_mode==="Bank"?"#246B32":C.brass}}>{t.payment_mode||"Cash"}</span><div style={{minWidth:0}}><div style={{fontWeight:650,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.label}</div>{t.note&&<div style={{fontSize:10,color:C.inkSoft,marginTop:3}}>{t.note}</div>}{t.type==="out"&&t.manualId&&<button title="Edit expense" aria-label="Edit expense" onClick={()=>startEditExpense(t)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer",padding:"3px 0",fontSize:10}}>Edit</button>}</div><span style={{textAlign:"right",fontFamily:font.mono,fontWeight:700,color:t.type==="in"?C.sage:C.inkSoft}}>{t.type==="in"?inr(t.amount):"—"}</span><span style={{textAlign:"right",fontFamily:font.mono,fontWeight:700,color:t.type==="out"?C.stamp:C.inkSoft}}>{t.type==="out"?inr(t.amount):"—"}</span><span style={{textAlign:"right",fontFamily:font.mono,fontWeight:800}}>{inr(t.balanceAfter)}</span></div>)}</div>); })()}
-    {shown.length===0 && <EmptyNote text="No transactions for the selected dates and filter."/>}
+
+    {modalOpen && <div onClick={resetManualForm} style={{ position: "fixed", inset: 0, background: "rgba(38,50,65,0.45)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, maxHeight: "92vh", overflowY: "auto", background: C.white, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,.28)", padding: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>{editingExpenseId ? "Edit Entry" : type === "in" ? "New Cash In" : "New Cash Out"}</div>
+          <button onClick={resetManualForm} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: C.inkSoft, display: "flex" }}><X size={18} /></button>
+        </div>
+        {errMsg && <div style={{ marginBottom: 10, padding: 8, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+        {!editingExpenseId && <div style={{ marginBottom: 12 }}>{seg(type, (v) => { setType(v); setCategory(v === "in" ? "Other Receipt" : "Rent"); }, [["in", "Cash In"], ["out", "Cash Out"]])}</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div><Label>{type === "out" ? "Expense Head" : "Category"}</Label><Select value={category} onChange={e => setCategory(e.target.value)} style={{ marginBottom: 0, padding: "8px 10px" }}>{type === "in" ? <option>Other Receipt</option> : <><option>Rent</option><option>Electricity</option></>}</Select></div>
+          <div><Label>Payment Mode</Label>{seg(paymentMode, setPaymentMode, [["Cash", "Cash"], ["Bank", "Bank"]], true)}</div>
+          <div><Label>Date</Label><Field type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={compactField} /></div>
+          <div><Label>Amount (₹)</Label><Field type="number" value={amount} placeholder="0" onChange={e => setAmount(e.target.value)} style={compactField} /></div>
+        </div>
+        <Label>Note (optional)</Label><Field value={note} onChange={e => setNote(e.target.value)} style={{ ...compactField, marginBottom: 14 }} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="ghost" onClick={resetManualForm} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+          <Btn onClick={addManual} style={{ flex: 2, justifyContent: "center" }}>{editingExpenseId ? <Save size={15} /> : <Plus size={15} />} {editingExpenseId ? "Update Entry" : "Add Entry"}</Btn>
+        </div>
+      </div>
+    </div>}
   </div>;
 }
 
