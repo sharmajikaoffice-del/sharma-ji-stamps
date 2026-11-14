@@ -1300,7 +1300,7 @@ function SharmaJiStampsAdmin() {
       {tab === "create" && <CreateStampTab rubbers={rubbers} initialOrder={orderToEdit} onOrderConsumed={() => setOrderToEdit(null)} onEditorActiveChange={setEditorActive} theme={theme} onThemeChange={setTheme} />}
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
-      {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} />}
+      {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} purchases={purchases} entries={entries} />}
       {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
       {tab === "purchase" && user.role === "admin" && <PurchaseTab rubbers={rubbers} purchases={purchases} refresh={refreshAll} />}
       {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} rubbers={rubbers} refresh={refreshAll} />}
@@ -5098,8 +5098,14 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
 }
 
 
-function StockTab({ rubbers, stockByRubber }) {
+function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
+  const [selectedItemId, setSelectedItemId] = useState(null);
   const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
+  const selectedItem = rubberOnly.find(r => r.id === selectedItemId);
+  const itemMovements = selectedItem ? [
+    ...purchases.filter(p => p.rubber_id === selectedItem.id).map(p => ({ id: `purchase-${p.id}`, date: p.date, direction: "IN", qty: Number(p.qty || 0), detail: "Purchase", amount: Number(p.total ?? p.amount ?? 0), payment: p.payment_mode || "Cash" })),
+    ...entries.filter(e => e.rubber_id === selectedItem.id).map(e => ({ id: `sale-${e.id}`, date: e.date, direction: "OUT", qty: 1, detail: "Sale / Used", amount: Number(e.amount || 0), payment: e.payment_mode || "Cash" }))
+  ].sort((a,b) => String(b.date).localeCompare(String(a.date))) : [];
   return (
     <div>
       <SectionTitle icon={Package} title="Stock Report" />
@@ -5117,10 +5123,10 @@ function StockTab({ rubbers, stockByRubber }) {
               const low = s.balance <= 15;
               return <tr key={r.id}>
                 <td style={{ ...tdStyle, padding: "10px 12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  <button onClick={() => setSelectedItemId(selectedItemId === r.id ? null : r.id)} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: 0, padding: 0, background: "transparent", color: C.ink, cursor: "pointer" }}>
                     {r.photo_url ? <img src={r.photo_url} alt={r.name} style={{ width: 34, height: 34, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <div style={{ width: 34, height: 34, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Stamp size={14} color={C.brass} /></div>}
-                    <div style={{ minWidth: 0 }}><div style={{ fontFamily: font.body, fontWeight: 650, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>{r.size && <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Size: {r.size}</div>}</div>
-                  </div>
+                    <div style={{ minWidth: 0 }}><div style={{ fontFamily: font.body, fontWeight: 650, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>{r.size && <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Size: {r.size}</div>}<div style={{fontSize:9,color:C.brass,marginTop:2}}>View In / Out Register ↗</div></div>
+                  </button>
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>{inr(r.rate)}</td>
                 <td style={{ ...tdStyle, textAlign: "right", color: C.sage }}>+{s.purchased}</td><td style={{ ...tdStyle, textAlign: "right", color: C.stamp }}>−{s.used}</td><td style={{ ...tdStyle, textAlign: "right", fontWeight: 700, color: low ? C.stamp : C.ink }}>{low ? `${s.balance} ⚠` : s.balance}</td>
@@ -5130,6 +5136,27 @@ function StockTab({ rubbers, stockByRubber }) {
         </table>
         {rubberOnly.length === 0 && <EmptyNote text="No rubber items found." />}
       </div>
+      {selectedItem && <Card style={{marginTop:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
+          <div><div style={{fontWeight:800,fontSize:15}}>{selectedItem.name} — Item Register</div><div style={{fontSize:11,color:C.inkSoft}}>Opening: {Number(selectedItem.opening_stock || 0)} · Current stock: {(stockByRubber[selectedItem.id] || {}).balance ?? 0}</div></div>
+          <Btn variant="ghost" onClick={()=>setSelectedItemId(null)}>Close</Btn>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:10}}>
+          <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>TOTAL IN</div><div style={{fontWeight:800,fontSize:18,color:C.sage}}>{(stockByRubber[selectedItem.id] || {}).purchased || 0}</div></div>
+          <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>TOTAL OUT</div><div style={{fontWeight:800,fontSize:18,color:C.stamp}}>{(stockByRubber[selectedItem.id] || {}).used || 0}</div></div>
+          <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>CLOSING</div><div style={{fontWeight:800,fontSize:18}}>{(stockByRubber[selectedItem.id] || {}).balance || 0}</div></div>
+        </div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:480}}>
+            <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Type</th><th style={{...thStyle,textAlign:"right"}}>Qty</th><th style={thStyle}>Details</th><th style={{...thStyle,textAlign:"right"}}>Amount</th><th style={thStyle}>Mode</th></tr></thead>
+            <tbody>
+              <tr><td style={tdStyle}>—</td><td style={{...tdStyle,color:C.brass}}>OPENING</td><td style={{...tdStyle,textAlign:"right"}}>{Number(selectedItem.opening_stock || 0)}</td><td style={tdStyle}>Opening Stock</td><td style={{...tdStyle,textAlign:"right"}}>—</td><td style={tdStyle}>—</td></tr>
+              {itemMovements.map(m=><tr key={m.id}><td style={tdStyle}>{fmtDate(m.date)}</td><td style={{...tdStyle,color:m.direction==="IN"?C.sage:C.stamp,fontWeight:800}}>{m.direction}</td><td style={{...tdStyle,textAlign:"right"}}>{m.qty}</td><td style={tdStyle}>{m.detail}</td><td style={{...tdStyle,textAlign:"right"}}>{inr(m.amount)}</td><td style={tdStyle}>{m.payment}</td></tr>)}
+              {itemMovements.length===0 && <tr><td colSpan={6} style={{...tdStyle,textAlign:"center",padding:16}}>No purchase or sale movements found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>}
     </div>
   );
 }
@@ -5296,7 +5323,8 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const monthExpenses = cashManual.filter(e => e.type === "out" && String(e.date || "").slice(0, 7) === reportMonth);
   const monthlyRent = monthExpenses.filter(e => String(e.category || "").toLowerCase() === "rent").reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthlyElectricity = monthExpenses.filter(e => String(e.category || "").toLowerCase() === "electricity").reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const monthlyTotalExpense = monthlyRent + monthlyElectricity;
+  const monthlyPurchase = purchases.filter(p => String(p.date || "").slice(0, 7) === reportMonth).reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0);
+  const monthlyTotalExpense = monthlyRent + monthlyElectricity + monthlyPurchase;
   const monthlyNet = monthlyTotalSale - monthlyTotalExpense;
 
   const cashSales = entries.filter(e => (e.payment_mode || "Cash") === "Cash");
@@ -5351,13 +5379,14 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
       <div style={{marginTop:12,borderTop:`1px solid ${C.line}`,paddingTop:10}}>
         <div style={{fontWeight:750,fontSize:13,marginBottom:8}}>Expenses</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:8}}>
+          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>PURCHASE</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyPurchase)}</div></div>
           <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>RENT</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyRent)}</div></div>
           <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>ELECTRICITY</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyElectricity)}</div></div>
           <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>TOTAL EXPENSE</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyTotalExpense)}</div></div>
         </div>
       </div>
       <div style={{marginTop:10,padding:"12px 14px",borderRadius:9,background:monthlyNet>=0?"#EAF4E8":"#FBEAE7",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-        <div style={{fontWeight:800,fontSize:13}}>SALE − RENT − ELECTRICITY</div><div style={{fontWeight:900,fontSize:21,color:monthlyNet>=0?"#2D7A35":"#B42318"}}>{inr(monthlyNet)}</div>
+        <div style={{fontWeight:800,fontSize:13}}>SALE − PURCHASE − RENT − ELECTRICITY</div><div style={{fontWeight:900,fontSize:21,color:monthlyNet>=0?"#2D7A35":"#B42318"}}>{inr(monthlyNet)}</div>
       </div>
     </Card>
     <Card style={{marginBottom:12}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:10,alignItems:"end"}}><div><Label>From Date</Label><Field type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={{marginBottom:0}}/></div><div><Label>To Date</Label><Field type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={{marginBottom:0}}/></div><Btn variant="ghost" onClick={()=>{setFromDate("");setToDate(todayISO())}}>Reset</Btn></div></Card>
