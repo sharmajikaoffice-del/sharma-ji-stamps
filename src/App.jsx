@@ -3631,6 +3631,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // text behavior continues to use its existing rendering/layouts.
   const ADD_TEXT_LAYOUTS = [
     { id: "center", label: "Center" },
+    { id: "topArc", label: "Top Arc" },
+    { id: "bottomArc", label: "Bottom Arc" },
   ];
   const TRIANGLE_TEXT_LAYOUTS = [
     { id: "bottom", label: "Bottom" },
@@ -3828,22 +3830,24 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <button
                 key={opt.id}
                 type="button"
+                title={opt.label}
+                aria-label={opt.label}
                 onClick={() => updateLayer(layer.id, layoutPatch(opt.id))}
                 style={{
                   border: `1px solid ${active ? STAMP_INK_BLUE : C.line}`,
                   background: active ? C.paperDark : C.white,
                   borderRadius: 8,
-                  padding: "10px 4px 8px",
+                  padding: "8px 4px",
+                  minHeight: 38,
                   cursor: "pointer",
                   display: "flex",
-                  flexDirection: "column",
                   alignItems: "center",
-                  gap: 6,
+                  justifyContent: "center",
                   fontFamily: font.body,
                 }}
               >
                 <LayoutIcon id={opt.id} active={active} />
-                <span style={{ fontSize: 10.5, color: active ? STAMP_INK_BLUE : C.inkSoft, fontWeight: active ? 700 : 500 }}>{opt.label}</span>
+
               </button>
             );
           })}
