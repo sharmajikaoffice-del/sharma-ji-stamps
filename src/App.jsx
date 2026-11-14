@@ -3798,26 +3798,23 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         )}
 
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button type="button" onClick={() => updateLayer(layer.id, { bold: !layer.bold })} title="Bold"
-            style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 8, background: layer.bold ? STAMP_INK_BLUE : C.white, color: layer.bold ? C.white : C.ink, fontWeight: 700, padding: "9px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button type="button" onClick={() => updateLayer(layer.id, { bold: !layer.bold })} title="Bold" aria-label="Bold"
+            style={{ flex: 1, height: 44, border: `1px solid ${C.line}`, borderRadius: 8, background: layer.bold ? STAMP_INK_BLUE : C.white, color: layer.bold ? C.white : C.ink, fontWeight: 800, fontSize: 16, padding: "9px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             B
           </button>
-          <button type="button" onClick={() => updateLayer(layer.id, { fontStyle: layer.fontStyle === "italic" ? "normal" : "italic" })} title="Italic"
-            style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 8, background: layer.fontStyle === "italic" ? STAMP_INK_BLUE : C.white, color: layer.fontStyle === "italic" ? C.white : C.ink, padding: "9px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button type="button" onClick={() => updateLayer(layer.id, { invert: !layer.invert })} title="Invert text" aria-label="Invert text" aria-pressed={!!layer.invert}
+            style={{ flex: 1, height: 44, border: `1px solid ${layer.invert ? STAMP_INK_BLUE : C.line}`, borderRadius: 8, background: layer.invert ? C.paperDark : C.white, color: C.ink, padding: "7px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ width: 25, height: 25, borderRadius: 3, background: "#000", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Arial, sans-serif", fontSize: 19, fontWeight: 800, lineHeight: 1 }}>A</span>
+          </button>
+          <button type="button" onClick={() => updateLayer(layer.id, { fontStyle: layer.fontStyle === "italic" ? "normal" : "italic" })} title="Italic" aria-label="Italic"
+            style={{ flex: 1, height: 44, border: `1px solid ${C.line}`, borderRadius: 8, background: layer.fontStyle === "italic" ? STAMP_INK_BLUE : C.white, color: layer.fontStyle === "italic" ? C.white : C.ink, padding: "9px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <ItalicIcon size={15} />
           </button>
-          <button type="button" onClick={() => updateLayer(layer.id, { tall: !layer.tall })} title="Text height"
-            style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 8, background: layer.tall ? STAMP_INK_BLUE : C.white, color: layer.tall ? C.white : C.ink, padding: "9px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button type="button" onClick={() => updateLayer(layer.id, { tall: !layer.tall })} title="Text height" aria-label="Text height"
+            style={{ flex: 1, height: 44, border: `1px solid ${C.line}`, borderRadius: 8, background: layer.tall ? STAMP_INK_BLUE : C.white, color: layer.tall ? C.white : C.ink, padding: "9px 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <MoveVertical size={15} />
           </button>
         </div>
-
-        {(
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.ink, cursor: "pointer", marginBottom: 16 }}>
-            <input type="checkbox" checked={!!layer.invert} onChange={(e) => updateLayer(layer.id, { invert: e.target.checked })} />
-            Invert (solid box behind text, like a "CERTIFIED" banner)
-          </label>
-        )}
 
         <Label>Text layout</Label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 16 }}>
