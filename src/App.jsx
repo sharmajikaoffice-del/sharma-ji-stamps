@@ -5,7 +5,8 @@ import {
   Wand2, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Type, Star, X, Upload,
   Palette,
   Italic as ItalicIcon, MoveVertical, Square, Triangle, Eye, EyeOff, Printer, Inbox, Check, MoreHorizontal, Lock, Unlock, Save, Sun, Moon,
-  LayoutDashboard
+  LayoutDashboard, AlignLeft, AlignCenter, AlignRight,
+  AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd
 } from "lucide-react";
 
 /* Preloaded symbol PNGs — ready-made icons users can drop onto a stamp
@@ -3857,14 +3858,38 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             const curV = vs.findIndex(([, v]) => near(activeLayer.y ?? 50, alignTextY(activeLayer, v)));
             return (
               <div className="sjs-mobile-hidden-text-alignment">
-                <Label>Alignment (tap to change)</Label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
-                  <button type="button" title="Horizontal: Left → Center → Right" onClick={() => alignLayer(activeLayer.id, "x", hs[(curH + 1) % 3][1])} style={{ padding: "9px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                    ↔ {curH >= 0 ? hs[curH][0] : "Left / Center / Right"}
-                  </button>
-                  <button type="button" title="Vertical: Up → Center → Down" onClick={() => alignLayer(activeLayer.id, "y", vs[(curV + 1) % 3][1])} style={{ padding: "9px 4px", border: `1px solid ${C.line}`, borderRadius: 7, background: C.white, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                    ↕ {curV >= 0 ? vs[curV][0] : "Up / Center / Down"}
-                  </button>
+                <Label>Text Alignment</Label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: C.inkSoft, marginBottom: 6 }}>HORIZONTAL</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 4 }}>
+                      {[
+                        { value: 10, Icon: AlignLeft, label: "Left" },
+                        { value: 50, Icon: AlignCenter, label: "Center" },
+                        { value: 90, Icon: AlignRight, label: "Right" },
+                      ].map(({ value, Icon, label }) => {
+                        const selected = curH >= 0 && curH === [10, 50, 90].indexOf(value);
+                        return <button key={label} type="button" title={label} aria-label={`Horizontal align ${label}`} aria-pressed={selected} onClick={() => alignLayer(activeLayer.id, "x", value)} style={{ minWidth: 0, height: 38, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${selected ? STAMP_INK_BLUE : C.line}`, borderRadius: 7, background: selected ? C.paperDark : C.white, color: selected ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer" }}>
+                          <Icon size={18} strokeWidth={2} />
+                        </button>;
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: C.inkSoft, marginBottom: 6 }}>VERTICAL</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 4 }}>
+                      {[
+                        { value: 10, Icon: AlignVerticalJustifyStart, label: "Up" },
+                        { value: 50, Icon: AlignVerticalJustifyCenter, label: "Center" },
+                        { value: 90, Icon: AlignVerticalJustifyEnd, label: "Down" },
+                      ].map(({ value, Icon, label }) => {
+                        const selected = curV >= 0 && curV === [10, 50, 90].indexOf(value);
+                        return <button key={label} type="button" title={label} aria-label={`Vertical align ${label}`} aria-pressed={selected} onClick={() => alignLayer(activeLayer.id, "y", value)} style={{ minWidth: 0, height: 38, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${selected ? STAMP_INK_BLUE : C.line}`, borderRadius: 7, background: selected ? C.paperDark : C.white, color: selected ? STAMP_INK_BLUE : C.inkSoft, cursor: "pointer" }}>
+                          <Icon size={18} strokeWidth={2} />
+                        </button>;
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
