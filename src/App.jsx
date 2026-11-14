@@ -2513,8 +2513,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const loadTemplates = async () => {
     setTemplatesLoading(true);
     try {
-      const rows = await dbGet("stamp_templates");
-      setTemplates(rows);
+      const rows = customerMode
+        ? await fetch("/api/customer-templates").then(async (response) => {
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.error || "Templates could not be loaded.");
+            return data;
+          })
+        : await dbGet("stamp_templates");
+      setTemplates(Array.isArray(rows) ? rows : []);
       setTemplatesError("");
     } catch {
       setTemplatesError("Couldn't load saved templates — run the stamp_templates SQL in Supabase first.");
@@ -4822,10 +4828,8 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : (
           <Card id="mobile-stamp-submit" style={{ marginBottom: 24 }}>
             <div style={{ fontWeight: 750, fontSize: 17, marginBottom: 6 }}>Template</div>
-            {!customerMode && <Btn onClick={() => {
-              const canvas = canvasRef.current;
-              if (!canvas) { window.print(); return; }
-              const dataUrl = canvas.toDataURL("image/png");
+            {!customerMode && <Btn onClick={async () => {
+              const { dataUrl } = await generateStampJpegDataUrl(600);
               const printWidthMm = Math.max(1, Number(selectedDimensions.widthMm) || 38);
               const printHeightMm = Math.max(1, Number(selectedDimensions.heightMm) || 25);
               const printWindow = window.open("", "_blank");
