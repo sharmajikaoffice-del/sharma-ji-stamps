@@ -5284,7 +5284,20 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [note, setNote] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState(todayISO());
+  const [reportMonth, setReportMonth] = useState(todayISO().slice(0, 7));
   const [errMsg, setErrMsg] = useState("");
+
+  // Monthly turnover includes both payment channels; the cash ledger below
+  // continues to include only actual cash receipts and cash payments.
+  const monthEntries = entries.filter(e => String(e.date || "").slice(0, 7) === reportMonth);
+  const monthlyCashSale = monthEntries.filter(e => (e.payment_mode || "Cash") !== "Bank").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthlyBankSale = monthEntries.filter(e => e.payment_mode === "Bank").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthlyTotalSale = monthlyCashSale + monthlyBankSale;
+  const monthExpenses = cashManual.filter(e => e.type === "out" && String(e.date || "").slice(0, 7) === reportMonth);
+  const monthlyRent = monthExpenses.filter(e => String(e.category || "").toLowerCase() === "rent").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthlyElectricity = monthExpenses.filter(e => String(e.category || "").toLowerCase() === "electricity").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthlyTotalExpense = monthlyRent + monthlyElectricity;
+  const monthlyNet = monthlyTotalSale - monthlyTotalExpense;
 
   const cashSales = entries.filter(e => (e.payment_mode || "Cash") === "Cash");
   const cashPurchases = purchases.filter(p => (p.payment_mode || "Cash") === "Cash");
@@ -5325,13 +5338,35 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
 
   return <div>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,paddingBottom:10,borderBottom:`2px solid ${C.headerGreen}`,gap:8}}><SectionTitle icon={Wallet} title="Cash Register" bare/><Btn variant="ghost" onClick={exportCSV} style={{padding:"6px 10px",fontSize:11.5}}><Download size={13}/> Export</Btn></div>
+    <Card style={{marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:12}}>
+        <div style={{fontWeight:800,fontSize:15}}>Monthly Sale & Expense Summary</div>
+        <div style={{minWidth:170}}><Label>Report Month</Label><Field type="month" value={reportMonth} onChange={e=>setReportMonth(e.target.value)} style={{marginBottom:0}}/></div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:8}}>
+        <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>CASH SALE</div><div style={{fontSize:20,fontWeight:800,marginTop:4}}>{inr(monthlyCashSale)}</div></div>
+        <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>BANK SALE</div><div style={{fontSize:20,fontWeight:800,marginTop:4}}>{inr(monthlyBankSale)}</div></div>
+        <div style={{background:C.ink,color:C.white,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:"#DCE9FF"}}>TOTAL SALE</div><div style={{fontSize:20,fontWeight:800,marginTop:4}}>{inr(monthlyTotalSale)}</div></div>
+      </div>
+      <div style={{marginTop:12,borderTop:`1px solid ${C.line}`,paddingTop:10}}>
+        <div style={{fontWeight:750,fontSize:13,marginBottom:8}}>Expenses</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:8}}>
+          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>RENT</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyRent)}</div></div>
+          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>ELECTRICITY</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyElectricity)}</div></div>
+          <div style={{background:C.paperDark,borderRadius:9,padding:11}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>TOTAL EXPENSE</div><div style={{fontSize:19,fontWeight:800,marginTop:4}}>{inr(monthlyTotalExpense)}</div></div>
+        </div>
+      </div>
+      <div style={{marginTop:10,padding:"12px 14px",borderRadius:9,background:monthlyNet>=0?"#EAF4E8":"#FBEAE7",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+        <div style={{fontWeight:800,fontSize:13}}>SALE − RENT − ELECTRICITY</div><div style={{fontWeight:900,fontSize:21,color:monthlyNet>=0?"#2D7A35":"#B42318"}}>{inr(monthlyNet)}</div>
+      </div>
+    </Card>
     <Card style={{marginBottom:12}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:10,alignItems:"end"}}><div><Label>From Date</Label><Field type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} style={{marginBottom:0}}/></div><div><Label>To Date</Label><Field type="date" value={toDate} onChange={e=>setToDate(e.target.value)} style={{marginBottom:0}}/></div><Btn variant="ghost" onClick={()=>{setFromDate("");setToDate(todayISO())}}>Reset</Btn></div></Card>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10,marginBottom:12}}>
       <Card style={{background:C.ink,color:C.white}}><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:"#DCE9FF"}}>CURRENT CASH BALANCE</div><div style={{fontFamily:font.display,fontWeight:700,fontSize:28,marginTop:4}}>{inr(currentBalance)}</div></Card>
       <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH IN</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredIn)}</div></Card>
       <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH OUT</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredOut)}</div></Card>
     </div>
-    <Card><Label>Add Cash Entry</Label>{errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}<div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>setType("in")} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>setType("out")} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>Category</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<option>Other Expense</option>}</Select><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}><Plus size={16}/> Add Entry</Btn></Card>
+    <Card><Label>Add Cash Entry</Label>{errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}<div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>{setType("in");setCategory("Other Receipt");}} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>{setType("out");setCategory("Rent");}} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>{type==="out"?"Expense Head":"Category"}</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<><option>Rent</option><option>Electricity</option></>}</Select><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}><Plus size={16}/> Add Entry</Btn></Card>
     <Label>Transactions</Label>
     {(() => { const groups=[]; shown.slice(0,100).forEach(t=>{const last=groups[groups.length-1];if(last&&last.date===t.date)last.items.push(t);else groups.push({date:t.date,items:[t]});}); return groups.map(g=><div key={g.date}><div style={{fontFamily:font.mono,fontSize:10.5,fontWeight:700,color:C.brass,textTransform:"uppercase",letterSpacing:1,margin:"16px 0 6px"}}>{fmtDate(g.date)}</div>{g.items.map(t=><Card key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0,overflow:"hidden"}}><div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.label}</div></div><div style={{textAlign:"right",flexShrink:0}}><div style={{fontFamily:font.mono,fontWeight:700,color:t.type==="in"?C.sage:C.stamp}}>{t.type==="in"?"+":"−"}{inr(t.amount)}</div><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,marginTop:2}}>Bal: {inr(t.balanceAfter)}</div></div></Card>)}</div>); })()}
     {shown.length===0 && <EmptyNote text="No cash transactions for the selected dates."/>}
