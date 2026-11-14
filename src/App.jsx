@@ -3864,7 +3864,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             const curH = hs.findIndex(([, v]) => near(activeLayer.x ?? 50, alignTextX(activeLayer, v)));
             const curV = vs.findIndex(([, v]) => near(activeLayer.y ?? 50, alignTextY(activeLayer, v)));
             return (
-              <div className="sjs-mobile-hidden-text-alignment">
+              <div className="sjs-text-alignment-controls">
                 <Label>Text Alignment</Label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                   <div>
