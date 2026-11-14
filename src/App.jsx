@@ -56,6 +56,32 @@ async function uploadPhoto(file, folder) {
   return result.url;
 }
 
+/* ---------- printed stamps (suggestions for Stamp Entry) ---------- */
+const PRINTED_STAMPS_KEY = "sjs_printed_stamps_v1";
+function loadPrintedStamps() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(PRINTED_STAMPS_KEY) || "[]");
+    return Array.isArray(rows) ? rows : [];
+  } catch { return []; }
+}
+function savePrintedStamp(entry) {
+  try {
+    const next = [entry, ...loadPrintedStamps()].slice(0, 20);
+    localStorage.setItem(PRINTED_STAMPS_KEY, JSON.stringify(next));
+  } catch {
+    // Storage full: keep only the newest few and retry once.
+    try { localStorage.setItem(PRINTED_STAMPS_KEY, JSON.stringify([entry, ...loadPrintedStamps()].slice(0, 5))); } catch {}
+  }
+}
+function dataUrlToFile(dataUrl, filename) {
+  const [head, b64] = dataUrl.split(",");
+  const mime = (head.match(/data:(.*?);/) || [])[1] || "image/jpeg";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
+}
+
 /* ---------- design tokens ---------- */
 const THEME_PALETTES = {
   "green-olive": {
@@ -1726,11 +1752,43 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
 
+  // Printed designs from Create Stamp, suggested for this entry.
+  const [printed, setPrinted] = useState(() => loadPrintedStamps());
+  const [pickedPrintId, setPickedPrintId] = useState(null);
+  const [printDismissed, setPrintDismissed] = useState(false);
+  useEffect(() => { setPrinted(loadPrintedStamps()); }, []);
+
+  const suggestions = useMemo(() => {
+    const sameRubber = printed.filter((p) => p.rubberId && p.rubberId === rubberId);
+    const sameSize = printed.filter((p) => !sameRubber.includes(p) && p.size && rubber?.size && rubberSizeKey(p.size) === rubberSizeKey(rubber.size));
+    const rest = printed.filter((p) => !sameRubber.includes(p) && !sameSize.includes(p));
+    return [...sameRubber, ...sameSize, ...rest].slice(0, 8);
+  }, [printed, rubberId, rubber?.size]);
+  const pickedPrint = printed.find((p) => p.id === pickedPrintId) || null;
+
+  // If no image was uploaded by hand, auto-pick the latest matching printed
+  // design (same rubber, else same size) as the impression.
+  useEffect(() => {
+    if (photoFile || printDismissed) return;
+    const best = suggestions.find((p) => p.rubberId === rubberId)
+      || suggestions.find((p) => p.size && rubber?.size && rubberSizeKey(p.size) === rubberSizeKey(rubber.size));
+    setPickedPrintId(best ? best.id : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions, photoFile, printDismissed, rubberId]);
+
+  const pickPrinted = (p) => {
+    setPhotoFile(null); setPhotoPreview(null);
+    setPrintDismissed(false);
+    setPickedPrintId(p.id);
+    if (p.label && !remarks.trim()) setRemarks(p.label);
+  };
+
   const handlePhotoChange = (e) => {
   const file = e.target.files[0];
   if (!file) return;
   setPhotoFile(file);
   setPhotoPreview(URL.createObjectURL(file));
+  setPickedPrintId(null);
 };
 
   const save = async () => {
@@ -1739,8 +1797,9 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
     try {
       let image_url = null;
       if (photoFile) image_url = await uploadPhoto(photoFile, "entries");
+      else if (pickedPrint?.image) image_url = await uploadPhoto(dataUrlToFile(pickedPrint.image, `printed-${pickedPrint.id}.jpg`), "entries");
       await dbInsert("stamp_entries", { id: uid(), date, rubber_id: rubberId, mobile, qty: 1, rate: Number(rate || 0), discount: Number(discount || 0), amount, payment_mode: paymentMode, remarks, by_user: user.name, image_url });
-      setMobile(""); setDiscount(0); setPaymentMode("Cash"); setRemarks(""); setPhotoFile(null); setPhotoPreview(null);
+      setMobile(""); setDiscount(0); setPaymentMode("Cash"); setRemarks(""); setPhotoFile(null); setPhotoPreview(null); setPickedPrintId(null); setPrintDismissed(false); setPrinted(loadPrintedStamps());
       setSavedMsg(`Saved — Stock −1, ${paymentMode} In ${inr(amount)}`);
       await refresh();
       setTimeout(() => setSavedMsg(""), 2500);
@@ -1800,10 +1859,31 @@ function StampEntryTab({ rubbers, entries, refresh, user, initialFill, onFillCon
                 <Btn key={mode} variant={paymentMode === mode ? "solid" : "ghost"} onClick={() => setPaymentMode(mode)} style={{ flex: 1, justifyContent: "center" }}>{mode === "Cash" ? "💵 Cash" : "🏦 Bank"}</Btn>
               ))}
             </div>
+            {suggestions.length > 0 && !photoFile && (
+              <>
+                <Label>Suggested (printed templates)</Label>
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 10 }}>
+                  {suggestions.map((p) => (
+                    <button key={p.id} type="button" onClick={() => pickPrinted(p)} title={p.label || "Printed stamp"}
+                      style={{ flex: "0 0 auto", width: 96, padding: 4, borderRadius: 8, cursor: "pointer", background: "#fff", border: `2px solid ${pickedPrintId === p.id ? C.sage : C.line}` }}>
+                      <img src={p.image} alt={p.label || "Printed stamp"} style={{ width: "100%", height: 48, objectFit: "contain", display: "block" }} />
+                      <div style={{ fontFamily: font.mono, fontSize: 9, color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.label || fmtDate(p.printed_at)}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             <Label>Stamp Impression Image</Label>
             <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: "16px", textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 12, cursor: "pointer", overflow: "hidden" }}>
             {photoPreview ? (
             <img src={photoPreview} alt="Stamp impression" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+              ) : pickedPrint ? (
+            <div>
+              <img src={pickedPrint.image} alt="Printed impression" style={{ maxWidth: "100%", maxHeight: 160, borderRadius: 6 }} />
+              <div style={{ fontSize: 11, marginTop: 6 }}>Printed design auto-attached · tap to upload a different image</div>
+              <button type="button" onClick={(e) => { e.preventDefault(); setPickedPrintId(null); setPrintDismissed(true); }}
+                style={{ marginTop: 6, border: "none", background: "transparent", color: C.brass, textDecoration: "underline", cursor: "pointer", fontSize: 11 }}>Remove</button>
+            </div>
               ) : (
             "📷 Tap to capture / upload impression"
             )}
@@ -3130,6 +3210,25 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // impressions instead of wasting a whole sheet on a single print.
   // Uses the same 600dpi source as Download — 300dpi was soft/blurry once the
   // browser scaled the image up to the printer's actual resolution.
+  // Remember every printed design (small JPEG + label) so Stamp Entry can
+  // suggest it and attach its impression automatically.
+  const recordPrintedStamp = async () => {
+    if (customerMode) return;
+    try {
+      const { dataUrl: thumb } = await generateStampJpegDataUrl(200, 0.85);
+      const label = [topText, centerLine1, rectLine1, centerLine2, rectLine2, bottomText, rectLine3]
+        .map((t) => String(t || "").trim()).filter(Boolean).join(" ");
+      savePrintedStamp({
+        id: uid(),
+        label: label.slice(0, 80),
+        rubberId: selectedRubberId || null,
+        size: selectedRubber?.size || null,
+        image: thumb,
+        printed_at: new Date().toISOString(),
+      });
+    } catch (err) { console.warn("Could not record printed stamp", err); }
+  };
+
   const handlePrint = async () => {
     const sideChoice = window.prompt("Print position choose karein:\n1 = UP SIDE (0 to 2.92 inch)\n2 = DOWN SIDE (2.92 to 5.84 inch)", "1");
     if (sideChoice === null) return;
@@ -3149,6 +3248,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 
     const printWindow = window.open("", "_blank", "width=800,height=1000");
     if (!printWindow) return;
+    recordPrintedStamp();
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -4838,6 +4938,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               const printHeightMm = Math.max(1, Number(selectedDimensions.heightMm) || 25);
               const printWindow = window.open("", "_blank");
               if (!printWindow) { window.print(); return; }
+              recordPrintedStamp();
               printWindow.document.write(`<!doctype html><html><head><title>Stamp ${printWidthMm} x ${printHeightMm} mm</title><style>
                 @page{size:${printWidthMm}mm ${printHeightMm}mm;margin:0}
                 html,body{width:${printWidthMm}mm;height:${printHeightMm}mm;margin:0;padding:0;overflow:hidden}
