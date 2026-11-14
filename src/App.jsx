@@ -5101,7 +5101,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
 function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
   const [selectedItemId, setSelectedItemId] = useState(null);
   const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
-  const selectedItem = rubberOnly.find(r => r.id === selectedItemId);
+  const selectedItem = rubberOnly.find(r => String(r.id) === String(selectedItemId));
   const itemMovements = selectedItem ? [
     ...purchases.filter(p => p.rubber_id === selectedItem.id).map(p => ({ id: `purchase-${p.id}`, date: p.date, direction: "IN", qty: Number(p.qty || 0), detail: "Purchase", amount: Number(p.total ?? p.amount ?? 0), payment: p.payment_mode || "Cash" })),
     ...entries.filter(e => e.rubber_id === selectedItem.id).map(e => ({ id: `sale-${e.id}`, date: e.date, direction: "OUT", qty: 1, detail: "Sale / Used", amount: Number(e.amount || 0), payment: e.payment_mode || "Cash" }))
@@ -5121,11 +5121,11 @@ function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
             {rubberOnly.map((r) => {
               const s = stockByRubber[r.id] || { opening: 0, purchased: 0, used: 0, balance: 0 };
               const low = s.balance <= 15;
-              return <tr key={r.id}>
+              return <tr key={r.id} onClick={() => setSelectedItemId(String(selectedItemId) === String(r.id) ? null : r.id)} style={{ cursor: "pointer", background: String(selectedItemId) === String(r.id) ? C.paperDark : "transparent" }}>
                 <td style={{ ...tdStyle, padding: "10px 12px" }}>
-                  <button onClick={() => setSelectedItemId(selectedItemId === r.id ? null : r.id)} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: 0, padding: 0, background: "transparent", color: C.ink, cursor: "pointer" }}>
+                  <button onClick={(ev) => { ev.stopPropagation(); setSelectedItemId(String(selectedItemId) === String(r.id) ? null : r.id); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", border: 0, padding: 0, background: "transparent", color: C.ink, cursor: "pointer" }}>
                     {r.photo_url ? <img src={r.photo_url} alt={r.name} style={{ width: 34, height: 34, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} /> : <div style={{ width: 34, height: 34, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Stamp size={14} color={C.brass} /></div>}
-                    <div style={{ minWidth: 0 }}><div style={{ fontFamily: font.body, fontWeight: 650, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>{r.size && <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Size: {r.size}</div>}<div style={{fontSize:9,color:C.brass,marginTop:2}}>View In / Out Register ↗</div></div>
+                    <div style={{ minWidth: 0 }}><div style={{ fontFamily: font.body, fontWeight: 650, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>{r.size && <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Size: {r.size}</div>}<div style={{fontSize:10,color:C.brass,marginTop:3,fontWeight:700}}>Click row to open In / Out Register ↗</div></div>
                   </button>
                 </td>
                 <td style={{ ...tdStyle, textAlign: "right", fontWeight: 700 }}>{inr(r.rate)}</td>
@@ -5322,9 +5322,16 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const monthlyCashSale = monthEntries.filter(e => (e.payment_mode || "Cash") !== "Bank").reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthlyBankSale = monthEntries.filter(e => e.payment_mode === "Bank").reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthlyTotalSale = monthlyCashSale + monthlyBankSale;
+  const expenseHead = (row) => {
+    const categoryText = String(row.category || "").trim().toLowerCase();
+    const noteText = String(row.note || "").trim().toLowerCase();
+    if (categoryText === "rent" || noteText === "rent" || noteText.includes("rent")) return "Rent";
+    if (categoryText === "electricity" || noteText.includes("electricity") || noteText.includes(" बिजली")) return "Electricity";
+    return row.category && row.category !== "Other Receipt" ? row.category : "Other Expense";
+  };
   const monthExpenses = cashManual.filter(e => e.type === "out" && String(e.date || "").slice(0, 7) === reportMonth);
-  const monthlyRent = monthExpenses.filter(e => String(e.category || "").toLowerCase() === "rent").reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const monthlyElectricity = monthExpenses.filter(e => String(e.category || "").toLowerCase() === "electricity").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthlyRent = monthExpenses.filter(e => expenseHead(e) === "Rent").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthlyElectricity = monthExpenses.filter(e => expenseHead(e) === "Electricity").reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthlyPurchase = purchases.filter(p => String(p.date || "").slice(0, 7) === reportMonth).reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0);
   const monthlyTotalExpense = monthlyRent + monthlyElectricity + monthlyPurchase;
   const monthlyNet = monthlyTotalSale - monthlyTotalExpense;
@@ -5353,7 +5360,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const allTxns = [
     ...cashSales.map(e => { const r=rubbers.find(r=>r.id===e.rubber_id); return {id:`sale-${e.id}`,date:e.date,label:`${r?.name||"Unknown Item"} - Sale`,type:"in",amount:Number(e.amount||0),payment_mode:"Cash"}; }),
     ...purchaseSingleEntries,
-    ...cashManual.map(c => ({id:`manual-${c.id}`,manualId:c.id,date:c.date,label:c.category,type:c.type,amount:Number(c.amount||0),note:c.note||"",payment_mode:"Cash"}))
+    ...cashManual.map(c => ({id:`manual-${c.id}`,manualId:c.id,date:c.date,label:c.type === "out" ? expenseHead(c) : (c.category || "Other Receipt"),type:c.type,amount:Number(c.amount||0),note:c.note||"",payment_mode:"Cash"}))
   ].sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
 
   let running=0;
@@ -5376,7 +5383,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const startEditExpense = (txn) => {
     const row = cashManual.find(c => c.id === txn.manualId);
     if (!row || row.type !== "out") return;
-    setEditingExpenseId(row.id); setType("out"); setCategory(row.category || "Rent");
+    setEditingExpenseId(row.id); setType("out"); setCategory(expenseHead(row) === "Other Expense" ? "Rent" : expenseHead(row));
     setAmount(String(row.amount ?? "")); setNote(row.note || ""); setEntryDate(row.date || todayISO());
     setErrMsg("");
     document.getElementById("cash-expense-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
