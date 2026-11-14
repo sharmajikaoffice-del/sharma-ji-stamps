@@ -1847,11 +1847,13 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   const canvasRef = useRef(null);
   const logoInputRef = useRef(null);
   const [view, setView] = useState(() => {
+    if (customerMode) return "templates";
     try { return localStorage.getItem("sjs_create_view") === "editor" ? "editor" : "templates"; } catch { return "templates"; }
   }); // "templates" | "editor"
   useEffect(() => {
+    if (customerMode) return;
     try { localStorage.setItem("sjs_create_view", view); } catch {}
-  }, [view]);
+  }, [view, customerMode]);
   const [designStartTab, setDesignStartTab] = useState("templates"); // "templates" | "recent"
   // Let the app shell know when the full-screen editor (with its own top
   // toolbar and bottom Layer/Edit/Size/Submit bar) is open, so it can hide
