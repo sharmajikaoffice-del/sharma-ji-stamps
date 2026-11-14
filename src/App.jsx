@@ -5309,6 +5309,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [category, setCategory] = useState("Other Receipt");
   const [amount, setAmount] = useState(0);
   const [note, setNote] = useState("");
+  const [paymentMode, setPaymentMode] = useState("Cash");
   const [entryDate, setEntryDate] = useState(todayISO());
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [fromDate, setFromDate] = useState("");
@@ -5360,21 +5361,26 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const allTxns = [
     ...cashSales.map(e => { const r=rubbers.find(r=>r.id===e.rubber_id); return {id:`sale-${e.id}`,date:e.date,label:`${r?.name||"Unknown Item"} - Sale`,type:"in",amount:Number(e.amount||0),payment_mode:"Cash"}; }),
     ...purchaseSingleEntries,
-    ...cashManual.map(c => ({id:`manual-${c.id}`,manualId:c.id,date:c.date,label:c.type === "out" ? expenseHead(c) : (c.category || "Other Receipt"),type:c.type,amount:Number(c.amount||0),note:c.note||"",payment_mode:"Cash"}))
+    ...cashManual.map(c => ({id:`manual-${c.id}`,manualId:c.id,date:c.date,label:c.type === "out" ? expenseHead(c) : (c.category || "Other Receipt"),type:c.type,amount:Number(c.amount||0),note:c.note||"",payment_mode:c.payment_mode || "Cash"}))
   ].sort((a,b)=>a.date.localeCompare(b.date)||String(a.id).localeCompare(String(b.id)));
 
-  let running=0;
-  const txnsWithBalance=allTxns.map(t=>{running += t.type === "in" ? t.amount : -t.amount; return {...t,balanceAfter:running};});
+  let runningCash=0, runningBank=0;
+  const txnsWithBalance=allTxns.map(t=>{
+    const isBank = t.payment_mode === "Bank";
+    if (isBank) runningBank += t.type === "in" ? t.amount : -t.amount;
+    else runningCash += t.type === "in" ? t.amount : -t.amount;
+    return {...t,balanceAfter:isBank?runningBank:runningCash};
+  });
   const shown=txnsWithBalance.filter(t=>inRange(t.date)).reverse();
-  const currentBalance=running;
-  const filteredIn=shown.reduce((s,t)=>s+(t.type==="in"?t.amount:0),0);
-  const filteredOut=shown.reduce((s,t)=>s+(t.type==="out"?t.amount:0),0);
+  const currentBalance=runningCash;
+  const filteredIn=shown.filter(t=>t.payment_mode!=="Bank").reduce((s,t)=>s+(t.type==="in"?t.amount:0),0);
+  const filteredOut=shown.filter(t=>t.payment_mode!=="Bank").reduce((s,t)=>s+(t.type==="out"?t.amount:0),0);
 
-  const resetManualForm = () => { setEditingExpenseId(null); setType("in"); setCategory("Other Receipt"); setAmount(0); setNote(""); setEntryDate(todayISO()); };
+  const resetManualForm = () => { setEditingExpenseId(null); setType("in"); setCategory("Other Receipt"); setAmount(0); setNote(""); setPaymentMode("Cash"); setEntryDate(todayISO()); };
   const addManual = async () => {
     if (!amount || Number(amount) <= 0 || !entryDate) { setErrMsg("Date aur valid amount enter karein."); return; }
     try {
-      const payload = { date: entryDate, type, category, amount: Number(amount), note };
+      const payload = { date: entryDate, type, category, amount: Number(amount), note, payment_mode: paymentMode };
       if (editingExpenseId) await dbUpdate("cash_manual", editingExpenseId, payload);
       else await dbInsert("cash_manual", { id: uid(), ...payload });
       resetManualForm(); setErrMsg(""); await refresh();
@@ -5384,7 +5390,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
     const row = cashManual.find(c => c.id === txn.manualId);
     if (!row || row.type !== "out") return;
     setEditingExpenseId(row.id); setType("out"); setCategory(expenseHead(row) === "Other Expense" ? "Rent" : expenseHead(row));
-    setAmount(String(row.amount ?? "")); setNote(row.note || ""); setEntryDate(row.date || todayISO());
+    setAmount(String(row.amount ?? "")); setNote(row.note || ""); setPaymentMode(row.payment_mode || "Cash"); setEntryDate(row.date || todayISO());
     setErrMsg("");
     document.getElementById("cash-expense-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
@@ -5421,9 +5427,9 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
       <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH IN</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredIn)}</div></Card>
       <Card><div style={{fontFamily:font.mono,fontSize:10,letterSpacing:1.5,color:C.inkSoft}}>SELECTED CASH OUT</div><div style={{fontFamily:font.display,fontWeight:800,fontSize:25,marginTop:4}}>{inr(filteredOut)}</div></Card>
     </div>
-    <Card><div id="cash-expense-form" style={{fontWeight:800,marginBottom:10}}>{editingExpenseId ? "Edit Expense" : "Add Cash Entry"}</div>{errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}<div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>{if(editingExpenseId)return;setType("in");setCategory("Other Receipt");}} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>{if(editingExpenseId)return;setType("out");setCategory("Rent");}} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>{type==="out"?"Expense Head":"Category"}</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<><option>Rent</option><option>Electricity</option></>}</Select><Label>Date</Label><Field type="date" value={entryDate} onChange={e=>setEntryDate(e.target.value)}/><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><div style={{display:"flex",gap:8}}><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}>{editingExpenseId?<Save size={16}/>:<Plus size={16}/>} {editingExpenseId?"Update Expense":"Add Entry"}</Btn>{editingExpenseId&&<Btn variant="ghost" onClick={resetManualForm}>Cancel</Btn>}</div></Card>
+    <Card><div id="cash-expense-form" style={{fontWeight:800,marginBottom:10}}>{editingExpenseId ? "Edit Expense" : "Add Cash Entry"}</div>{errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}<div style={{display:"flex",gap:8,marginBottom:10}}><Btn variant={type==="in"?"solid":"ghost"} onClick={()=>{if(editingExpenseId)return;setType("in");setCategory("Other Receipt");}} style={{flex:1,justifyContent:"center"}}>Cash In</Btn><Btn variant={type==="out"?"solid":"ghost"} onClick={()=>{if(editingExpenseId)return;setType("out");setCategory("Rent");}} style={{flex:1,justifyContent:"center"}}>Cash Out</Btn></div><Label>{type==="out"?"Expense Head":"Category"}</Label><Select value={category} onChange={e=>setCategory(e.target.value)}>{type==="in"?<option>Other Receipt</option>:<><option>Rent</option><option>Electricity</option></>}</Select><Label>Payment Mode</Label><Select value={paymentMode} onChange={e=>setPaymentMode(e.target.value)}><option value="Cash">Cash</option><option value="Bank">Bank</option></Select><Label>Date</Label><Field type="date" value={entryDate} onChange={e=>setEntryDate(e.target.value)}/><Label>Amount (₹)</Label><Field type="number" value={amount} onChange={e=>setAmount(e.target.value)}/><Label>Note (optional)</Label><Field value={note} onChange={e=>setNote(e.target.value)}/><div style={{display:"flex",gap:8}}><Btn onClick={addManual} style={{width:"100%",justifyContent:"center"}}>{editingExpenseId?<Save size={16}/>:<Plus size={16}/>} {editingExpenseId?"Update Expense":"Add Entry"}</Btn>{editingExpenseId&&<Btn variant="ghost" onClick={resetManualForm}>Cancel</Btn>}</div></Card>
     <Label>Transactions</Label>
-    {(() => { const groups=[]; shown.slice(0,100).forEach(t=>{const last=groups[groups.length-1];if(last&&last.date===t.date)last.items.push(t);else groups.push({date:t.date,items:[t]});}); return groups.map(g=><div key={g.date}><div style={{fontFamily:font.mono,fontSize:10.5,fontWeight:700,color:C.brass,textTransform:"uppercase",letterSpacing:1,margin:"16px 0 6px"}}>{fmtDate(g.date)}</div>{g.items.map(t=><Card key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0,overflow:"hidden"}}><div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.label}</div>{t.note&&<div style={{fontSize:10.5,color:C.inkSoft,marginTop:3,overflow:"hidden",textOverflow:"ellipsis"}}>{t.note}</div>}</div><div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{textAlign:"right"}}><div style={{fontFamily:font.mono,fontWeight:700,color:t.type==="in"?C.sage:C.stamp}}>{t.type==="in"?"+":"−"}{inr(t.amount)}</div><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,marginTop:2}}>Bal: {inr(t.balanceAfter)}</div></div>{t.type==="out"&&t.manualId&&<button title="Edit expense" aria-label="Edit expense" onClick={()=>startEditExpense(t)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer",padding:5}}><PenSquare size={16}/></button>}</div></Card>)}</div>); })()}
+    {(() => { const groups=[]; shown.slice(0,100).forEach(t=>{const last=groups[groups.length-1];if(last&&last.date===t.date)last.items.push(t);else groups.push({date:t.date,items:[t]});}); return groups.map(g=><div key={g.date}><div style={{fontFamily:font.mono,fontSize:10.5,fontWeight:700,color:C.brass,textTransform:"uppercase",letterSpacing:1,margin:"16px 0 6px"}}>{fmtDate(g.date)}</div>{g.items.map(t=><Card key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}><div style={{minWidth:0,overflow:"hidden"}}><div style={{fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.label}</div>{t.note&&<div style={{fontSize:10.5,color:C.inkSoft,marginTop:3,overflow:"hidden",textOverflow:"ellipsis"}}>{t.note}</div>}</div><div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{textAlign:"right"}}><div style={{fontFamily:font.mono,fontWeight:700,color:t.type==="in"?C.sage:C.stamp}}>{t.type==="in"?"+":"−"}{inr(t.amount)}</div><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,marginTop:2}}>{t.payment_mode || "Cash"} Bal: {inr(t.balanceAfter)}</div></div>{t.type==="out"&&t.manualId&&<button title="Edit expense" aria-label="Edit expense" onClick={()=>startEditExpense(t)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer",padding:5}}><PenSquare size={16}/></button>}</div></Card>)}</div>); })()}
     {shown.length===0 && <EmptyNote text="No cash transactions for the selected dates."/>}
   </div>;
 }
