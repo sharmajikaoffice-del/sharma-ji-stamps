@@ -774,7 +774,9 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       const naturalRatio = layer.imageObj.naturalHeight && layer.imageObj.naturalWidth
         ? layer.imageObj.naturalHeight / layer.imageObj.naturalWidth
         : 1;
-      const ih = iw * naturalRatio;
+      const ih = layer.height != null
+        ? (Number(layer.height) / 100) * Math.min(size, canvasHeight)
+        : iw * naturalRatio;
       ctx.drawImage(layer.imageObj, -iw / 2, -ih / 2, iw, ih);
       ctx.restore();
     }
@@ -4042,7 +4044,19 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         </>
       ) : (
         <>
-          <SliderControl label="Image size" value={activeLayer.width ?? activeLayer.size ?? 75} min={5} max={250} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
+          <SliderControl label="Image width" value={activeLayer.width ?? activeLayer.size ?? 75} min={5} max={250} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { width: v })} />
+          <SliderControl
+            label="Image height"
+            value={activeLayer.height ?? ((activeLayer.width ?? activeLayer.size ?? 75) * (
+              activeLayer.imageObj?.naturalWidth && activeLayer.imageObj?.naturalHeight
+                ? activeLayer.imageObj.naturalHeight / activeLayer.imageObj.naturalWidth
+                : 1
+            ))}
+            min={5}
+            max={250}
+            step={0.5}
+            onChange={(v) => updateLayer(activeLayer.id, { height: v })}
+          />
           <SliderControl label="Horizontal position" value={activeLayer.x ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { x: v })} />
           <SliderControl label="Vertical position" value={activeLayer.y ?? 50} min={0} max={100} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { y: v })} />
           <SliderControl label="Rotation" value={activeLayer.rotation ?? 0} min={0} max={360} step={0.5} onChange={(v) => updateLayer(activeLayer.id, { rotation: v })} />
