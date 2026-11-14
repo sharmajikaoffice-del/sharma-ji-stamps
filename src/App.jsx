@@ -467,7 +467,7 @@ function drawStampOnCanvas(canvas, cfg, displaySize = STAMP_CANVAS_SIZE) {
       const weight = layer.bold ? 700 : 400;
       const style = layer.fontStyle === "italic" ? "italic " : "";
       const family = layer.fontFamily || "Arial";
-      const size = layer.fontSize ?? 13;
+      const size = layer.fontSize ?? 20;
       ctx.font = `${style}${weight} ${size}px ${family}`;
       const startAngle = (((layer.start ?? 90) - 90) * Math.PI) / 180;
       // "Flip text" for curved text means: read it round the other way along the
@@ -2121,7 +2121,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     const id = uid();
     let layer = { id, type, num };
     if (type === "circleText") {
-      layer = { ...layer, text: "YOUR COMPANY NAME", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 13, bold: false, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
+      layer = { ...layer, text: "YOUR COMPANY NAME", radius: 130, spacing: 4, start: 90, fontFamily: "Arial", fontSize: 20, bold: false, flipX: false, fontStyle: "normal", tall: false, invert: false, layout: "topArc" };
     } else if (type === "centerText") {
       const isFirstAddText = layers.length === 0;
       const isLandscapeStamp = Number(selectedDimensions.widthMm) > Number(selectedDimensions.heightMm);
@@ -2135,13 +2135,13 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         const first = {
           ...layer,
           id: firstId, num, source: "addText",
-          text: "For your company name pvt ltd", size: 13, fontFamily: "Arial", fontSize: 13,
+          text: "For your company name pvt ltd", size: 13, fontFamily: "Arial", fontSize: 20,
           bold: false, flipX: false, x: 50, y: 36, rotation: 0, fontStyle: "normal",
           tall: false, invert: false, layout: "center"
         };
         const second = {
           id: secondId, type: "centerText", num: num + 1, source: "addText",
-          text: "Auth. Sign.", size: 13, fontFamily: "Arial", fontSize: 13,
+          text: "Auth. Sign.", size: 13, fontFamily: "Arial", fontSize: 20,
           bold: false, flipX: false, x: 50, y: 64, rotation: 0, fontStyle: "normal",
           tall: false, invert: false, layout: "center"
         };
@@ -2186,14 +2186,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           const top = {
             id: uid(), type: "circleText", num: num + 1,
             text: "YOUR COMPANY NAME", radius: radius * 0.82, spacing: 4,
-            start: 90, fontFamily: "Arial", fontSize: 13, bold: true,
+            start: 90, fontFamily: "Arial", fontSize: 20, bold: true,
             flipX: false, fontStyle: "normal", tall: false, invert: false,
             layout: "topArc"
           };
           const bottom = {
             id: uid(), type: "circleText", num: num + 2,
             text: "YOUR ADDRESS", radius: radius * 0.82, spacing: 4,
-            start: 90, fontFamily: "Arial", fontSize: 13, bold: true,
+            start: 90, fontFamily: "Arial", fontSize: 20, bold: true,
             flipX: true, fontStyle: "normal", tall: false, invert: false,
             layout: "bottomArc"
           };
@@ -3714,8 +3714,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                 onChange={(e) => {
                   const raw = e.target.value;
                   if (raw === "") return;
-                  const v = Math.min(100, Math.max(5, Number(raw)));
-                  if (Number.isFinite(v)) updateLayer(layer.id, { fontSize: v, size: v });
+                  const v = Number(raw);
+                  if (Number.isFinite(v) && v <= 100) updateLayer(layer.id, { fontSize: v, size: v });
+                }}
+                onBlur={(e) => {
+                  const v = Math.min(100, Math.max(5, Number(e.target.value) || 5));
+                  updateLayer(layer.id, { fontSize: v, size: v });
                 }}
                 style={{ marginBottom: 0 }}
               />
@@ -3764,8 +3768,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
                   onChange={(e) => {
                     const raw = e.target.value;
                     if (raw === "") return;
-                    const v = Math.min(100, Math.max(5, Number(raw)));
-                    if (Number.isFinite(v)) updateLayer(layer.id, { fontSize: v, size: v });
+                    const v = Number(raw);
+                    if (Number.isFinite(v) && v <= 100) updateLayer(layer.id, { fontSize: v, size: v });
+                  }}
+                  onBlur={(e) => {
+                    const v = Math.min(100, Math.max(5, Number(e.target.value) || 5));
+                    updateLayer(layer.id, { fontSize: v, size: v });
                   }}
                   aria-label="Text size value"
                 />
