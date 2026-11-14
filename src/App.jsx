@@ -162,6 +162,8 @@ function ThemeSwatchPicker({ theme, onChange, compact, placement = "up" }) {
 }
 const uid = () => Math.random().toString(36).slice(2, 10);
 const todayISO = () => new Date().toISOString().slice(0, 10);
+// Ledger (Bank & Cash + Expense Ledger) opening date — 01-01-2026.
+const LEDGER_START = "2026-01-01";
 const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 const inr = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 // Compact axis label, e.g. ₹1.2L / ₹8.4k / ₹350 — used on chart y-axes so
@@ -5386,33 +5388,226 @@ function RubberTab({ rubbers, refresh, stockByRubber = {} }) {
 
 /* ================= PURCHASE ================= */
 function PurchaseTab({ rubbers, purchases, refresh }) {
-  const [date,setDate]=useState(todayISO()); const [paymentMode,setPaymentMode]=useState("Cash");
-  const [items,setItems]=useState([{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]); const [busy,setBusy]=useState(false); const [errMsg,setErrMsg]=useState("");
-  const [editId,setEditId]=useState(null); const [editRubberId,setEditRubberId]=useState(""); const [editQty,setEditQty]=useState(0); const [editRate,setEditRate]=useState(0); const [editDate,setEditDate]=useState(todayISO()); const [editPaymentMode,setEditPaymentMode]=useState("Cash"); const [editBusy,setEditBusy]=useState(false);
-  const addRow=()=>setItems([...items,{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]); const removeRow=(idx)=>setItems(items.filter((_,i)=>i!==idx)); const updateRow=(idx,patch)=>setItems(items.map((it,i)=>i===idx?{...it,...patch}:it));
-  const itemsAmount=items.reduce((s,it)=>s+Number(it.qty||0)*Number(it.purchaseRate||0),0);
-  const save=async()=>{const validItems=items.filter(it=>it.rubberId&&Number(it.qty)>0);if(!validItems.length||busy)return;setBusy(true);setErrMsg("");try{for(const it of validItems){const amount=Number(it.qty)*Number(it.purchaseRate||0);await dbInsert("purchases",{id:uid(),date,rubber_id:it.rubberId,qty:Number(it.qty),purchase_rate:Number(it.purchaseRate||0),amount,courier:0,total:amount,payment_mode:paymentMode});}setItems([{rubberId:rubbers[0]?.id||"",qty:"",purchaseRate:""}]);await refresh();}catch(err){setErrMsg(err.message||"Save failed — check connection.");}finally{setBusy(false);}};
-  const startEdit=(p)=>{setEditId(p.id);setEditRubberId(p.rubber_id);setEditQty(p.qty);setEditRate(p.purchase_rate);setEditPaymentMode(p.payment_mode||"Cash");setEditDate(p.date);};
-  const saveEdit=async()=>{if(!editRubberId||!editQty||editBusy)return;setEditBusy(true);setErrMsg("");try{const amount=Number(editQty)*Number(editRate||0);await dbUpdate("purchases",editId,{date:editDate,rubber_id:editRubberId,qty:Number(editQty),purchase_rate:Number(editRate||0),amount,courier:0,total:amount,payment_mode:editPaymentMode});setEditId(null);await refresh();}catch(err){setErrMsg(err.message||"Save failed — check connection.");}finally{setEditBusy(false);}};
-  const removePurchase=async(id)=>{try{await dbDelete("purchases",id);await refresh();}catch(err){setErrMsg(err.message||"Delete failed — check connection.");}};
-  const grouped=useMemo(()=>{const map=new Map();purchases.forEach(p=>{const key=p.date;if(!map.has(key))map.set(key,{date:key,items:[],total:0,modes:new Set()});const g=map.get(key);g.items.push(p);g.total+=Number(p.total??p.amount??0);g.modes.add(p.payment_mode||"Cash");});return [...map.values()].sort((a,b)=>new Date(b.date)-new Date(a.date));},[purchases]);
-  const exportCSV=()=>{const rows=[...purchases].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(p=>{const r=rubbers.find(r=>r.id===p.rubber_id);return{Date:fmtDate(p.date),"Payment Mode":p.payment_mode||"Cash","Category":r?.category||"rubber","Size":r?.category==="rubber"?(r?.size||""):"","Item Name":r?.name||"",Qty:p.qty,Rate:p.purchase_rate,Total:Number(p.total??p.amount??0)};});exportToCSV(`purchases-${todayISO()}.csv`,rows);};
-  const catLabel=(c)=>c==="machine"?"Machine":c==="raw"?"Raw":"Rubber";
-  const optionLabel=(r)=>`${r.name} · ${catLabel(r.category)}${r.category==="rubber"&&r.size?` · ${r.size}`:""}`;
-  return <div>
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,paddingBottom:10,borderBottom:`2px solid ${C.headerGreen}`,gap:8}}><SectionTitle icon={ShoppingCart} title="Purchase Entry" bare/><Btn variant="ghost" onClick={exportCSV} style={{padding:"6px 10px",fontSize:11.5,flexShrink:0}}><Download size={13}/> Export</Btn></div>
-    {errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
-    <Card><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}><div><Label>Date</Label><Field type="date" value={date} onChange={e=>setDate(e.target.value)} style={{marginBottom:0}}/></div><div><Label>Payment Mode</Label><div style={{display:"flex",gap:7}}><Btn variant={paymentMode==="Cash"?"solid":"ghost"} onClick={()=>setPaymentMode("Cash")} style={{flex:1,justifyContent:"center",padding:"9px 10px"}}>💵 Cash</Btn><Btn variant={paymentMode==="Bank"?"solid":"ghost"} onClick={()=>setPaymentMode("Bank")} style={{flex:1,justifyContent:"center",padding:"9px 10px"}}>🏦 Bank</Btn></div></div></div>
-      <div style={{display:"grid",gridTemplateColumns:"38px minmax(180px,1fr) 120px 140px 110px 34px",gap:8,alignItems:"center",padding:"8px 10px",background:C.paperDark,borderRadius:7,fontFamily:font.mono,fontSize:10,color:C.inkSoft,letterSpacing:.5}}><span>#</span><span>ITEM · CATEGORY · SIZE</span><span>QTY</span><span>RATE (₹)</span><span style={{textAlign:"right"}}>AMOUNT</span><span/></div>
-      {items.map((it,idx)=>{const rowAmount=Number(it.qty||0)*Number(it.purchaseRate||0);return <div key={idx} style={{display:"grid",gridTemplateColumns:"38px minmax(180px,1fr) 120px 140px 110px 34px",gap:8,alignItems:"center",padding:"9px 10px",borderBottom:`1px solid ${C.line}`}}><div style={{fontFamily:font.mono,fontWeight:700,color:C.inkSoft}}>{idx+1}</div><Select value={it.rubberId} onChange={e=>updateRow(idx,{rubberId:e.target.value})} style={{marginBottom:0}}>{rubbers.map(r=><option key={r.id} value={r.id}>{optionLabel(r)}</option>)}</Select><Field type="number" min="0" value={it.qty} onChange={e=>updateRow(idx,{qty:e.target.value})} placeholder="Qty" style={{marginBottom:0}}/><Field type="number" min="0" value={it.purchaseRate} onChange={e=>updateRow(idx,{purchaseRate:e.target.value})} placeholder="Rate" style={{marginBottom:0}}/><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:700}}>{inr(rowAmount)}</div>{items.length>1?<button onClick={()=>removeRow(idx)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={15}/></button>:<span/>}</div>})}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,gap:10,flexWrap:"wrap"}}><Btn variant="ghost" onClick={addRow}><Plus size={15}/> Add Item</Btn><div style={{textAlign:"right"}}><div style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft,letterSpacing:1}}>TOTAL</div><div style={{fontFamily:font.display,fontSize:24,fontWeight:800}}>{inr(itemsAmount)}</div></div></div><Btn onClick={save} disabled={busy} style={{width:"100%",justifyContent:"center",marginTop:12}}><Plus size={16}/> {busy?"Saving…":"Save Purchase"}</Btn>
-    </Card>
-    <Label>Purchase List</Label>
-    {grouped.slice(0,30).map(g=>{const mode=g.modes.size===1?[...g.modes][0]:"Mixed";return <Card key={g.date}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}><div><div style={{fontWeight:800,fontSize:14}}>{fmtDate(g.date)}</div><div style={{display:"inline-flex",marginTop:5,padding:"2px 8px",borderRadius:999,background:mode==="Bank"?C.paperDark:"#EEF8F1",color:mode==="Bank"?C.stampDark:"#2D7A4A",fontFamily:font.mono,fontSize:10,fontWeight:700}}>{mode==="Bank"?"🏦 BANK":mode==="Cash"?"💵 CASH":"CASH + BANK"}</div></div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:800,fontSize:15}}>{inr(g.total)}</div></div><div style={{borderTop:`1px solid ${C.line}`}}>{g.items.map((p,i)=>{const r=rubbers.find(r=>r.id===p.rubber_id);return editId===p.id?<div key={p.id} style={{padding:"10px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Date</Label><Field type="date" value={editDate} onChange={e=>setEditDate(e.target.value)}/></div><div><Label>Payment Mode</Label><div style={{display:"flex",gap:6}}><Btn variant={editPaymentMode==="Cash"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Cash")} style={{flex:1,justifyContent:"center"}}>Cash</Btn><Btn variant={editPaymentMode==="Bank"?"solid":"ghost"} onClick={()=>setEditPaymentMode("Bank")} style={{flex:1,justifyContent:"center"}}>Bank</Btn></div></div></div><Label>Item / Category / Size</Label><Select value={editRubberId} onChange={e=>setEditRubberId(e.target.value)}>{rubbers.map(rb=><option key={rb.id} value={rb.id}>{optionLabel(rb)}</option>)}</Select><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><Label>Qty</Label><Field type="number" value={editQty} onChange={e=>setEditQty(e.target.value)}/></div><div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={e=>setEditRate(e.target.value)}/></div></div><div style={{display:"flex",gap:8}}><Btn onClick={saveEdit} disabled={editBusy} style={{flex:1,justifyContent:"center"}}>{editBusy?"Saving…":"Save"}</Btn><Btn variant="ghost" onClick={()=>setEditId(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn></div></div>:<div key={p.id} style={{display:"grid",gridTemplateColumns:"32px minmax(160px,1fr) 80px 100px 110px 50px",gap:8,alignItems:"center",padding:"9px 0",borderBottom:i<g.items.length-1?`1px solid ${C.line}`:"none"}}><div style={{fontFamily:font.mono,color:C.inkSoft}}>{i+1}</div><div><div style={{fontWeight:600}}>{r?.name||"Unknown Item"}</div><div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:2}}><span style={{fontFamily:font.mono,fontSize:9,padding:"1px 6px",borderRadius:999,background:C.paperDark}}>{catLabel(r?.category)}</span>{r?.category==="rubber"&&r?.size&&<span style={{fontFamily:font.mono,fontSize:9,color:C.inkSoft}}>Size: {r.size}</span>}</div></div><div style={{fontFamily:font.mono}}>Qty {p.qty}</div><div style={{fontFamily:font.mono}}>₹{Number(p.purchase_rate||0).toFixed(2)}</div><div style={{textAlign:"right",fontFamily:font.mono,fontWeight:700}}>{inr(p.total??p.amount??0)}</div><div style={{display:"flex",gap:2,justifyContent:"flex-end"}}><button onClick={()=>startEdit(p)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer"}}><PenSquare size={15}/></button><button onClick={()=>removePurchase(p.id)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={15}/></button></div></div>})}</div><div style={{display:"flex",justifyContent:"flex-end",paddingTop:10,fontFamily:font.mono,fontWeight:800}}>TOTAL&nbsp;&nbsp; {inr(g.total)}</div></Card>})}
-    {purchases.length===0&&<EmptyNote text="No purchases recorded yet."/>}
-  </div>;
-}
+  const isDesktop = useIsDesktop();
+  const emptyRow = () => ({ rubberId: rubbers[0]?.id || "", qty: "", purchaseRate: "" });
+  const [q, setQ] = useState("");
+  const [modeFilter, setModeFilter] = useState("All");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [date, setDate] = useState(todayISO());
+  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [items, setItems] = useState([emptyRow()]);
+  const [busy, setBusy] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editRubberId, setEditRubberId] = useState("");
+  const [editQty, setEditQty] = useState("");
+  const [editRate, setEditRate] = useState("");
+  const [editDate, setEditDate] = useState(todayISO());
+  const [editPaymentMode, setEditPaymentMode] = useState("Cash");
 
+  const catLabel = (c) => c === "machine" ? "Machine" : c === "raw" ? "Raw" : "Rubber";
+  const optionLabel = (r) => `${r.name} · ${catLabel(r.category)}${r.category === "rubber" && r.size ? ` · ${r.size}` : ""}`;
+  const amountOf = (p) => Number(p.total ?? p.amount ?? 0);
+
+  const openAdd = () => { setDate(todayISO()); setPaymentMode("Cash"); setItems([emptyRow()]); setErrMsg(""); setAddOpen(true); };
+  const addRow = () => setItems([...items, emptyRow()]);
+  const removeRow = (idx) => setItems(items.filter((_, i) => i !== idx));
+  const updateRow = (idx, patch) => setItems(items.map((it, i) => i === idx ? { ...it, ...patch } : it));
+  const itemsAmount = items.reduce((sum, it) => sum + Number(it.qty || 0) * Number(it.purchaseRate || 0), 0);
+
+  const save = async () => {
+    const validItems = items.filter((it) => it.rubberId && Number(it.qty) > 0);
+    if (!validItems.length) { setErrMsg("Kam se kam ek item aur quantity bharein."); return; }
+    if (busy) return;
+    setBusy(true); setErrMsg("");
+    try {
+      for (const it of validItems) {
+        const amount = Number(it.qty) * Number(it.purchaseRate || 0);
+        await dbInsert("purchases", { id: uid(), date, rubber_id: it.rubberId, qty: Number(it.qty), purchase_rate: Number(it.purchaseRate || 0), amount, courier: 0, total: amount, payment_mode: paymentMode });
+      }
+      setAddOpen(false); await refresh();
+    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
+    finally { setBusy(false); }
+  };
+
+  const startEdit = (p) => { setEditId(p.id); setEditRubberId(p.rubber_id); setEditQty(String(p.qty ?? "")); setEditRate(String(p.purchase_rate ?? "")); setEditPaymentMode(p.payment_mode || "Cash"); setEditDate(p.date); setErrMsg(""); };
+  const editAmount = Number(editQty || 0) * Number(editRate || 0);
+  const saveEdit = async () => {
+    if (!editRubberId || !Number(editQty)) { setErrMsg("Item aur quantity bharein."); return; }
+    if (busy) return;
+    setBusy(true); setErrMsg("");
+    try {
+      await dbUpdate("purchases", editId, { date: editDate, rubber_id: editRubberId, qty: Number(editQty), purchase_rate: Number(editRate || 0), amount: editAmount, courier: 0, total: editAmount, payment_mode: editPaymentMode });
+      setEditId(null); await refresh();
+    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
+    finally { setBusy(false); }
+  };
+  const removePurchase = async (p) => {
+    if (!window.confirm("Is purchase ko delete karna hai?")) return;
+    try { await dbDelete("purchases", p.id); await refresh(); }
+    catch (err) { setErrMsg(err.message || "Delete failed — check connection."); }
+  };
+
+  const rubberOf = (id) => rubbers.find((r) => r.id === id);
+  const display = [...purchases].filter((p) => {
+    if (modeFilter !== "All" && (p.payment_mode || "Cash") !== modeFilter) return false;
+    if (fromDate && p.date < fromDate) return false;
+    if (toDate && p.date > toDate) return false;
+    if (!q.trim()) return true;
+    const r = rubberOf(p.rubber_id);
+    return `${r?.name || ""} ${r?.size || ""} ${r?.category || ""}`.toLowerCase().includes(q.trim().toLowerCase());
+  }).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)));
+  const totalAmt = display.reduce((a, p) => a + amountOf(p), 0);
+  const cashAmt = display.filter((p) => (p.payment_mode || "Cash") !== "Bank").reduce((a, p) => a + amountOf(p), 0);
+  const bankAmt = display.filter((p) => p.payment_mode === "Bank").reduce((a, p) => a + amountOf(p), 0);
+  const totalQty = display.reduce((a, p) => a + Number(p.qty || 0), 0);
+
+  const exportCSV = () => {
+    const rows = display.map((p) => { const r = rubberOf(p.rubber_id); return { Date: fmtDate(p.date), "Payment Mode": p.payment_mode || "Cash", Category: r?.category || "rubber", Size: r?.category === "rubber" ? (r?.size || "") : "", "Item Name": r?.name || "", Qty: p.qty, Rate: p.purchase_rate, Total: amountOf(p) }; });
+    exportToCSV(`purchases-${todayISO()}.csv`, rows);
+  };
+
+  const itemCell = (r) => <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+    {r?.photo_url
+      ? <img src={r.photo_url} alt={r.name} style={{ width: 34, height: 34, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
+      : <div style={{ width: 34, height: 34, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Package size={15} color={C.brass} /></div>}
+    <div style={{ minWidth: 0, fontFamily: font.body, fontWeight: 650, fontSize: 12.5 }}>{r?.name || "Unknown item"}<div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, fontWeight: 400 }}>{r ? `${catLabel(r.category)}${r.category === "rubber" && r.size ? ` · ${r.size}` : ""}` : ""}</div></div>
+  </div>;
+  const actions = (p) => <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+    <button title="Edit" aria-label="Edit purchase" onClick={() => startEdit(p)} style={iconBtnStyle(C.brass)}><PenSquare size={13} /></button>
+    <button title="Delete" aria-label="Delete purchase" onClick={() => removePurchase(p)} style={iconBtnStyle(C.stamp)}><Trash2 size={13} /></button>
+  </div>;
+  const td = { ...tdStyle, padding: "9px 10px" };
+  const th = { ...thStyle, ...thSticky, padding: "9px 10px" };
+  const compact = { marginBottom: 0, padding: "8px 10px", fontSize: 13 };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8, flexWrap: "wrap" }}>
+        <SectionTitle icon={ShoppingCart} title="Purchase Entry" bare />
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn onClick={openAdd} style={{ padding: "8px 14px", fontSize: 12.5 }}><Plus size={14} /> New Purchase</Btn>
+          <Btn variant="ghost" onClick={exportCSV} style={{ padding: "7px 12px", fontSize: 12.5 }}><Download size={13} /> Export</Btn>
+        </div>
+      </div>
+      {errMsg && !addOpen && !editId && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+
+      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(4, minmax(0,1fr))" : "repeat(2, minmax(0,1fr))", gap: 10, marginBottom: 14 }}>
+        <StatCard label="Total Purchase" value={inr(totalAmt)} color={C.ink} />
+        <StatCard label="Cash" value={inr(cashAmt)} color={C.brass} onClick={() => setModeFilter(modeFilter === "Cash" ? "All" : "Cash")} active={modeFilter === "Cash"} />
+        <StatCard label="Bank" value={inr(bankAmt)} color="#246B32" onClick={() => setModeFilter(modeFilter === "Bank" ? "All" : "Bank")} active={modeFilter === "Bank"} />
+        <StatCard label="Items Bought (Qty)" value={totalQty} color={C.headerGreen} />
+      </div>
+
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "12px 14px", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ position: "relative", flex: "1 1 200px", maxWidth: 300 }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: 10, color: C.inkSoft }} />
+            <Field placeholder="Search item…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...compact, paddingLeft: 30 }} />
+          </div>
+          <SegControl small value={modeFilter} onChange={setModeFilter} options={[["All", "All"], ["Cash", "Cash"], ["Bank", "Bank"]]} />
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>FROM</span><Field type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ ...compact, width: 138 }} />
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>TO</span><Field type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ ...compact, width: 138 }} />
+            <Btn variant="ghost" onClick={() => { setFromDate(""); setToDate(""); setModeFilter("All"); setQ(""); }} style={{ padding: "7px 10px", fontSize: 12 }}>Reset</Btn>
+          </div>
+        </div>
+
+        {isDesktop ? (
+          <div style={{ overflow: "auto", maxHeight: "calc(100vh - 360px)", minHeight: 200 }}>
+            <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={th}>Date</th><th style={th}>Item</th>
+                <th style={{ ...th, textAlign: "right" }}>Qty</th><th style={{ ...th, textAlign: "right" }}>Rate</th><th style={{ ...th, textAlign: "right" }}>Amount</th>
+                <th style={th}>Mode</th><th style={{ ...th, width: 80 }} />
+              </tr></thead>
+              <tbody>
+                {display.slice(0, 300).map((p) => <tr key={p.id}>
+                  <td style={{ ...td, whiteSpace: "nowrap" }}>{fmtDate(p.date)}</td>
+                  <td style={td}>{itemCell(rubberOf(p.rubber_id))}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{p.qty}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{inr(p.purchase_rate)}</td>
+                  <td style={{ ...td, textAlign: "right", fontWeight: 800, color: C.stamp }}>{inr(amountOf(p))}</td>
+                  <td style={td}><ModePill mode={p.payment_mode || "Cash"} /></td>
+                  <td style={td}>{actions(p)}</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ padding: 10 }}>
+            {display.slice(0, 200).map((p) => <div key={p.id} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ minWidth: 0 }}>{itemCell(rubberOf(p.rubber_id))}</div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}><div style={{ fontFamily: font.mono, fontWeight: 800, color: C.stamp }}>{inr(amountOf(p))}</div><div style={{ marginTop: 3 }}><ModePill mode={p.payment_mode || "Cash"} /></div></div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft }}>{fmtDate(p.date)} · {p.qty} × {inr(p.purchase_rate)}</div>
+                {actions(p)}
+              </div>
+            </div>)}
+          </div>
+        )}
+        {display.length === 0 && <EmptyNote text={q || fromDate || toDate || modeFilter !== "All" ? "No matching purchases." : "No purchases recorded yet."} />}
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, padding: "10px 14px", borderTop: `1px solid ${C.line}`, background: C.paperDark, fontFamily: font.mono, fontSize: 11.5 }}>
+          <span>{display.length} entries · Qty {totalQty}</span><span style={{ fontWeight: 800 }}>Total {inr(totalAmt)}</span>
+        </div>
+      </div>
+
+      {addOpen && <ModalShell title="New Purchase" onClose={() => setAddOpen(false)} width={720}>
+        {errMsg && <div style={{ marginBottom: 10, padding: 8, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 12 }}>
+          <div><Label>Date</Label><Field type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...compact, width: 160 }} /></div>
+          <div><Label>Payment Mode</Label><SegControl value={paymentMode} onChange={setPaymentMode} options={[["Cash", "💵 Cash"], ["Bank", "🏦 Bank"]]} /></div>
+        </div>
+        {isDesktop && <div style={{ display: "grid", gridTemplateColumns: "28px minmax(0,1fr) 90px 100px 100px 30px", gap: 8, padding: "7px 8px", background: C.paperDark, borderRadius: 7, fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 0.5 }}><span>#</span><span>ITEM · CATEGORY · SIZE</span><span>QTY</span><span>RATE (₹)</span><span style={{ textAlign: "right" }}>AMOUNT</span><span /></div>}
+        <div style={{ maxHeight: "42vh", overflowY: "auto" }}>
+          {items.map((it, idx) => {
+            const rowAmount = Number(it.qty || 0) * Number(it.purchaseRate || 0);
+            const sel = <Select value={it.rubberId} onChange={(e) => updateRow(idx, { rubberId: e.target.value })} style={{ marginBottom: 0, padding: "8px 10px", fontSize: 13 }}>{rubbers.map((r) => <option key={r.id} value={r.id}>{optionLabel(r)}</option>)}</Select>;
+            const qty = <Field type="number" min="0" value={it.qty} onChange={(e) => updateRow(idx, { qty: e.target.value })} placeholder="Qty" style={compact} />;
+            const rate = <Field type="number" min="0" value={it.purchaseRate} onChange={(e) => updateRow(idx, { purchaseRate: e.target.value })} placeholder="Rate" style={compact} />;
+            const del = items.length > 1 ? <button onClick={() => removeRow(idx)} aria-label="Remove row" style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={15} /></button> : <span />;
+            return isDesktop
+              ? <div key={idx} style={{ display: "grid", gridTemplateColumns: "28px minmax(0,1fr) 90px 100px 100px 30px", gap: 8, alignItems: "center", padding: "8px", borderBottom: `1px solid ${C.line}` }}>
+                  <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.inkSoft }}>{idx + 1}</div>{sel}{qty}{rate}<div style={{ textAlign: "right", fontFamily: font.mono, fontWeight: 700 }}>{inr(rowAmount)}</div>{del}
+                </div>
+              : <div key={idx} style={{ padding: "10px 0", borderBottom: `1px solid ${C.line}` }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}><div style={{ flex: 1 }}>{sel}</div>{del}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, alignItems: "center" }}>{qty}{rate}<div style={{ fontFamily: font.mono, fontWeight: 700, minWidth: 64, textAlign: "right" }}>{inr(rowAmount)}</div></div>
+                </div>;
+          })}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
+          <Btn variant="ghost" onClick={addRow} style={{ padding: "7px 12px", fontSize: 12.5 }}><Plus size={14} /> Add Item</Btn>
+          <div style={{ textAlign: "right" }}><div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 1 }}>TOTAL</div><div style={{ fontFamily: font.display, fontSize: 24, fontWeight: 800 }}>{inr(itemsAmount)}</div></div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <Btn variant="ghost" onClick={() => setAddOpen(false)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+          <Btn onClick={save} disabled={busy} style={{ flex: 2, justifyContent: "center" }}><Save size={15} /> {busy ? "Saving…" : "Save Purchase"}</Btn>
+        </div>
+      </ModalShell>}
+
+      {editId && <ModalShell title="Edit Purchase" onClose={() => setEditId(null)} width={440}>
+        {errMsg && <div style={{ marginBottom: 10, padding: 8, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div><Label>Date</Label><Field type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} style={compact} /></div>
+          <div><Label>Payment Mode</Label><SegControl small value={editPaymentMode} onChange={setEditPaymentMode} options={[["Cash", "Cash"], ["Bank", "Bank"]]} /></div>
+          <div style={{ gridColumn: "1 / -1" }}><Label>Item · Category · Size</Label><Select value={editRubberId} onChange={(e) => setEditRubberId(e.target.value)} style={{ marginBottom: 0 }}>{rubbers.map((r) => <option key={r.id} value={r.id}>{optionLabel(r)}</option>)}</Select></div>
+          <div><Label>Qty</Label><Field type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={compact} /></div>
+          <div><Label>Rate (₹)</Label><Field type="number" value={editRate} onChange={(e) => setEditRate(e.target.value)} style={compact} /></div>
+        </div>
+        <div style={{ padding: "10px 12px", background: C.paperDark, borderRadius: 8, display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 12, marginBottom: 14 }}><span>AMOUNT (AUTO)</span><b>{inr(editAmount)}</b></div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+          <Btn onClick={saveEdit} disabled={busy} style={{ flex: 2, justifyContent: "center" }}><Save size={15} /> {busy ? "Saving…" : "Update Purchase"}</Btn>
+        </div>
+      </ModalShell>}
+    </div>
+  );
+}
 /* ================= CASH REGISTER ================= */
 function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [type, setType] = useState("in");
@@ -5422,12 +5617,12 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [entryDate, setEntryDate] = useState(todayISO());
   const [editingExpenseId, setEditingExpenseId] = useState(null);
-  const [fromDate, setFromDate] = useState("");
+  const [fromDate, setFromDate] = useState(LEDGER_START);
   const [toDate, setToDate] = useState(todayISO());
   const [txnFilter, setTxnFilter] = useState("All");
   const [modalOpen, setModalOpen] = useState(false);
   const [showExpLedger, setShowExpLedger] = useState(false);
-  const [expFrom, setExpFrom] = useState(todayISO().slice(0, 7) + "-01");
+  const [expFrom, setExpFrom] = useState(LEDGER_START);
   const [expTo, setExpTo] = useState(todayISO());
   const [expHead, setExpHead] = useState("All");
   const isDesktop = useIsDesktop();
@@ -5577,7 +5772,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
           <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
             <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>FROM</span><Field type="date" value={expFrom} onChange={e => setExpFrom(e.target.value)} style={{ ...compactField, width: 138 }} />
             <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>TO</span><Field type="date" value={expTo} onChange={e => setExpTo(e.target.value)} style={{ ...compactField, width: 138 }} />
-            <Btn variant="ghost" onClick={() => { setExpFrom(todayISO().slice(0, 7) + "-01"); setExpTo(todayISO()); setExpHead("All"); }} style={{ padding: "7px 10px", fontSize: 12 }}>This Month</Btn>
+            <Btn variant="ghost" onClick={() => { setExpFrom(LEDGER_START); setExpTo(todayISO()); setExpHead("All"); }} style={{ padding: "7px 10px", fontSize: 12 }}>Reset</Btn>
           </div>
         </div>
         <div style={{ overflow: "auto", maxHeight: isDesktop ? "calc(100vh - 360px)" : "none", minHeight: isDesktop ? 220 : 0 }}>
@@ -5620,7 +5815,7 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
           <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
             <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>FROM</span><Field type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={{ ...compactField, width: 138 }} />
             <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>TO</span><Field type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={{ ...compactField, width: 138 }} />
-            <Btn variant="ghost" onClick={() => { setFromDate(""); setToDate(todayISO()); }} style={{ padding: "7px 10px", fontSize: 12 }}>Reset</Btn>
+            <Btn variant="ghost" onClick={() => { setFromDate(LEDGER_START); setToDate(todayISO()); }} style={{ padding: "7px 10px", fontSize: 12 }}>Reset</Btn>
           </div>
         </div>
         <div style={{ overflow: "auto", maxHeight: isDesktop ? "calc(100vh - 340px)" : "none", minHeight: isDesktop ? 240 : 0 }}>
