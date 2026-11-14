@@ -3631,8 +3631,6 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   // text behavior continues to use its existing rendering/layouts.
   const ADD_TEXT_LAYOUTS = [
     { id: "center", label: "Center" },
-    { id: "topArc", label: "Top Arc" },
-    { id: "bottomArc", label: "Bottom Arc" },
   ];
   const TRIANGLE_TEXT_LAYOUTS = [
     { id: "bottom", label: "Bottom" },
