@@ -3470,7 +3470,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     <>
       {activeLayer?.type === "centerText" ? (
         <>
-          <Label>Text in the centre</Label>
+          
           <Field
             placeholder="New text"
             value={activeLayer.text ?? ""}
@@ -3865,7 +3865,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
             const curV = vs.findIndex(([, v]) => near(activeLayer.y ?? 50, alignTextY(activeLayer, v)));
             return (
               <div className="sjs-text-alignment-controls">
-                <Label>Text Alignment</Label>
+                
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                   <div>
                     <div style={{ fontFamily: font.mono, fontSize: 9.5, letterSpacing: 1, color: C.inkSoft, marginBottom: 6 }}>HORIZONTAL</div>
@@ -4823,7 +4823,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
               <div id="mobile-stamp-edit-properties">
                 {activeLayer ? (
                   <>
-                    <Label>Edit properties</Label>
+                    
                     {activeLayer.type === "centerText" || activeLayer.type === "circleText" ? textFields : (
                       <div style={{ padding: "8px 4px", color: C.inkSoft, fontFamily: font.mono, fontSize: 11 }}>
                         {activeLayer.type === "image" ? "Image selected — use Layer tab for image controls." :
