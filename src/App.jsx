@@ -1301,7 +1301,7 @@ function SharmaJiStampsAdmin() {
       {tab === "orders" && <OrdersTab onEditOrder={editOrder} onBillOrder={billOrder} />}
       {tab === "register" && <StampRegisterTab entries={entries} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "stock" && <StockTab rubbers={rubbers} stockByRubber={stockByRubber} purchases={purchases} entries={entries} />}
-      {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} />}
+      {tab === "rubber" && user.role === "admin" && <RubberTab rubbers={rubbers} refresh={refreshAll} stockByRubber={stockByRubber} />}
       {tab === "purchase" && user.role === "admin" && <PurchaseTab rubbers={rubbers} purchases={purchases} refresh={refreshAll} />}
       {tab === "ledger" && <LedgerTab purchases={purchases} entries={entries} cashManual={cashManual} rubbers={rubbers} refresh={refreshAll} />}
       {tab === "users" && user.role === "admin" && <UsersTab users={users} refresh={refreshAll} currentUser={user} />}
@@ -4931,8 +4931,37 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
 }
 
 /* ================= STAMP SALE REGISTER ================= */
+/* ================= SHARED UI (modal + segmented control) ================= */
+function ModalShell({ title, onClose, children, width = 440 }) {
+  useEffect(() => { const h = (e) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+  return <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(38,50,65,0.45)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: width, maxHeight: "92vh", overflowY: "auto", background: C.white, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,.28)", padding: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>{title}</div>
+        <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: C.inkSoft, display: "flex" }}><X size={18} /></button>
+      </div>
+      {children}
+    </div>
+  </div>;
+}
+function SegControl({ value, onChange, options, small }) {
+  return <div style={{ display: "inline-flex", border: `1.5px solid ${C.line}`, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
+    {options.map(([val, label]) => <button key={val} type="button" onClick={() => onChange(val)} style={{ padding: small ? "7px 12px" : "8px 18px", border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 700, fontFamily: font.body, background: value === val ? C.headerGreen : C.white, color: value === val ? C.white : C.ink }}>{label}</button>)}
+  </div>;
+}
+const StatCard = ({ label, value, color, onClick, active }) => <div onClick={onClick} style={{ cursor: onClick ? "pointer" : "default", background: C.white, borderStyle: "solid", borderWidth: "4px 1.5px 1.5px 1.5px", borderColor: `${color} ${active ? color : C.line} ${active ? color : C.line} ${active ? color : C.line}`, borderRadius: 10, padding: "10px 14px" }}>
+  <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 0.8 }}>{String(label).toUpperCase()}</div>
+  <div style={{ fontFamily: font.display, fontWeight: 800, fontSize: 22, marginTop: 3 }}>{value}</div>
+</div>;
+const ModePill = ({ mode }) => <span style={{ fontSize: 9.5, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: mode === "Bank" ? "#E3F1E6" : C.paperDark, color: mode === "Bank" ? "#246B32" : C.brass }}>{mode === "Bank" ? "🏦 Bank" : "💵 Cash"}</span>;
+const iconBtnStyle = (color) => ({ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color, cursor: "pointer", padding: "4px 7px", display: "inline-flex", alignItems: "center" });
+const thSticky = { position: "sticky", top: 0, zIndex: 1 };
+
 function StampRegisterTab({ entries, rubbers, refresh }) {
   const [q, setQ] = useState("");
+  const [modeFilter, setModeFilter] = useState("All");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [editId, setEditId] = useState(null);
   const [editDate, setEditDate] = useState(todayISO());
   const [editRubberId, setEditRubberId] = useState("");
@@ -4942,6 +4971,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
   const [editRemarks, setEditRemarks] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const isDesktop = useIsDesktop();
 
   const chronological = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
   let runningTotal = 0;
@@ -4950,20 +4980,21 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     return { ...e, balanceAfter: runningTotal };
   });
   const display = [...withBalance].reverse().filter((e) => {
+    if (modeFilter !== "All" && (e.payment_mode || "Cash") !== modeFilter) return false;
+    if (fromDate && e.date < fromDate) return false;
+    if (toDate && e.date > toDate) return false;
     if (!q.trim()) return true;
     const r = rubbers.find((r) => r.id === e.rubber_id);
     const needle = q.trim().toLowerCase();
     return (r?.name || "").toLowerCase().includes(needle) || (e.mobile || "").toLowerCase().includes(needle) || (e.remarks || "").toLowerCase().includes(needle);
   });
+  const totalAmt = display.reduce((a, e) => a + Number(e.amount || 0), 0);
+  const cashAmt = display.filter((e) => (e.payment_mode || "Cash") !== "Bank").reduce((a, e) => a + Number(e.amount || 0), 0);
+  const bankAmt = display.filter((e) => e.payment_mode === "Bank").reduce((a, e) => a + Number(e.amount || 0), 0);
 
   const startEdit = (e) => {
-    setEditId(e.id);
-    setEditDate(e.date);
-    setEditRubberId(e.rubber_id);
-    setEditMobile(e.mobile || "");
-    setEditDiscount(e.discount || 0);
-    setEditPaymentMode(e.payment_mode || "Cash");
-    setEditRemarks(e.remarks || "");
+    setEditId(e.id); setEditDate(e.date); setEditRubberId(e.rubber_id); setEditMobile(e.mobile || "");
+    setEditDiscount(e.discount || 0); setEditPaymentMode(e.payment_mode || "Cash"); setEditRemarks(e.remarks || ""); setErrMsg("");
   };
   const editRubber = rubbers.find((r) => r.id === editRubberId);
   const editRate = editRubber?.rate || 0;
@@ -4986,6 +5017,7 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     }
   };
   const removeEntry = async (id) => {
+    if (!window.confirm("Is entry ko delete karna hai?")) return;
     try { await dbDelete("stamp_entries", id); await refresh(); }
     catch (err) { setErrMsg(err.message || "Delete failed — check connection."); }
   };
@@ -4994,112 +5026,136 @@ function StampRegisterTab({ entries, rubbers, refresh }) {
     const rows = display.map((e) => {
       const r = rubbers.find((r) => r.id === e.rubber_id);
       return {
-        Date: fmtDate(e.date),
-        "Rubber Name": r?.name || "",
-        Mobile: e.mobile || "",
-        "Stamp Name": e.remarks || "",
-        Rate: e.rate,
-        Discount: e.discount,
-        Amount: e.amount,
-        "Payment Mode": e.payment_mode || "Cash",
-        Balance: e.balanceAfter,
+        Date: fmtDate(e.date), "Rubber Name": r?.name || "", Mobile: e.mobile || "", "Stamp Name": e.remarks || "",
+        Rate: e.rate, Discount: e.discount, Amount: e.amount, "Payment Mode": e.payment_mode || "Cash", Balance: e.balanceAfter,
       };
     });
     exportToCSV(`stamp-sale-register-${todayISO()}.csv`, rows);
   };
 
-  const isDesktop = useIsDesktop();
+  const itemCell = (r) => <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+    {r?.photo_url
+      ? <img src={r.photo_url} alt={r.name} style={{ width: 34, height: 34, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
+      : <div style={{ width: 34, height: 34, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Stamp size={15} color={C.brass} /></div>}
+    <div style={{ minWidth: 0, fontFamily: font.body, fontWeight: 650, fontSize: 12.5 }}>{r?.name || "—"}{r?.size && <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, fontWeight: 400 }}>{r.size}</div>}</div>
+  </div>;
+  const impression = (e) => e.image_url
+    ? <a href={e.image_url} target="_blank" rel="noreferrer"><img src={e.image_url} alt="Stamp impression" style={{ width: 38, height: 38, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.line}`, display: "block" }} /></a>
+    : <span style={{ color: C.inkSoft, fontSize: 11 }}>—</span>;
+  const actions = (e) => <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+    <button title="Edit" aria-label="Edit entry" onClick={() => startEdit(e)} style={iconBtnStyle(C.brass)}><PenSquare size={13} /></button>
+    <button title="Delete" aria-label="Delete entry" onClick={() => removeEntry(e.id)} style={iconBtnStyle(C.stamp)}><Trash2 size={13} /></button>
+  </div>;
+  const td = { ...tdStyle, padding: "8px 10px" };
+  const th = { ...thStyle, ...thSticky, padding: "9px 10px" };
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8, flexWrap: "wrap" }}>
         <SectionTitle icon={BookOpen} title="Stamp Sale Register" bare />
-        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "6px 10px", fontSize: 11.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
+        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "7px 12px", fontSize: 12.5, flexShrink: 0 }}><Download size={13} /> Export</Btn>
       </div>
-      {errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
-      <div style={{ position: "relative", marginBottom: 10, maxWidth: isDesktop ? 420 : "none" }}>
-        <Search size={15} style={{ position: "absolute", left: 10, top: 12, color: C.inkSoft }} />
-        <Field placeholder="Search by rubber name, mobile, or stamp name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 32 }} />
+      {errMsg && !editId && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+
+      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(4, minmax(0,1fr))" : "repeat(2, minmax(0,1fr))", gap: 10, marginBottom: 14 }}>
+        <StatCard label="Total Sale" value={inr(totalAmt)} color={C.ink} />
+        <StatCard label="Cash" value={inr(cashAmt)} color={C.brass} onClick={() => setModeFilter(modeFilter === "Cash" ? "All" : "Cash")} active={modeFilter === "Cash"} />
+        <StatCard label="Bank" value={inr(bankAmt)} color="#246B32" onClick={() => setModeFilter(modeFilter === "Bank" ? "All" : "Bank")} active={modeFilter === "Bank"} />
+        <StatCard label="Entries" value={display.length} color={C.headerGreen} />
       </div>
-      <div style={isDesktop ? { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 10, alignItems: "start" } : undefined}>
-      {display.map((e) => {
-        const r = rubbers.find((r) => r.id === e.rubber_id);
-        return (
-          <Card key={e.id}>
-            {editId === e.id ? (
-              <div>
-                <Label>Date</Label>
-                <Field type="date" value={editDate} onChange={(ev) => setEditDate(ev.target.value)} />
-                <Label>Rubber</Label>
-                <Select value={editRubberId} onChange={(ev) => setEditRubberId(ev.target.value)}>
-                  {rubbers.map((rb) => <option key={rb.id} value={rb.id}>{rb.name}</option>)}
-                </Select>
-                <Label>Customer Mobile No.</Label>
-                <Field type="tel" value={editMobile} onChange={(ev) => setEditMobile(ev.target.value)} />
-                <Label>Discount (₹)</Label>
-                <Field type="number" value={editDiscount} onChange={(ev) => setEditDiscount(ev.target.value)} />
-                <Label>Amount (Auto)</Label>
-                <Field value={inr(editAmount)} disabled style={{ background: C.paperDark, color: C.ink, fontWeight: 700 }} />
-                <Label>Payment Mode</Label>
-                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                  {["Cash", "Bank"].map((mode) => (
-                    <Btn key={mode} variant={editPaymentMode === mode ? "solid" : "ghost"} onClick={() => setEditPaymentMode(mode)} style={{ flex: 1, justifyContent: "center" }}>{mode === "Cash" ? "💵 Cash" : "🏦 Bank"}</Btn>
-                  ))}
+
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "12px 14px", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 340 }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: 10, color: C.inkSoft }} />
+            <Field placeholder="Search rubber, mobile, stamp name…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 30, marginBottom: 0, padding: "8px 10px 8px 30px", fontSize: 13 }} />
+          </div>
+          <SegControl small value={modeFilter} onChange={setModeFilter} options={[["All", "All"], ["Cash", "Cash"], ["Bank", "Bank"]]} />
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>FROM</span><Field type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ marginBottom: 0, padding: "8px 10px", fontSize: 13, width: 138 }} />
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>TO</span><Field type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ marginBottom: 0, padding: "8px 10px", fontSize: 13, width: 138 }} />
+            <Btn variant="ghost" onClick={() => { setFromDate(""); setToDate(""); setModeFilter("All"); setQ(""); }} style={{ padding: "7px 10px", fontSize: 12 }}>Reset</Btn>
+          </div>
+        </div>
+
+        {isDesktop ? (
+          <div style={{ overflow: "auto", maxHeight: "calc(100vh - 360px)", minHeight: 220 }}>
+            <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={th}>Date</th><th style={th}>Item</th><th style={th}>Mobile</th><th style={th}>Stamp Name</th><th style={th}>Photo</th><th style={th}>Mode</th>
+                <th style={{ ...th, textAlign: "right" }}>Rate</th><th style={{ ...th, textAlign: "right" }}>Disc.</th><th style={{ ...th, textAlign: "right" }}>Amount</th><th style={{ ...th, textAlign: "right" }}>Running Total</th><th style={{ ...th, width: 80 }} />
+              </tr></thead>
+              <tbody>
+                {display.slice(0, 300).map((e) => {
+                  const r = rubbers.find((x) => x.id === e.rubber_id);
+                  return <tr key={e.id}>
+                    <td style={{ ...td, whiteSpace: "nowrap" }}>{fmtDate(e.date)}</td>
+                    <td style={td}>{itemCell(r)}</td>
+                    <td style={td}>{e.mobile || "—"}</td>
+                    <td style={{ ...td, fontFamily: font.body, fontStyle: e.remarks ? "italic" : "normal", fontSize: 12.5 }}>{e.remarks || "—"}</td>
+                    <td style={td}>{impression(e)}</td>
+                    <td style={td}><ModePill mode={e.payment_mode || "Cash"} /></td>
+                    <td style={{ ...td, textAlign: "right" }}>{inr(e.rate)}</td>
+                    <td style={{ ...td, textAlign: "right", color: C.inkSoft }}>{Number(e.discount || 0) ? inr(e.discount) : "—"}</td>
+                    <td style={{ ...td, textAlign: "right", fontWeight: 800, color: C.sage }}>{inr(e.amount)}</td>
+                    <td style={{ ...td, textAlign: "right", color: C.inkSoft }}>{inr(e.balanceAfter)}</td>
+                    <td style={td}>{actions(e)}</td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ padding: 10 }}>
+            {display.slice(0, 200).map((e) => {
+              const r = rubbers.find((x) => x.id === e.rubber_id);
+              return <div key={e.id} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 0 }}>{itemCell(r)}</div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}><div style={{ fontFamily: font.mono, fontWeight: 800, color: C.sage }}>+{inr(e.amount)}</div><div style={{ marginTop: 3 }}><ModePill mode={e.payment_mode || "Cash"} /></div></div>
                 </div>
-                <Label>Stamp Name (text engraved on stamp)</Label>
-                <Field value={editRemarks} onChange={(ev) => setEditRemarks(ev.target.value)} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 1, justifyContent: "center" }}>{editBusy ? "Saving…" : "Save"}</Btn>
-                  <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 56 }}>
-                  <div style={{ fontWeight: 600, fontSize: 11.5, textAlign: "center", marginBottom: 4, lineHeight: 1.2 }}>{r?.name || "—"}</div>
-                  {r?.photo_url ? (
-                    <img src={r.photo_url} alt={r.name} style={{ width: 40, height: 40, borderRadius: 7, objectFit: "cover", border: `1px solid ${C.line}` }} />
-                  ) : (
-                    <div style={{ width: 40, height: 40, borderRadius: 7, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <Stamp size={16} color={C.brass} />
-                    </div>
-                  )}
-                </div>
-                <div style={{ flex: 1, marginLeft: 12 }}>
-                  <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft }}>{fmtDate(e.date)}</div>
-                  <div style={{ fontFamily: font.mono, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{e.mobile || "no mobile"}</div>
-                  <div style={{ display: "inline-flex", marginTop: 5, padding: "2px 7px", borderRadius: 999, background: (e.payment_mode || "Cash") === "Bank" ? C.paperDark : "#EEF8F1", color: (e.payment_mode || "Cash") === "Bank" ? C.stampDark : "#2D7A4A", fontFamily: font.mono, fontSize: 10, fontWeight: 700 }}>{(e.payment_mode || "Cash") === "Bank" ? "🏦 BANK" : "💵 CASH"}</div>
-                  {e.remarks && <div style={{ fontFamily: font.body, fontSize: 12, color: C.ink, marginTop: 4, fontStyle: "italic" }}>"{e.remarks}"</div>}
-                  {e.image_url ? (
-                    <a href={e.image_url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 6 }}>
-                      <img src={e.image_url} alt="Stamp impression" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.line}` }} />
-                    </a>
-                  ) : (
-                    <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft, marginTop: 6 }}>No photo</div>
-                  )}
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontFamily: font.mono, fontWeight: 700, color: C.sage }}>+{inr(e.amount)}</div>
-                  <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, marginTop: 2 }}>Bal: {inr(e.balanceAfter)}</div>
-                  <div style={{ display: "flex", gap: 4, marginTop: 6, justifyContent: "flex-end" }}>
-                    <button onClick={() => startEdit(e)} style={{ background: "none", border: "none", color: C.brass, cursor: "pointer" }}><PenSquare size={14} /></button>
-                    <button onClick={() => removeEntry(e.id)} style={{ background: "none", border: "none", color: C.stamp, cursor: "pointer" }}><Trash2 size={14} /></button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, gap: 8 }}>
+                  <div style={{ fontFamily: font.mono, fontSize: 11, color: C.inkSoft, minWidth: 0 }}>
+                    <div>{fmtDate(e.date)} · {e.mobile || "no mobile"}</div>
+                    {e.remarks && <div style={{ fontFamily: font.body, fontStyle: "italic", color: C.ink, fontSize: 12, marginTop: 2 }}>"{e.remarks}"</div>}
                   </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{impression(e)}{actions(e)}</div>
                 </div>
-              </div>
-            )}
-          </Card>
-        );
-      })}
+              </div>;
+            })}
+          </div>
+        )}
+        {display.length === 0 && <EmptyNote text={q || fromDate || toDate || modeFilter !== "All" ? "No matching entries." : "No entries yet."} />}
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, padding: "10px 14px", borderTop: `1px solid ${C.line}`, background: C.paperDark, fontFamily: font.mono, fontSize: 11.5 }}>
+          <span>{display.length} entries</span><span style={{ fontWeight: 800 }}>Total {inr(totalAmt)}</span>
+        </div>
       </div>
-      {display.length === 0 && <EmptyNote text={q ? "No matching entries." : "No entries yet."} />}
+
+      {editId && <ModalShell title="Edit Sale Entry" onClose={() => setEditId(null)} width={440}>
+        {errMsg && <div style={{ marginBottom: 10, padding: 8, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div><Label>Date</Label><Field type="date" value={editDate} onChange={(ev) => setEditDate(ev.target.value)} style={{ marginBottom: 0 }} /></div>
+          <div><Label>Customer Mobile</Label><Field type="tel" value={editMobile} onChange={(ev) => setEditMobile(ev.target.value)} style={{ marginBottom: 0 }} /></div>
+          <div style={{ gridColumn: "1 / -1" }}><Label>Rubber</Label><Select value={editRubberId} onChange={(ev) => setEditRubberId(ev.target.value)} style={{ marginBottom: 0 }}>{rubbers.map((rb) => <option key={rb.id} value={rb.id}>{rb.name}{rb.size ? ` · ${rb.size}` : ""}</option>)}</Select></div>
+          <div><Label>Discount (₹)</Label><Field type="number" value={editDiscount} onChange={(ev) => setEditDiscount(ev.target.value)} style={{ marginBottom: 0 }} /></div>
+          <div><Label>Amount (Auto)</Label><Field value={inr(editAmount)} disabled style={{ marginBottom: 0, background: C.paperDark, color: C.ink, fontWeight: 700 }} /></div>
+        </div>
+        <Label>Payment Mode</Label>
+        <div style={{ marginBottom: 10 }}><SegControl value={editPaymentMode} onChange={setEditPaymentMode} options={[["Cash", "💵 Cash"], ["Bank", "🏦 Bank"]]} /></div>
+        <Label>Stamp Name (text engraved on stamp)</Label>
+        <Field value={editRemarks} onChange={(ev) => setEditRemarks(ev.target.value)} style={{ marginBottom: 14 }} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="ghost" onClick={() => setEditId(null)} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+          <Btn onClick={saveEdit} disabled={editBusy} style={{ flex: 2, justifyContent: "center" }}><Save size={15} /> {editBusy ? "Saving…" : "Update Entry"}</Btn>
+        </div>
+      </ModalShell>}
     </div>
   );
 }
 
-
 function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
   const [selectedItemId, setSelectedItemId] = useState(null);
+  useEffect(() => { if (selectedItemId === null) return; const h = (e) => { if (e.key === "Escape") setSelectedItemId(null); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [selectedItemId]);
   const rubberOnly = rubbers.filter((r) => String(r.category || "rubber").toLowerCase() === "rubber");
   const selectedItem = rubberOnly.find(r => String(r.id) === String(selectedItemId));
   const itemMovements = selectedItem ? [
@@ -5142,9 +5198,9 @@ function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
         </table>
         {rubberOnly.length === 0 && <EmptyNote text="No rubber items found." />}
       </div>
-      {selectedItem && <Card style={{marginTop:14}}>
+      {selectedItem && <div onClick={()=>setSelectedItemId(null)} style={{position:"fixed",inset:0,background:"rgba(38,50,65,0.45)",zIndex:600,display:"flex",alignItems:"center",justifyContent:"center",padding:14}}><div onClick={(ev)=>ev.stopPropagation()} style={{width:"100%",maxWidth:860,maxHeight:"90vh",overflowY:"auto",background:C.white,borderRadius:14,boxShadow:"0 18px 50px rgba(0,0,0,.28)",padding:18}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginBottom:10}}>
-          <div><div style={{fontWeight:800,fontSize:15}}>{selectedItem.name} — Item Register</div><div style={{fontSize:11,color:C.inkSoft}}>Opening: {Number(selectedItem.opening_stock || 0)} · Current stock: {(stockByRubber[selectedItem.id] || {}).balance ?? 0}</div></div>
+          <div><div style={{fontWeight:800,fontSize:16}}>{selectedItem.name} — Stock Register</div><div style={{fontSize:11,color:C.inkSoft}}>Opening: {Number(selectedItem.opening_stock || 0)} · Current stock: {(stockByRubber[selectedItem.id] || {}).balance ?? 0}</div></div>
           <div style={{display:"flex",gap:6}}><Btn variant="ghost" onClick={exportItemRegister} style={{padding:"6px 10px",fontSize:11.5}}><Download size={13}/> Export</Btn><Btn variant="ghost" onClick={()=>setSelectedItemId(null)}>Close</Btn></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:8,marginBottom:10}}>
@@ -5153,8 +5209,8 @@ function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
           <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>TOTAL OUT</div><div style={{fontWeight:800,fontSize:18,color:C.stamp}}>{(stockByRubber[selectedItem.id] || {}).used || 0}</div></div>
           <div style={{background:C.paperDark,borderRadius:8,padding:10}}><div style={{fontSize:10,color:C.inkSoft}}>CLOSING STOCK</div><div style={{fontWeight:800,fontSize:18}}>{(stockByRubber[selectedItem.id] || {}).balance || 0}</div></div>
         </div>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:480}}>
+        <div style={{overflow:"auto",maxHeight:"52vh",border:`1px solid ${C.line}`,borderRadius:8}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:520}}>
             <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Type</th><th style={{...thStyle,textAlign:"right"}}>Qty</th><th style={thStyle}>Details</th><th style={{...thStyle,textAlign:"right"}}>Amount</th><th style={thStyle}>Mode</th><th style={{...thStyle,textAlign:"right"}}>Balance</th></tr></thead>
             <tbody>
               <tr><td style={tdStyle}>—</td><td style={{...tdStyle,color:C.brass}}>OPENING</td><td style={{...tdStyle,textAlign:"right"}}>{Number(selectedItem.opening_stock || 0)}</td><td style={tdStyle}>Opening Stock</td><td style={{...tdStyle,textAlign:"right"}}>—</td><td style={tdStyle}>—</td><td style={{...tdStyle,textAlign:"right",fontWeight:800}}>{Number(selectedItem.opening_stock || 0)}</td></tr>
@@ -5163,7 +5219,7 @@ function StockTab({ rubbers, stockByRubber, purchases = [], entries = [] }) {
             </tbody>
           </table>
         </div>
-      </Card>}
+      </div></div>}
     </div>
   );
 }
@@ -5175,108 +5231,155 @@ function Row({ label, value, color, bold }) {
 
 
 /* ================= ITEM MASTER ================= */
-function RubberTab({ rubbers, refresh }) {
+function RubberTab({ rubbers, refresh, stockByRubber = {} }) {
+  const [q, setQ] = useState("");
+  const [catFilter, setCatFilter] = useState("all");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState("rubber");
   const [size, setSize] = useState("");
-  const [opening, setOpening] = useState(0);
-  const [rate, setRate] = useState(0);
-  const [q, setQ] = useState("");
+  const [opening, setOpening] = useState("");
+  const [rate, setRate] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
-  const [editId, setEditId] = useState(null);
-  const [editName, setEditName] = useState("");
-  const [editCategory, setEditCategory] = useState("rubber");
-  const [editSize, setEditSize] = useState("");
-  const [editOpening, setEditOpening] = useState(0);
-  const [editRate, setEditRate] = useState(0);
-  const [editPhotoPreview, setEditPhotoPreview] = useState(null);
-  const [editPhotoFile, setEditPhotoFile] = useState(null);
-  const [editPhotoUrl, setEditPhotoUrl] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(null);
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const isDesktop = useIsDesktop();
 
+  const closeModal = () => { setModalOpen(false); setEditId(null); setErrMsg(""); };
+  const openAdd = () => {
+    setEditId(null); setName(""); setCategory(catFilter === "all" ? "rubber" : catFilter); setSize(""); setOpening(""); setRate("");
+    setPhotoPreview(null); setPhotoFile(null); setPhotoUrl(null); setErrMsg(""); setModalOpen(true);
+  };
   const startEdit = (r) => {
-    setEditId(r.id); setEditName(r.name); setEditCategory(r.category || "rubber");
-    setEditSize(r.size || ""); setEditOpening(r.opening_stock || 0); setEditRate(r.rate || 0);
-    setEditPhotoPreview(r.photo_url || null); setEditPhotoUrl(r.photo_url || null); setEditPhotoFile(null);
+    setEditId(r.id); setName(r.name || ""); setCategory(r.category || "rubber"); setSize(r.size || ""); setOpening(String(r.opening_stock ?? ""));
+    setRate(String(r.rate ?? "")); setPhotoPreview(r.photo_url || null); setPhotoUrl(r.photo_url || null); setPhotoFile(null); setErrMsg(""); setModalOpen(true);
   };
-  const handleEditPhotoChange = (e) => { const file=e.target.files[0]; if(!file)return; setEditPhotoFile(file); setEditPhotoPreview(URL.createObjectURL(file)); };
-  const saveEdit = async () => {
-    if (!editName.trim() || busy) return;
+  const handlePhotoChange = (e) => { const file = e.target.files[0]; if (!file) return; setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); };
+  const save = async () => {
+    if (!name.trim()) { setErrMsg("Item name likhein."); return; }
+    if (busy) return;
     setBusy(true); setErrMsg("");
     try {
-      let photo_url = editPhotoUrl;
-      if (editPhotoFile) photo_url = await uploadPhoto(editPhotoFile, "rubbers");
-      await dbUpdate("rubbers", editId, {
-        name: editName.trim(), category: editCategory, size: editCategory === "rubber" ? editSize.trim() || null : null,
-        opening_stock: Number(editOpening) || 0, rate: Number(editRate) || 0, photo_url
-      });
-      setEditId(null); await refresh();
-    } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
-    finally { setBusy(false); }
-  };
-  const handlePhotoChange = (e) => { const file=e.target.files[0]; if(!file)return; setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); };
-  const add = async () => {
-    if (!name.trim() || busy) return;
-    setBusy(true); setErrMsg("");
-    try {
-      let photo_url = null;
+      let photo_url = photoUrl;
       if (photoFile) photo_url = await uploadPhoto(photoFile, "rubbers");
-      await dbInsert("rubbers", {
-        id: uid(), name: name.trim(), category, size: category === "rubber" ? size.trim() || null : null,
-        opening_stock: Number(opening) || 0, rate: Number(rate) || 0, photo_url
-      });
-      setName(""); setCategory("rubber"); setSize(""); setOpening(0); setRate(0); setPhotoPreview(null); setPhotoFile(null); await refresh();
+      const row = { name: name.trim(), category, size: category === "rubber" ? size.trim() || null : null, opening_stock: Number(opening) || 0, rate: Number(rate) || 0, photo_url };
+      if (editId) await dbUpdate("rubbers", editId, row);
+      else await dbInsert("rubbers", { id: uid(), ...row });
+      closeModal(); await refresh();
     } catch (err) { setErrMsg(err.message || "Save failed — check connection."); }
     finally { setBusy(false); }
   };
-  const remove = async (id) => {
-    try { await dbDelete("rubbers", id); await refresh(); }
+  const remove = async (r) => {
+    if (!window.confirm(`"${r.name}" ko delete karna hai?`)) return;
+    try { await dbDelete("rubbers", r.id); await refresh(); }
     catch (err) { setErrMsg(err.message || "Delete failed — check connection."); }
   };
-  const filtered = rubbers.filter((r) => `${r.name} ${r.category || "rubber"} ${r.size || ""}`.toLowerCase().includes(q.toLowerCase()));
+
+  const catOf = (r) => String(r.category || "rubber").toLowerCase();
   const catLabel = (c) => c === "machine" ? "Machine" : c === "raw" ? "Raw" : "Rubber";
+  const count = (c) => rubbers.filter((r) => catOf(r) === c).length;
+  const lowCount = rubbers.filter((r) => catOf(r) === "rubber" && (stockByRubber[r.id]?.balance ?? 0) <= 15).length;
+  const filtered = rubbers.filter((r) => (catFilter === "all" || catOf(r) === catFilter) && `${r.name} ${catOf(r)} ${r.size || ""}`.toLowerCase().includes(q.toLowerCase()));
+  const stockOf = (r) => stockByRubber[r.id]?.balance ?? Number(r.opening_stock || 0);
+  const thumb = (r, sz = 38) => r.photo_url
+    ? <img src={r.photo_url} alt={r.name} style={{ width: sz, height: sz, borderRadius: 8, objectFit: "cover", border: `1px solid ${C.line}`, flexShrink: 0 }} />
+    : <div style={{ width: sz, height: sz, borderRadius: 8, background: C.paperDark, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Package size={sz * 0.45} color={C.brass} /></div>;
+  const catPill = (r) => <span style={{ padding: "2px 8px", borderRadius: 999, background: C.paperDark, fontFamily: font.mono, fontSize: 9.5, fontWeight: 700 }}>{catLabel(catOf(r))}</span>;
+  const stockCell = (r) => { const b = stockOf(r); const low = catOf(r) === "rubber" && b <= 15; return <span style={{ fontWeight: 800, color: low ? C.stamp : C.ink }}>{low ? `${b} ⚠` : b}</span>; };
+  const actions = (r) => <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+    <button title="Edit" aria-label="Edit item" onClick={() => startEdit(r)} style={iconBtnStyle(C.brass)}><PenSquare size={13} /></button>
+    <button title="Delete" aria-label="Delete item" onClick={() => remove(r)} style={iconBtnStyle(C.stamp)}><Trash2 size={13} /></button>
+  </div>;
+  const td = { ...tdStyle, padding: "9px 10px" };
+  const th = { ...thStyle, ...thSticky, padding: "9px 10px" };
 
   return (
     <div>
-      <SectionTitle icon={Package} title="Item Master" />
-      <Card>
-        {errMsg && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8, flexWrap: "wrap" }}>
+        <SectionTitle icon={Package} title="Item Master" bare />
+        <Btn onClick={openAdd} style={{ padding: "8px 14px", fontSize: 12.5 }}><Plus size={14} /> Add Item</Btn>
+      </div>
+      {errMsg && !modalOpen && <div style={{ marginBottom: 10, padding: 9, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
+
+      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(5, minmax(0,1fr))" : "repeat(2, minmax(0,1fr))", gap: 10, marginBottom: 14 }}>
+        <StatCard label="All Items" value={rubbers.length} color={C.ink} onClick={() => setCatFilter("all")} active={catFilter === "all"} />
+        <StatCard label="Rubber" value={count("rubber")} color={C.headerGreen} onClick={() => setCatFilter("rubber")} active={catFilter === "rubber"} />
+        <StatCard label="Machine" value={count("machine")} color={C.brass} onClick={() => setCatFilter("machine")} active={catFilter === "machine"} />
+        <StatCard label="Raw" value={count("raw")} color="#D97706" onClick={() => setCatFilter("raw")} active={catFilter === "raw"} />
+        <StatCard label="Low Stock" value={lowCount} color={lowCount ? C.stamp : C.sage} />
+      </div>
+
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "12px 14px", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 340 }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: 10, color: C.inkSoft }} />
+            <Field placeholder="Search item name, category or size…" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 0, padding: "8px 10px 8px 30px", fontSize: 13 }} />
+          </div>
+          <SegControl small value={catFilter} onChange={setCatFilter} options={[["all", "All"], ["rubber", "Rubber"], ["machine", "Machine"], ["raw", "Raw"]]} />
+          <div style={{ marginLeft: "auto", fontFamily: font.mono, fontSize: 11, color: C.inkSoft }}>{filtered.length} items</div>
+        </div>
+
+        {isDesktop ? (
+          <div style={{ overflow: "auto", maxHeight: "calc(100vh - 360px)", minHeight: 200 }}>
+            <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={th}>Item</th><th style={th}>Category</th><th style={th}>Size</th>
+                <th style={{ ...th, textAlign: "right" }}>Opening</th><th style={{ ...th, textAlign: "right" }}>In Stock</th><th style={{ ...th, textAlign: "right" }}>Rate</th><th style={{ ...th, width: 80 }} />
+              </tr></thead>
+              <tbody>
+                {filtered.map((r) => <tr key={r.id}>
+                  <td style={td}><div style={{ display: "flex", alignItems: "center", gap: 10 }}>{thumb(r)}<div style={{ fontFamily: font.body, fontWeight: 650, fontSize: 13 }}>{r.name}</div></div></td>
+                  <td style={td}>{catPill(r)}</td>
+                  <td style={td}>{catOf(r) === "rubber" && r.size ? r.size : "—"}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{Number(r.opening_stock || 0)}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{stockCell(r)}</td>
+                  <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>{inr(r.rate)}</td>
+                  <td style={td}>{actions(r)}</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ padding: 10 }}>
+            {filtered.map((r) => <div key={r.id} style={{ border: `1px solid ${C.line}`, borderRadius: 10, padding: "10px 12px", marginBottom: 8, display: "flex", gap: 10, alignItems: "center" }}>
+              {thumb(r, 44)}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 650, fontSize: 13.5 }}>{r.name}</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4, fontFamily: font.mono, fontSize: 10.5, color: C.inkSoft }}>
+                  {catPill(r)}{catOf(r) === "rubber" && r.size && <span>{r.size}</span>}<span>Stock: {stockCell(r)}</span><span>{inr(r.rate)}</span>
+                </div>
+              </div>
+              {actions(r)}
+            </div>)}
+          </div>
+        )}
+        {filtered.length === 0 && <EmptyNote text={q || catFilter !== "all" ? "No matching items." : "No items yet — Add Item dabayein."} />}
+      </div>
+
+      {modalOpen && <ModalShell title={editId ? "Edit Item" : "Add Item"} onClose={closeModal} width={460}>
+        {errMsg && <div style={{ marginBottom: 10, padding: 8, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
         <Label>Item Name</Label>
-        <Field value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Round Seal / Cutting Machine / Rubber Sheet" />
+        <Field value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Round Seal / Cutting Machine / Rubber Sheet" style={{ marginBottom: 10 }} />
         <Label>Category</Label>
-        <Select value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="machine">Machine</option><option value="raw">Raw</option><option value="rubber">Rubber</option>
-        </Select>
-        {category === "rubber" && <><Label>Impression Size (mm)</Label><Field value={size} onChange={(e) => setSize(e.target.value)} placeholder='e.g. 38 × 13 mm' /></>}
-        <Label>Opening Stock</Label><Field type="number" value={opening} onChange={(e) => setOpening(e.target.value)} />
-        <Label>Rate (₹)</Label><Field type="number" min="0" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="Selling rate" />
+        <div style={{ marginBottom: 10 }}><SegControl value={category} onChange={setCategory} options={[["rubber", "Rubber"], ["machine", "Machine"], ["raw", "Raw"]]} /></div>
+        {category === "rubber" && <><Label>Impression Size (mm)</Label><Field value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. 38 × 13 mm" style={{ marginBottom: 10 }} /></>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div><Label>Opening Stock</Label><Field type="number" value={opening} placeholder="0" onChange={(e) => setOpening(e.target.value)} style={{ marginBottom: 0 }} /></div>
+          <div><Label>Rate (₹)</Label><Field type="number" min="0" value={rate} placeholder="Selling rate" onChange={(e) => setRate(e.target.value)} style={{ marginBottom: 0 }} /></div>
+        </div>
         <Label>{category === "rubber" ? "Rubber Stamp Photo" : "Item Photo"}</Label>
-        <label style={{ display:"block", border:`1px dashed ${C.brass}`, borderRadius:8, padding:16, textAlign:"center", color:C.brass, fontSize:13, marginBottom:12, cursor:"pointer", overflow:"hidden" }}>
-          {photoPreview ? <img src={photoPreview} alt="Item" style={{ maxWidth:"100%", maxHeight:160, borderRadius:6 }} /> : "📷 Tap to capture / upload photo"}
-          <input type="file" accept="image/*" style={{display:"none"}} onChange={handlePhotoChange}/>
+        <label style={{ display: "block", border: `1px dashed ${C.brass}`, borderRadius: 8, padding: 12, textAlign: "center", color: C.brass, fontSize: 13, marginBottom: 14, cursor: "pointer", overflow: "hidden" }}>
+          {photoPreview ? <img src={photoPreview} alt="Item" style={{ maxWidth: "100%", maxHeight: 130, borderRadius: 6 }} /> : "📷 Tap to capture / upload photo"}
+          <input type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
         </label>
-        <Btn onClick={add} disabled={busy} style={{width:"100%",justifyContent:"center"}}><Plus size={16}/> {busy ? "Saving…" : "Add Item"}</Btn>
-      </Card>
-      <div style={{position:"relative",marginBottom:10}}><Search size={15} style={{position:"absolute",left:10,top:12,color:C.inkSoft}}/><Field placeholder="Search item name, category or size…" value={q} onChange={(e)=>setQ(e.target.value)} style={{paddingLeft:32}}/></div>
-      {filtered.map((r)=><Card key={r.id}>
-        {editId === r.id ? <div>
-          <Label>Item Name</Label><Field value={editName} onChange={(e)=>setEditName(e.target.value)}/>
-          <Label>Category</Label><Select value={editCategory} onChange={(e)=>setEditCategory(e.target.value)}><option value="machine">Machine</option><option value="raw">Raw</option><option value="rubber">Rubber</option></Select>
-          {editCategory === "rubber" && <><Label>Impression Size (mm)</Label><Field value={editSize} onChange={(e)=>setEditSize(e.target.value)} placeholder='e.g. 38 × 13 mm'/></>}
-          <Label>Opening Stock</Label><Field type="number" value={editOpening} onChange={(e)=>setEditOpening(e.target.value)}/>
-          <Label>Rate (₹)</Label><Field type="number" min="0" value={editRate} onChange={(e)=>setEditRate(e.target.value)} placeholder="Selling rate"/>
-          <Label>Item Photo</Label>
-          <label style={{display:"block",border:`1px dashed ${C.brass}`,borderRadius:8,padding:16,textAlign:"center",color:C.brass,fontSize:13,marginBottom:12,cursor:"pointer",overflow:"hidden"}}>{editPhotoPreview?<img src={editPhotoPreview} alt="Item" style={{maxWidth:"100%",maxHeight:160,borderRadius:6}}/>:"📷 Tap to capture / upload photo"}<input type="file" accept="image/*" style={{display:"none"}} onChange={handleEditPhotoChange}/></label>
-          <div style={{display:"flex",gap:8}}><Btn onClick={saveEdit} disabled={busy} style={{flex:1,justifyContent:"center"}}>{busy?"Saving…":"Save"}</Btn><Btn variant="ghost" onClick={()=>setEditId(null)} style={{flex:1,justifyContent:"center"}}>Cancel</Btn></div>
-        </div> : <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{display:"flex",gap:10,alignItems:"center"}}>
-            {r.photo_url?<img src={r.photo_url} alt={r.name} style={{width:40,height:40,borderRadius:8,objectFit:"cover",border:`1px solid ${C.line}`}}/>:<div style={{width:40,height:40,borderRadius:8,background:C.paperDark,border:`1px solid ${C.line}`,display:"flex",alignItems:"center",justifyContent:"center"}}><Package size={18} color={C.brass}/></div>}
-            <div><div style={{fontWeight:600,fontSize:13.5}}>{r.name}</div><div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:3}}><span style={{padding:"2px 7px",borderRadius:999,background:C.paperDark,fontFamily:font.mono,fontSize:9,fontWeight:700}}>{catLabel(r.category)}</span>{r.category === "rubber" && r.size && <span style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>Size: {r.size}</span>}<span style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>Opening: {r.opening_stock}</span><span style={{fontFamily:font.mono,fontSize:10,color:C.inkSoft}}>Rate: ₹{Number(r.rate||0).toFixed(2)}</span></div></div>
-          </div><div style={{display:"flex",gap:6}}><button onClick={()=>startEdit(r)} style={{background:"none",border:"none",color:C.brass,cursor:"pointer"}}><PenSquare size={16}/></button><button onClick={()=>remove(r.id)} style={{background:"none",border:"none",color:C.stamp,cursor:"pointer"}}><Trash2 size={16}/></button></div>
-        </div>}
-      </Card>)}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="ghost" onClick={closeModal} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
+          <Btn onClick={save} disabled={busy} style={{ flex: 2, justifyContent: "center" }}>{editId ? <Save size={15} /> : <Plus size={15} />} {busy ? "Saving…" : editId ? "Update Item" : "Add Item"}</Btn>
+        </div>
+      </ModalShell>}
     </div>
   );
 }
@@ -5323,6 +5426,10 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const [toDate, setToDate] = useState(todayISO());
   const [txnFilter, setTxnFilter] = useState("All");
   const [modalOpen, setModalOpen] = useState(false);
+  const [showExpLedger, setShowExpLedger] = useState(false);
+  const [expFrom, setExpFrom] = useState(todayISO().slice(0, 7) + "-01");
+  const [expTo, setExpTo] = useState(todayISO());
+  const [expHead, setExpHead] = useState("All");
   const isDesktop = useIsDesktop();
   useEffect(() => { if (!modalOpen) return; const h = (e) => { if (e.key === "Escape") resetManualForm(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [modalOpen]);
   const [reportMonth, setReportMonth] = useState(todayISO().slice(0, 7));
@@ -5337,15 +5444,20 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
   const expenseHead = (row) => {
     const categoryText = String(row.category || "").trim().toLowerCase();
     const noteText = String(row.note || "").trim().toLowerCase();
-    if (categoryText === "rent" || noteText === "rent" || noteText.includes("rent")) return "Rent";
-    if (categoryText === "electricity" || noteText.includes("electricity") || noteText.includes(" बिजली")) return "Electricity";
+    if (categoryText === "rent") return "Rent";
+    if (categoryText === "electricity") return "Electricity";
+    if (categoryText === "other expense") return "Other Expense";
+    // Older entries saved without a proper head: fall back to the note text.
+    if (noteText === "rent" || noteText.includes("rent")) return "Rent";
+    if (noteText.includes("electricity") || noteText.includes("बिजली")) return "Electricity";
     return row.category && row.category !== "Other Receipt" ? row.category : "Other Expense";
   };
   const monthExpenses = cashManual.filter(e => e.type === "out" && String(e.date || "").slice(0, 7) === reportMonth);
   const monthlyRent = monthExpenses.filter(e => expenseHead(e) === "Rent").reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthlyElectricity = monthExpenses.filter(e => expenseHead(e) === "Electricity").reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const monthlyOther = monthExpenses.filter(e => { const h = expenseHead(e); return h !== "Rent" && h !== "Electricity"; }).reduce((sum, e) => sum + Number(e.amount || 0), 0);
   const monthlyPurchase = purchases.filter(p => String(p.date || "").slice(0, 7) === reportMonth).reduce((sum, p) => sum + Number(p.total ?? p.amount ?? 0), 0);
-  const monthlyTotalExpense = monthlyRent + monthlyElectricity + monthlyPurchase;
+  const monthlyTotalExpense = monthlyRent + monthlyElectricity + monthlyOther + monthlyPurchase;
   const monthlyNet = monthlyTotalSale - monthlyTotalExpense;
 
   const inRange = (d) => (!fromDate || d >= fromDate) && (!toDate || d <= toDate);
@@ -5413,30 +5525,86 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
     const row = cashManual.find(c => c.id === txn.manualId);
     if (!row) return;
     setEditingExpenseId(row.id); setType(row.type === "out" ? "out" : "in");
-    setCategory(row.type === "out" ? (expenseHead(row) === "Other Expense" ? "Rent" : expenseHead(row)) : "Other Receipt");
+    setCategory(row.type === "out" ? (["Rent", "Electricity"].includes(expenseHead(row)) ? expenseHead(row) : "Other Expense") : "Other Receipt");
     setAmount(String(row.amount ?? "")); setNote(row.note || ""); setPaymentMode(row.payment_mode || "Cash"); setEntryDate(row.date || todayISO());
     setErrMsg(""); setModalOpen(true);
   };
   const exportCSV=()=>exportToCSV(`transactions-${txnFilter.toLowerCase()}-${todayISO()}.csv`,[...shown].reverse().map(t=>({Date:fmtDate(t.date),"Payment Mode":t.payment_mode||"Cash",Description:t.label,Note:t.note||"",Credit:t.type==="in"?t.amount:"",Debit:t.type==="out"?t.amount:"",Balance:rowBalance(t)})));
 
+  const expenseRowsAll = [
+    ...cashManual.filter(c => c.type === "out").map(c => ({ id: `m-${c.id}`, manualId: c.id, date: c.date, head: expenseHead(c), note: c.note || "", payment_mode: c.payment_mode || "Cash", amount: Number(c.amount || 0) })),
+    ...purchaseSingleEntries.map(x => ({ id: x.id, date: x.date, head: "Purchase", note: x.label, payment_mode: x.payment_mode, amount: x.amount }))
+  ].map(r => ({ ...r, head: ["Purchase", "Rent", "Electricity"].includes(r.head) ? r.head : "Other Expense", rawHead: r.head }));
+  const expenseRowsInRange = expenseRowsAll.filter(r => (!expFrom || r.date >= expFrom) && (!expTo || r.date <= expTo));
+  const expenseRowsShown = expenseRowsInRange.filter(r => expHead === "All" || r.head === expHead).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)));
+  const expHeadTotal = (h) => expenseRowsInRange.filter(r => h === "All" || r.head === h).reduce((a, r) => a + r.amount, 0);
+  const expShownTotal = expenseRowsShown.reduce((a, r) => a + r.amount, 0);
+  const exportExpenseCSV = () => exportToCSV(`expense-ledger-${todayISO()}.csv`, expenseRowsShown.map(r => ({ Date: fmtDate(r.date), "Expense Head": r.head, "Payment Mode": r.payment_mode, Note: r.note, Amount: r.amount })));
   const seg = (value, onChange, options, small) => <div style={{ display: "inline-flex", border: `1.5px solid ${C.line}`, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>{options.map(([val, label]) => <button key={val} type="button" onClick={() => onChange(val)} style={{ padding: small ? "7px 12px" : "8px 18px", border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 700, fontFamily: font.body, background: value === val ? C.headerGreen : C.white, color: value === val ? C.white : C.ink }}>{label}</button>)}</div>;
   const periodIn = shown.filter(t => t.type === "in").reduce((a, t) => a + t.amount, 0);
   const periodOut = shown.filter(t => t.type === "out").reduce((a, t) => a + t.amount, 0);
   const compactField = { marginBottom: 0, padding: "8px 10px", fontSize: 13 };
-  const registerCard = (title, icon, balance, tin, tout, mode, accent) => <div onClick={() => setTxnFilter(mode)} style={{ cursor: "pointer", background: C.white, border: `1.5px solid ${txnFilter === mode ? accent : C.line}`, borderLeft: `5px solid ${accent}`, borderRadius: 10, padding: "12px 16px" }}>
+  const registerCard = (title, icon, balance, tin, tout, mode, accent) => <div onClick={() => setTxnFilter(mode)} style={{ cursor: "pointer", background: C.white, borderStyle: "solid", borderWidth: "1.5px 1.5px 1.5px 5px", borderColor: `${txnFilter === mode ? accent : C.line} ${txnFilter === mode ? accent : C.line} ${txnFilter === mode ? accent : C.line} ${accent}`, borderRadius: 10, padding: "12px 16px" }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ fontWeight: 800, fontSize: 13.5 }}>{icon} {title}</div><div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>BALANCE</div></div>
     <div style={{ fontFamily: font.display, fontWeight: 800, fontSize: 28, color: balance < 0 ? C.stamp : C.ink, margin: "4px 0 6px" }}>{inr(balance)}</div>
     <div style={{ display: "flex", gap: 14, fontFamily: font.mono, fontSize: 11 }}><span style={{ color: C.sage }}>↓ आया {inr(tin)}</span><span style={{ color: C.stamp }}>↑ गया {inr(tout)}</span></div>
   </div>;
   return <div>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 10, borderBottom: `2px solid ${C.headerGreen}`, gap: 8, flexWrap: "wrap" }}>
-      <SectionTitle icon={Wallet} title="Bank & Cash" bare />
+      <SectionTitle icon={Wallet} title={showExpLedger ? "Expense Ledger" : "Bank & Cash"} bare />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Btn onClick={() => openAdd("in")} style={{ padding: "8px 14px", fontSize: 12.5, background: C.sage }}><Plus size={14} /> Cash In</Btn>
-        <Btn onClick={() => openAdd("out")} style={{ padding: "8px 14px", fontSize: 12.5, background: C.stamp }}><Plus size={14} /> Cash Out</Btn>
-        <Btn variant="ghost" onClick={exportCSV} style={{ padding: "7px 12px", fontSize: 12.5 }}><Download size={13} /> Export</Btn>
+        {showExpLedger
+          ? <><Btn variant="ghost" onClick={() => setShowExpLedger(false)} style={{ padding: "7px 12px", fontSize: 12.5 }}><ChevronLeft size={14} /> Bank & Cash</Btn>
+              <Btn onClick={() => openAdd("out")} style={{ padding: "8px 14px", fontSize: 12.5, background: C.stamp }}><Plus size={14} /> Add Expense</Btn></>
+          : <><Btn variant="ghost" onClick={() => { setShowExpLedger(true); setExpHead("All"); }} style={{ padding: "7px 12px", fontSize: 12.5 }}>📒 Expense Ledger</Btn>
+              <Btn onClick={() => openAdd("in")} style={{ padding: "8px 14px", fontSize: 12.5, background: C.sage }}><Plus size={14} /> Cash In</Btn>
+              <Btn onClick={() => openAdd("out")} style={{ padding: "8px 14px", fontSize: 12.5, background: C.stamp }}><Plus size={14} /> Cash Out</Btn></>}
+        <Btn variant="ghost" onClick={showExpLedger ? exportExpenseCSV : exportCSV} style={{ padding: "7px 12px", fontSize: 12.5 }}><Download size={13} /> Export</Btn>
       </div>
     </div>
+    {showExpLedger ? <div>
+      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(5, minmax(0,1fr))" : "repeat(2, minmax(0,1fr))", gap: 10, marginBottom: 14 }}>
+        {[["All", "Total Expense", C.ink], ["Purchase", "Purchase", C.brass], ["Rent", "Rent", C.headerGreen], ["Electricity", "Electricity", "#D97706"], ["Other Expense", "Other Expense", C.stamp]].map(([h, label, col]) =>
+          <div key={h} onClick={() => setExpHead(h)} style={{ cursor: "pointer", background: C.white, borderStyle: "solid", borderWidth: "4px 1.5px 1.5px 1.5px", borderColor: `${col} ${expHead === h ? col : C.line} ${expHead === h ? col : C.line} ${expHead === h ? col : C.line}`, borderRadius: 10, padding: "10px 14px" }}>
+            <div style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft, letterSpacing: 0.8 }}>{label.toUpperCase()}</div>
+            <div style={{ fontFamily: font.display, fontWeight: 800, fontSize: 22, marginTop: 3 }}>{inr(expHeadTotal(h))}</div>
+          </div>)}
+      </div>
+      <div style={{ background: C.white, border: `1px solid ${C.line}`, borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "12px 14px", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginRight: 4 }}>Expenses</div>
+          {seg(expHead, setExpHead, [["All", "All"], ["Purchase", "Purchase"], ["Rent", "Rent"], ["Electricity", "Electricity"], ["Other Expense", "Other"]], true)}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>FROM</span><Field type="date" value={expFrom} onChange={e => setExpFrom(e.target.value)} style={{ ...compactField, width: 138 }} />
+            <span style={{ fontFamily: font.mono, fontSize: 10, color: C.inkSoft }}>TO</span><Field type="date" value={expTo} onChange={e => setExpTo(e.target.value)} style={{ ...compactField, width: 138 }} />
+            <Btn variant="ghost" onClick={() => { setExpFrom(todayISO().slice(0, 7) + "-01"); setExpTo(todayISO()); setExpHead("All"); }} style={{ padding: "7px 10px", fontSize: 12 }}>This Month</Btn>
+          </div>
+        </div>
+        <div style={{ overflow: "auto", maxHeight: isDesktop ? "calc(100vh - 360px)" : "none", minHeight: isDesktop ? 220 : 0 }}>
+          <table style={{ width: "100%", minWidth: 600, borderCollapse: "collapse" }}>
+            <thead><tr>
+              {["Date", "Expense Head", "Mode", "Note"].map(h => <th key={h} style={{ ...thStyle, position: "sticky", top: 0, zIndex: 1, padding: "9px 10px" }}>{h}</th>)}
+              <th style={{ ...thStyle, textAlign: "right", position: "sticky", top: 0, zIndex: 1, padding: "9px 10px" }}>Amount</th>
+              <th style={{ ...thStyle, position: "sticky", top: 0, zIndex: 1, width: 56 }} />
+            </tr></thead>
+            <tbody>
+              {expenseRowsShown.slice(0, 300).map(r => <tr key={r.id}>
+                <td style={{ ...tdStyle, padding: "9px 10px", whiteSpace: "nowrap" }}>{fmtDate(r.date)}</td>
+                <td style={{ ...tdStyle, padding: "9px 10px", fontFamily: font.body, fontWeight: 700, fontSize: 12.5 }}>{r.head}</td>
+                <td style={{ ...tdStyle, padding: "9px 10px" }}><span style={{ fontSize: 9.5, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: r.payment_mode === "Bank" ? "#E3F1E6" : C.paperDark, color: r.payment_mode === "Bank" ? "#246B32" : C.brass }}>{r.payment_mode}</span></td>
+                <td style={{ ...tdStyle, padding: "9px 10px", fontFamily: font.body, fontSize: 12, color: C.inkSoft }}>{r.note || "—"}</td>
+                <td style={{ ...tdStyle, padding: "9px 10px", textAlign: "right", fontWeight: 800, color: C.stamp }}>{inr(r.amount)}</td>
+                <td style={{ ...tdStyle, padding: "9px 6px", textAlign: "center" }}>{r.manualId && <button title="Edit expense" aria-label="Edit expense" onClick={() => startEditExpense({ manualId: r.manualId })} style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color: C.brass, cursor: "pointer", padding: "3px 8px", fontSize: 11, fontWeight: 700 }}>Edit</button>}</td>
+              </tr>)}
+              {expenseRowsShown.length === 0 && <tr><td colSpan={6} style={{ ...tdStyle, textAlign: "center", padding: 26 }}>No expenses for the selected dates and head.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, padding: "10px 14px", borderTop: `1px solid ${C.line}`, background: C.paperDark, fontFamily: font.mono, fontSize: 11.5 }}>
+          <span>{expenseRowsShown.length} entries · {expHead}</span><span style={{ color: C.stamp, fontWeight: 800 }}>Total {inr(expShownTotal)}</span>
+        </div>
+      </div>
+    </div> : <>
 
     <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(3, minmax(0,1fr))" : "1fr", gap: 12, marginBottom: 14 }}>
       {registerCard("Cash Register", "💵", currentCashBalance, cashTotalIn, cashTotalOut, "Cash", C.brass)}
@@ -5497,15 +5665,17 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
           <Row label="Purchase" value={inr(monthlyPurchase)} />
           <Row label="Rent" value={inr(monthlyRent)} />
           <Row label="Electricity" value={inr(monthlyElectricity)} />
+          <Row label="Other Expense" value={inr(monthlyOther)} />
           <div style={{ borderTop: `1px solid ${C.line}`, margin: "6px 0" }} />
           <Row label="Total Expense" value={inr(monthlyTotalExpense)} bold />
           <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 9, background: monthlyNet >= 0 ? "#EAF4E8" : "#FBEAE7" }}>
-            <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>NET = SALE − PURCHASE − RENT − ELECTRICITY</div>
+            <div style={{ fontFamily: font.mono, fontSize: 9.5, color: C.inkSoft }}>NET = SALE − PURCHASE − RENT − ELECTRICITY − OTHER</div>
             <div style={{ fontWeight: 900, fontSize: 24, marginTop: 2, color: monthlyNet >= 0 ? "#2D7A35" : "#B42318" }}>{inr(monthlyNet)}</div>
           </div>
         </Card>
       </div>
     </div>
+    </>}
 
     {modalOpen && <div onClick={resetManualForm} style={{ position: "fixed", inset: 0, background: "rgba(38,50,65,0.45)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, maxHeight: "92vh", overflowY: "auto", background: C.white, borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,.28)", padding: 18 }}>
@@ -5516,12 +5686,12 @@ function LedgerTab({ purchases, entries, cashManual, rubbers, refresh }) {
         {errMsg && <div style={{ marginBottom: 10, padding: 8, background: "#FBEAE7", border: `1px solid ${C.stamp}`, borderRadius: 8, fontSize: 11.5, color: C.stampDark }}>{errMsg}</div>}
         {!editingExpenseId && <div style={{ marginBottom: 12 }}>{seg(type, (v) => { setType(v); setCategory(v === "in" ? "Other Receipt" : "Rent"); }, [["in", "Cash In"], ["out", "Cash Out"]])}</div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div><Label>{type === "out" ? "Expense Head" : "Category"}</Label><Select value={category} onChange={e => setCategory(e.target.value)} style={{ marginBottom: 0, padding: "8px 10px" }}>{type === "in" ? <option>Other Receipt</option> : <><option>Rent</option><option>Electricity</option></>}</Select></div>
+          <div><Label>{type === "out" ? "Expense Head" : "Category"}</Label><Select value={category} onChange={e => setCategory(e.target.value)} style={{ marginBottom: 0, padding: "8px 10px" }}>{type === "in" ? <option>Other Receipt</option> : <><option>Rent</option><option>Electricity</option><option>Other Expense</option></>}</Select></div>
           <div><Label>Payment Mode</Label>{seg(paymentMode, setPaymentMode, [["Cash", "Cash"], ["Bank", "Bank"]], true)}</div>
           <div><Label>Date</Label><Field type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={compactField} /></div>
           <div><Label>Amount (₹)</Label><Field type="number" value={amount} placeholder="0" onChange={e => setAmount(e.target.value)} style={compactField} /></div>
         </div>
-        <Label>Note (optional)</Label><Field value={note} onChange={e => setNote(e.target.value)} style={{ ...compactField, marginBottom: 14 }} />
+        <Label>{category === "Other Expense" ? "Note — kis cheez ka kharcha?" : "Note (optional)"}</Label><Field value={note} placeholder={category === "Other Expense" ? "e.g. chai, courier, repair" : ""} onChange={e => setNote(e.target.value)} style={{ ...compactField, marginBottom: 14 }} />
         <div style={{ display: "flex", gap: 8 }}>
           <Btn variant="ghost" onClick={resetManualForm} style={{ flex: 1, justifyContent: "center" }}>Cancel</Btn>
           <Btn onClick={addManual} style={{ flex: 2, justifyContent: "center" }}>{editingExpenseId ? <Save size={15} /> : <Plus size={15} />} {editingExpenseId ? "Update Entry" : "Add Entry"}</Btn>
