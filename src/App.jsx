@@ -3177,27 +3177,42 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     }
   };
 
-  // Opens a clean, print-accurate preview in a new tab without printing.
+  // Opens a print-sheet preview showing four impressions: original, -2mm, original, -2mm.
   const handlePreview = async () => {
     try {
       const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
-      const previewWindow = window.open("", "_blank", "width=900,height=800");
+      const smallWidthMm = Math.max(1, widthMm - 2);
+      const smallHeightMm = Math.max(1, heightMm - 2);
+      const previewWindow = window.open("", "_blank", "width=900,height=1000");
       if (!previewWindow) return;
+      const impressions = [
+        { width: widthMm, height: heightMm },
+        { width: smallWidthMm, height: smallHeightMm },
+        { width: widthMm, height: heightMm },
+        { width: smallWidthMm, height: smallHeightMm },
+      ];
       previewWindow.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Stamp Preview - ${widthMm}x${heightMm}mm</title>
+            <title>Stamp Print Preview - 4 Impressions</title>
             <style>
-              html, body { margin:0; min-height:100%; background:#f3f6fa; font-family:Arial,sans-serif; }
-              body { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; box-sizing:border-box; }
-              img { max-width:min(90vw,900px); max-height:80vh; width:auto; height:auto; object-fit:contain; background:#fff; box-shadow:0 8px 30px rgba(0,0,0,.14); }
+              @page { size: A4 portrait; margin: 0; }
+              * { box-sizing: border-box; }
+              html, body { margin:0; min-height:100%; background:#eef1f5; font-family:Arial,sans-serif; }
+              body { display:flex; flex-direction:column; align-items:center; padding:18px; gap:12px; }
+              .sheet { width:210mm; min-height:297mm; padding:12mm 8mm; background:#fff; box-shadow:0 6px 28px rgba(0,0,0,.14); display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:3mm; }
+              .impression { display:flex; align-items:center; justify-content:center; flex:none; }
+              .impression img { display:block; width:100%; height:100%; object-fit:fill; }
               .meta { color:#687587; font-size:13px; }
+              @media print { html,body { background:#fff; } body { padding:0; } .sheet { box-shadow:none; } }
             </style>
           </head>
           <body>
-            <img src="${dataUrl}" alt="Stamp preview" />
-            <div class="meta">${widthMm} × ${heightMm} mm</div>
+            <div class="sheet">
+              ${impressions.map((item) => `<div class="impression" style="width:${item.width}mm;height:${item.height}mm"><img src="${dataUrl}" alt="Stamp impression"></div>`).join("")}
+            </div>
+            <div class="meta">4 impressions • ${widthMm}×${heightMm} mm / ${smallWidthMm}×${smallHeightMm} mm</div>
           </body>
         </html>
       `);
@@ -3207,14 +3222,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     }
   };
 
-  // Prints the stamp directly (no PNG download, no Word import, no size headaches).
-  // Print uses one A4/3 feeder piece at a time; no 3-up copies are generated.
-  // scissors mark between each, so one sheet of butter paper yields 3 stamp
-  // impressions instead of wasting a whole sheet on a single print.
-  // Uses the same 600dpi source as Download — 300dpi was soft/blurry once the
-  // browser scaled the image up to the printer's actual resolution.
-  // Remember every printed design (small JPEG + label) so Stamp Entry can
-  // suggest it and attach its impression automatically.
+  // Prints all four impressions together on one A4 sheet. No UP/DOWN prompt.
   const recordPrintedStamp = async () => {
     if (customerMode) return;
     try {
@@ -3233,22 +3241,15 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   };
 
   const handlePrint = async () => {
-    const sideChoice = window.prompt("Print position choose karein:\n1 = UP SIDE (0 to 2.92 inch)\n2 = DOWN SIDE (2.92 to 5.84 inch)", "1");
-    if (sideChoice === null) return;
-    const printSide = sideChoice.trim().toLowerCase();
-    if (!["1", "2", "up", "down"].includes(printSide)) {
-      window.alert("Please 1 (UP SIDE) ya 2 (DOWN SIDE) select karein.");
-      return;
-    }
-    const isDownSide = printSide === "2" || printSide === "down";
     const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
-
-    // Print into one of two 2.92-inch-high bands on a portrait A4 sheet.
-    const feederWidthMm = 210;
-    const feederHeightMm = 297;
-    const bandHeightMm = 2.92 * 25.4;
-    const topOffsetMm = isDownSide ? bandHeightMm : 0;
-
+    const smallWidthMm = Math.max(1, widthMm - 2);
+    const smallHeightMm = Math.max(1, heightMm - 2);
+    const impressions = [
+      { width: widthMm, height: heightMm },
+      { width: smallWidthMm, height: smallHeightMm },
+      { width: widthMm, height: heightMm },
+      { width: smallWidthMm, height: smallHeightMm },
+    ];
     const printWindow = window.open("", "_blank", "width=800,height=1000");
     if (!printWindow) return;
     recordPrintedStamp();
@@ -3257,49 +3258,23 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Print Stamp - ${isDownSide ? "DOWN SIDE" : "UP SIDE"} - ${widthMm}x${heightMm}mm</title>
+          <title>Print Stamp - 4 Impressions</title>
           <style>
-            @page {
-              size: A4 portrait;
-              margin: 0;
-            }
-            * { box-sizing: border-box; }
-            html, body {
-              margin: 0;
-              padding: 0;
-              width: ${feederWidthMm}mm;
-              height: ${feederHeightMm}mm;
-              overflow: hidden;
-            }
-            .sheet {
-              position: absolute;
-              top: ${topOffsetMm}mm;
-              left: 0;
-              width: ${feederWidthMm}mm;
-              height: ${bandHeightMm}mm;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              overflow: hidden;
-            }
-            img {
-              width: ${widthMm}mm;
-              height: ${heightMm}mm;
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-              display: block;
-            }
+            @page { size:A4 portrait; margin:0; }
+            * { box-sizing:border-box; }
+            html, body { margin:0; padding:0; width:210mm; min-height:297mm; }
+            body { display:flex; justify-content:center; align-items:flex-start; }
+            .sheet { width:210mm; height:297mm; padding:12mm 8mm; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:3mm; overflow:hidden; }
+            .impression { display:flex; align-items:center; justify-content:center; flex:none; }
+            img { display:block; width:100%; height:100%; object-fit:fill; }
           </style>
         </head>
         <body>
           <div class="sheet">
-            <img src="${dataUrl}" />
+            ${impressions.map((item) => `<div class="impression" style="width:${item.width}mm;height:${item.height}mm"><img src="${dataUrl}" alt="Stamp impression"></div>`).join("")}
           </div>
           <script>
-            window.onload = function () {
-              setTimeout(function () { window.print(); }, 250);
-            };
+            window.onload = function () { setTimeout(function () { window.print(); }, 250); };
           </script>
         </body>
       </html>
