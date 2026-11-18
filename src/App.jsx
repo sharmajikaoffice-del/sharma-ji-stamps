@@ -3177,52 +3177,95 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     }
   };
 
-  // Opens a print-sheet preview showing four impressions: original, -2mm, original, -2mm.
+  // Build one print-ready sheet image so mobile print engines cannot drop repeated elements.
+  const buildFourImpressionSheet = async () => {
+    const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+    const scale = 10; // 10 pixels per millimetre
+    const gapMm = 3;
+    const topBottomMarginMm = 8;
+    const smallWidthMm = Math.max(1, widthMm - 2);
+    const smallHeightMm = Math.max(1, heightMm - 2);
+    const sizes = [
+      { width: widthMm, height: heightMm },
+      { width: smallWidthMm, height: smallHeightMm },
+      { width: widthMm, height: heightMm },
+      { width: smallWidthMm, height: smallHeightMm },
+    ];
+    const sheetWidthMm = 210;
+    const sheetHeightMm = topBottomMarginMm * 2 + sizes.reduce((sum, item) => sum + item.height, 0) + gapMm * 3;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(sheetWidthMm * scale);
+    canvas.height = Math.round(sheetHeightMm * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let yMm = topBottomMarginMm;
+    for (const item of sizes) {
+      const xMm = (sheetWidthMm - item.width) / 2;
+      ctx.drawImage(
+        image,
+        Math.round(xMm * scale),
+        Math.round(yMm * scale),
+        Math.round(item.width * scale),
+        Math.round(item.height * scale)
+      );
+      yMm += item.height + gapMm;
+    }
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      widthMm,
+      heightMm,
+      sheetHeightMm,
+      smallWidthMm,
+      smallHeightMm,
+    };
+  };
+
+  const openFourImpressionSheet = async (autoPrint = false) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const result = await buildFourImpressionSheet();
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Stamp Sheet - 4 Impressions</title>
+          <style>
+            @page { size: A4 portrait; margin: 0; }
+            * { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; background: #fff; }
+            body { width: 210mm; margin: 0 auto; }
+            .sheet-image { display:block; width:210mm; height:${result.sheetHeightMm}mm; max-width:none; }
+            @media screen { body { padding-top: 8px; } .sheet-image { box-shadow: 0 1px 8px #bbb; } }
+            @media print { html, body { width:210mm; margin:0; } .sheet-image { box-shadow:none; } }
+          </style>
+        </head>
+        <body>
+          <img class="sheet-image" src="${result.dataUrl}" alt="Four stamp impressions">
+          ${autoPrint ? '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>' : ''}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    return result;
+  };
+
   const handlePreview = async () => {
     try {
-      const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
-      const smallWidthMm = Math.max(1, widthMm - 2);
-      const smallHeightMm = Math.max(1, heightMm - 2);
-      const previewWindow = window.open("", "_blank", "width=900,height=1000");
-      if (!previewWindow) return;
-      const impressions = [
-        { width: widthMm, height: heightMm },
-        { width: smallWidthMm, height: smallHeightMm },
-        { width: widthMm, height: heightMm },
-        { width: smallWidthMm, height: smallHeightMm },
-      ];
-      previewWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Stamp Print Preview - 4 Impressions</title>
-            <style>
-              @page { size: A4 portrait; margin: 0; }
-              * { box-sizing: border-box; }
-              html, body { margin:0; min-height:100%; background:#eef1f5; font-family:Arial,sans-serif; }
-              body { display:flex; flex-direction:column; align-items:center; padding:18px; gap:12px; }
-              .sheet { width:210mm; min-height:297mm; padding:12mm 8mm; background:#fff; box-shadow:0 6px 28px rgba(0,0,0,.14); display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:3mm; }
-              .impression { display:flex; align-items:center; justify-content:center; flex:none; }
-              .impression img { display:block; width:100%; height:100%; object-fit:fill; }
-              .meta { color:#687587; font-size:13px; }
-              @media print { html,body { background:#fff; } body { padding:0; } .sheet { box-shadow:none; } }
-            </style>
-          </head>
-          <body>
-            <div class="sheet">
-              ${impressions.map((item) => `<div class="impression" style="width:${item.width}mm;height:${item.height}mm"><img src="${dataUrl}" alt="Stamp impression"></div>`).join("")}
-            </div>
-            <div class="meta">4 impressions • ${widthMm}×${heightMm} mm / ${smallWidthMm}×${smallHeightMm} mm</div>
-          </body>
-        </html>
-      `);
-      previewWindow.document.close();
+      await openFourImpressionSheet(false);
     } catch (err) {
-      console.error(err);
+      console.error("Could not build four-impression preview", err);
     }
   };
 
-  // Prints all four impressions together on one A4 sheet. No UP/DOWN prompt.
   const recordPrintedStamp = async () => {
     if (customerMode) return;
     try {
@@ -3241,45 +3284,12 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
   };
 
   const handlePrint = async () => {
-    const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
-    const smallWidthMm = Math.max(1, widthMm - 2);
-    const smallHeightMm = Math.max(1, heightMm - 2);
-    const impressions = [
-      { width: widthMm, height: heightMm },
-      { width: smallWidthMm, height: smallHeightMm },
-      { width: widthMm, height: heightMm },
-      { width: smallWidthMm, height: smallHeightMm },
-    ];
-    const printWindow = window.open("", "_blank", "width=800,height=1000");
-    if (!printWindow) return;
-    recordPrintedStamp();
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Print Stamp - 4 Impressions</title>
-          <style>
-            @page { size:A4 portrait; margin:0; }
-            * { box-sizing:border-box; }
-            html, body { margin:0; padding:0; width:210mm; min-height:297mm; }
-            body { display:flex; justify-content:center; align-items:flex-start; }
-            .sheet { width:210mm; height:297mm; padding:12mm 8mm; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:3mm; overflow:hidden; }
-            .impression { display:flex; align-items:center; justify-content:center; flex:none; }
-            img { display:block; width:100%; height:100%; object-fit:fill; }
-          </style>
-        </head>
-        <body>
-          <div class="sheet">
-            ${impressions.map((item) => `<div class="impression" style="width:${item.width}mm;height:${item.height}mm"><img src="${dataUrl}" alt="Stamp impression"></div>`).join("")}
-          </div>
-          <script>
-            window.onload = function () { setTimeout(function () { window.print(); }, 250); };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    try {
+      await openFourImpressionSheet(true);
+      recordPrintedStamp();
+    } catch (err) {
+      console.error("Could not print four impressions", err);
+    }
   };
 
   // Size + price picker shown right after tapping "New Stamp". Rendered on
