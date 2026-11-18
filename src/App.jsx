@@ -3258,11 +3258,35 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     return result;
   };
 
+  // Single-impression design preview (separate from the four-up print sheet).
   const handlePreview = async () => {
     try {
-      await openFourImpressionSheet(false);
+      const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
+      const previewWindow = window.open("", "_blank");
+      if (!previewWindow) return;
+      previewWindow.document.open();
+      previewWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Stamp Preview</title>
+            <style>
+              @page { size: A4 portrait; margin: 0; }
+              * { box-sizing: border-box; }
+              html, body { margin:0; padding:0; background:#eef1f5; }
+              .page { width:210mm; min-height:297mm; margin:0 auto; background:#fff; display:flex; align-items:flex-start; justify-content:center; padding-top:35mm; }
+              .stamp { display:block; width:${widthMm}mm; height:${heightMm}mm; object-fit:fill; }
+              @media screen { .page { box-shadow:0 2px 12px rgba(0,0,0,.15); } }
+              @media print { html,body { background:#fff; } .page { margin:0; box-shadow:none; } }
+            </style>
+          </head>
+          <body><main class="page"><img class="stamp" src="${dataUrl}" alt="Single stamp preview"></main></body>
+        </html>
+      `);
+      previewWindow.document.close();
     } catch (err) {
-      console.error("Could not build four-impression preview", err);
+      console.error("Could not open single stamp preview", err);
     }
   };
 
@@ -4963,23 +4987,14 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         (!isDesktop && view === "editor" && mobileEditorPanel !== "submit") ? null : (
           <Card id="mobile-stamp-submit" style={{ marginBottom: 24 }}>
             <div style={{ fontWeight: 750, fontSize: 17, marginBottom: 6 }}>Template</div>
-            {!customerMode && <Btn onClick={async () => {
-              const { dataUrl } = await generateStampJpegDataUrl(600);
-              const printWidthMm = Math.max(1, Number(selectedDimensions.widthMm) || 38);
-              const printHeightMm = Math.max(1, Number(selectedDimensions.heightMm) || 25);
-              const printWindow = window.open("", "_blank");
-              if (!printWindow) { window.print(); return; }
-              recordPrintedStamp();
-              printWindow.document.write(`<!doctype html><html><head><title>Stamp ${printWidthMm} x ${printHeightMm} mm</title><style>
-                @page{size:${printWidthMm}mm ${printHeightMm}mm;margin:0}
-                html,body{width:${printWidthMm}mm;height:${printHeightMm}mm;margin:0;padding:0;overflow:hidden}
-                body{display:flex;align-items:center;justify-content:center}
-                img{display:block;width:${printWidthMm}mm;height:${printHeightMm}mm;max-width:none;max-height:none;object-fit:fill}
-              </style></head><body><img src="${dataUrl}" alt="Stamp"><script>window.onload=()=>{window.print();};<\/script></body></html>`);
-              printWindow.document.close();
-            }} style={{ width: "100%", justifyContent: "center", marginBottom: 10, background: C.primary }}>
-              <Printer size={16} /> Print / Save PDF
-            </Btn>}
+            {!customerMode && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+              <Btn onClick={handlePreview} variant="ghost" style={{ width: "100%", justifyContent: "center", border: `1px solid ${C.line}`, color: STAMP_INK_BLUE, background: C.white }}>
+                <Eye size={16} /> Preview
+              </Btn>
+              <Btn onClick={handlePrint} style={{ width: "100%", justifyContent: "center", background: C.primary }}>
+                <Printer size={16} /> Print 4 Impressions
+              </Btn>
+            </div>}
             <div style={{ color: C.inkSoft, fontSize: 12, lineHeight: 1.45, marginBottom: 12 }}>
               {editingTemplateId ? "Existing template ko update karein, ya naam badal kar Save Template se naya template banayein." : "Is design ko template ke roop mein save karein."}
             </div>
