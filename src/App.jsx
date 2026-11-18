@@ -3258,7 +3258,7 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
     return result;
   };
 
-  // Single-impression design preview (separate from the four-up print sheet).
+  // Single-stamp preview at the selected stamp's own physical dimensions (not an A4 sheet).
   const handlePreview = async () => {
     try {
       const { dataUrl, widthMm, heightMm } = await generateStampJpegDataUrl(600);
@@ -3270,18 +3270,26 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
         <html>
           <head>
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Stamp Preview</title>
+            <title>Stamp Preview - ${widthMm} × ${heightMm} mm</title>
             <style>
-              @page { size: A4 portrait; margin: 0; }
               * { box-sizing: border-box; }
               html, body { margin:0; padding:0; background:#eef1f5; }
-              .page { width:210mm; min-height:297mm; margin:0 auto; background:#fff; display:flex; align-items:flex-start; justify-content:center; padding-top:35mm; }
-              .stamp { display:block; width:${widthMm}mm; height:${heightMm}mm; object-fit:fill; }
-              @media screen { .page { box-shadow:0 2px 12px rgba(0,0,0,.15); } }
-              @media print { html,body { background:#fff; } .page { margin:0; box-shadow:none; } }
+              body { min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; }
+              .stamp { display:block; width:${widthMm}mm; height:${heightMm}mm; max-width:calc(100vw - 24px); object-fit:fill; background:#fff; box-shadow:0 2px 12px rgba(0,0,0,.18); }
+              .size { position:fixed; bottom:12px; left:0; right:0; text-align:center; color:#536170; font:12px Arial,sans-serif; }
+              @media print {
+                @page { margin:0; }
+                html,body { background:#fff; min-height:0; }
+                body { display:block; padding:0; }
+                .stamp { width:${widthMm}mm; height:${heightMm}mm; max-width:none; box-shadow:none; }
+                .size { display:none; }
+              }
             </style>
           </head>
-          <body><main class="page"><img class="stamp" src="${dataUrl}" alt="Single stamp preview"></main></body>
+          <body>
+            <img class="stamp" src="${dataUrl}" alt="Stamp preview at actual selected size">
+            <div class="size">${widthMm} × ${heightMm} mm</div>
+          </body>
         </html>
       `);
       previewWindow.document.close();
