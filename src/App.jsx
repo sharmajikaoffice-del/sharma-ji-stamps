@@ -4350,7 +4350,33 @@ function CreateStampTab({ rubbers = [], customerMode = false, initialOrder = nul
           }),
         }}
       >
-        <button type="button" onClick={() => setView("templates")} style={{ ...toolbarPill, background: C.sage, color: C.white, ...(isDesktop ? {} : { padding: "8px", flexShrink: 0 }) }}>
+        <button
+          type="button"
+          title="Back to Templates"
+          aria-label="Back to Templates"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setSymbolPickerOpen(false);
+            setView("templates");
+          }}
+          style={{
+            ...toolbarPill,
+            background: C.sage,
+            color: C.white,
+            minWidth: isDesktop ? 82 : 38,
+            width: isDesktop ? 82 : 38,
+            height: 38,
+            flex: "0 0 auto",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+            justifyContent: "center",
+            padding: isDesktop ? "8px 10px" : "8px",
+            position: "relative",
+            zIndex: 5,
+            overflow: "visible",
+          }}
+        >
           <ChevronLeft size={16} />{isDesktop && " Back"}
         </button>
         <div style={{
